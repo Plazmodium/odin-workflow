@@ -1,0 +1,34 @@
+{
+  "name": "odin-workflow",
+  "version": "0.1.0",
+  "description": "Specification-Driven Development framework for AI-assisted coding",
+  "keywords": [
+    "sdd",
+    "specification-driven-development",
+    "ai-coding",
+    "mcp",
+    "claude",
+    "cursor",
+    "agents",
+    "workflow"
+  ],
+  "homepage": "https://github.com/Plazmodium/odin-workflow",
+  "bugs": {
+    "url": "https://github.com/Plazmodium/odin-workflow/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Plazmodium/odin-workflow.git"
+  },
+  "license": "MIT",
+  "author": "Gabor Racz",
+  "type": "module",
+  "scripts": {
+    "dashboard:dev": "cd dashboard && npm run dev",
+    "dashboard:build": "cd dashboard && npm run build",
+    "dashboard:start": "cd dashboard && npm start"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
