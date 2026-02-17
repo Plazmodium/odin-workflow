@@ -39,23 +39,7 @@ git clone https://github.com/Plazmodium/odin-workflow.git
 cd odin-workflow
 ```
 
-### 2. Set up Supabase
-
-Apply the migrations to your Supabase project:
-
-```bash
-# Using Supabase CLI
-supabase db push --db-url "postgresql://..." < migrations/001_schema.sql
-supabase db push --db-url "postgresql://..." < migrations/002_functions.sql
-supabase db push --db-url "postgresql://..." < migrations/003_views.sql
-supabase db push --db-url "postgresql://..." < migrations/004_seed.sql
-```
-
-Or apply via the Supabase Dashboard SQL Editor.
-
-See [docs/guides/SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) for detailed instructions.
-
-### 3. Configure your AI tool
+### 2. Configure your AI tool
 
 Add the Supabase MCP server to your tool's configuration:
 
@@ -74,6 +58,26 @@ Add the Supabase MCP server to your tool's configuration:
   }
 }
 ```
+
+### 3. Set up Supabase
+
+Once MCP is configured, ask your AI assistant to run the migrations:
+
+> "Apply the Odin migrations from the migrations/ folder to my Supabase project"
+
+The AI will use the Supabase MCP to apply all 4 migration files automatically.
+
+**Manual alternative** — run via Supabase CLI or Dashboard SQL Editor:
+
+```bash
+# Using Supabase CLI
+supabase db push --db-url "postgresql://..." < migrations/001_schema.sql
+supabase db push --db-url "postgresql://..." < migrations/002_functions.sql
+supabase db push --db-url "postgresql://..." < migrations/003_views.sql
+supabase db push --db-url "postgresql://..." < migrations/004_seed.sql
+```
+
+See [docs/guides/SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) for detailed instructions.
 
 ### 4. Start using Odin
 
