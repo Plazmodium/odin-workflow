@@ -19,7 +19,7 @@ Odin is an 8-phase workflow framework that makes AI coding assistants actually u
 
 1. **Spec-first**: Every feature starts with a specification, not code
 2. **Adaptive complexity**: Specs scale from 5-minute bug fixes (L1) to multi-day epics (L3)
-3. **9 specialized agents**: Each phase has a dedicated agent with clear responsibilities
+3. **8 specialized agents**: Each phase has a dedicated agent with clear responsibilities
 4. **Quality gates**: Guardian agent reviews specs before any code is written
 5. **Learnings system**: Capture insights, evolve knowledge, propagate to future sessions
 6. **EVALS**: Monitor feature and system health over time
@@ -122,11 +122,10 @@ All agents live in `agents/definitions/`:
 | Integrator | `integrator.md` | Build & runtime verification |
 | Documenter | `documenter.md` | Documentation generation |
 | Release | `release.md` | PR creation & archival |
-| Consultant | `spec-driven-dev-consultant.md` | Spec refinement (any phase) |
 
 All agents inherit shared context from `_shared-context.md`.
 
-See [ODIN.md](ODIN.md#the-9-agents) for agent details.
+See [ODIN.md](ODIN.md#the-8-agents) for agent details.
 
 ## Skills System
 
@@ -167,7 +166,7 @@ Or deploy manually — see [dashboard/README.md](dashboard/README.md).
 odin-workflow/
 ├── ODIN.md                 # Complete framework guide (start here)
 ├── agents/
-│   ├── definitions/        # 9 agent prompts
+│   ├── definitions/        # 8 agent prompts
 │   └── skills/             # 36+ domain skills
 ├── docs/
 │   ├── framework/          # Core concepts
