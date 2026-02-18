@@ -139,7 +139,7 @@ lib/
 - **Refresh indicator** — countdown timer in sidebar with pause/resume toggle
 - **Client Components only for interactivity** — React Flow, Recharts, filters, tabs, polling
 - **Server Actions for mutations** — refresh EVALS, acknowledge/resolve alerts
-- **Dark theme only** — CSS variables in `globals.css`
+- **Light/Dark theme toggle** — CSS variables in `globals.css`, toggle in sidebar
 - **`force-dynamic`** on all pages — prevents static prerendering (requires DB at runtime)
 
 ### Why Polling Instead of Supabase Realtime?
