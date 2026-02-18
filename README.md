@@ -238,7 +238,7 @@ Odin is in active development. The workflow is stable and used in production, bu
 
 ## Contributing
 
-Contributions welcome! Please read the workflow — Odin uses its own process for development.
+As Odin is currently in beta, contributions are closed for now. If you have feedback, ideas, or find issues, please [open an issue](https://github.com/Plazmodium/odin-workflow/issues) and we'll look into it.
 
 ## License
 
