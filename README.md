@@ -226,6 +226,7 @@ Monitor feature health (efficiency + quality) and system health over time.
 | **Claude Code** | Native | Task tool | Full support |
 | **OpenCode** | Native | Task tool | Full support |
 | **Cursor** | Recent | Composer | Full support |
+| **Codex CLI** | Yes | Custom agents | Full support |
 | **Windsurf** | Limited | Cascade | Partial |
 | **Continue.dev** | Yes | Custom agents | Full support |
 | **Aider** | No | None | Manual mode |
