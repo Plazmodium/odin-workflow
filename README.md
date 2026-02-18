@@ -1,9 +1,17 @@
-# Odin
+<p align="center">
+  <img src="assets/odin-logo.svg" alt="Odin Logo" width="128" height="128">
+</p>
 
-> Specification-Driven Development for AI-Assisted Coding
+<h1 align="center">Odin</h1>
 
-![Version](https://img.shields.io/badge/version-0.1.0--beta-orange)
-![License](https://img.shields.io/badge/license-MIT-blue)
+<p align="center">
+  <strong>Specification-Driven Development for AI-Assisted Coding</strong>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.1.0--beta-orange" alt="Version">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
+</p>
 
 ## The Problem
 
