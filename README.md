@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0--beta-orange" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.1.1--beta-orange" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
 </p>
 
@@ -235,7 +235,7 @@ Monitor feature health (efficiency + quality) and system health over time.
 
 ## Status
 
-**Version**: 0.1.0-beta
+**Version**: 0.1.1-beta
 
 Odin is in active development. The workflow is stable and used in production, but APIs may change.
 
