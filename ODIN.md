@@ -1,7 +1,7 @@
 # ODIN.md
 
 > **Odin** is a Specification-Driven Development (SDD) framework for AI-assisted development.
-> It provides 8 specialized agents, adaptive complexity levels, a learnings system with
+> It provides 9 specialized agents, adaptive complexity levels, a learnings system with
 > confidence scoring, and EVALS for health monitoring.
 
 ---
@@ -60,7 +60,7 @@ When developers use AI coding assistants without proper specifications:
 - **Adaptive complexity** (L1/L2/L3) - specs scale to match task size
 - **Learnings system** with confidence scoring and multi-target propagation
 - **EVALS** for health monitoring and performance diagnostics
-- **8-phase workflow** with 8 specialized agents
+- **8-phase workflow** with 9 specialized agents
 - **Skills system** with 36+ domain-specific knowledge modules
 
 ---
@@ -176,10 +176,10 @@ Before implementation, score your spec:
 
 ---
 
-## The 8 Agents
+## The 9 Agents
 
-| Agent | Phase | Role |
-|-------|-------|------|
+| Agent | Phases | Role |
+|-------|--------|------|
 | [Planner](agents/definitions/planning.md) | 0 | Epic decomposition for L3 features |
 | [Discovery](agents/definitions/discovery.md) | 1 | Requirements gathering from vague inputs |
 | [Architect](agents/definitions/architect.md) | 2 | Specification drafting and task breakdown |
@@ -188,6 +188,7 @@ Before implementation, score your spec:
 | [Integrator](agents/definitions/integrator.md) | 5 | Build and runtime verification |
 | [Documenter](agents/definitions/documenter.md) | 6 | Documentation generation |
 | [Release](agents/definitions/release.md) | 7 | PR creation and feature archival |
+| [Consultant](agents/definitions/spec-driven-dev-consultant.md) | Any | Spec refinement and analysis |
 
 All agents inherit shared context from [_shared-context.md](agents/definitions/_shared-context.md).
 
@@ -568,7 +569,7 @@ odin/
 ├── ODIN.md                    # This file
 ├── README.md                  # Quick start
 ├── agents/
-│   ├── definitions/           # 8 agent prompts + shared context
+│   ├── definitions/           # 9 agent prompts + shared context
 │   └── skills/                # 36+ domain skills
 ├── docs/
 │   ├── framework/             # SDD-framework.md, multi-agent-protocol.md

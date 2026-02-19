@@ -1,8 +1,8 @@
 ---
 name: nextjs-dev
-description: Next.js development — App Router, Server Components, Server Actions, data fetching patterns, and deployment
+description: Next.js development — App Router, Server Components, Server Actions, caching, data fetching patterns, and deployment
 category: frontend
-version: "14.x"
+version: "14.x - 16.x"
 depends_on:
   - react-patterns
 compatible_with:
@@ -16,7 +16,7 @@ compatible_with:
 
 ## Overview
 
-Next.js 14 with App Router provides Server Components by default, Server Actions for mutations, and streaming for progressive rendering. Prefer the App Router for all new projects.
+Next.js 14+ with App Router provides Server Components by default, Server Actions for mutations, and streaming for progressive rendering. Next.js 16 introduces Cache Components (`use cache` directive) and makes request-bound APIs async. Prefer the App Router for all new projects.
 
 ## Project Structure
 
@@ -28,6 +28,9 @@ app/
 ├── not-found.tsx       # 404 page
 ├── loading.tsx         # Loading skeleton (shown during streaming)
 ├── globals.css         # Global styles
+├── (admin)/            # Route group (no URL segment)
+│   └── dashboard/
+├── _internal/          # Private folder (opted out of routing)
 ├── features/
 │   └── [id]/
 │       └── page.tsx    # Dynamic route
@@ -45,6 +48,12 @@ lib/
 ├── types/              # TypeScript interfaces
 └── utils.ts            # Formatting helpers
 ```
+
+**Route Groups**: Use parentheses (e.g., `(admin)`) to group routes without affecting the URL path.
+
+**Private Folders**: Prefix with `_` (e.g., `_internal`) to opt out of routing and signal implementation details.
+
+**Feature Folders**: For large apps, group by feature (e.g., `app/dashboard/`, `app/auth/`).
 
 ## Core Patterns
 
@@ -116,6 +125,92 @@ export function createServerClient() {
   );
 }
 ```
+
+## Server and Client Component Integration
+
+**Never use `next/dynamic` with `{ ssr: false }` inside a Server Component.** This is not supported and will cause a build/runtime error.
+
+**Correct Approach:**
+
+1. Move all client-only logic/UI into a dedicated Client Component (with `'use client'` at the top)
+2. Import and use that Client Component directly in the Server Component
+3. No need for `next/dynamic` — just import the Client Component normally
+
+```typescript
+// Server Component
+import DashboardNavbar from '@/components/DashboardNavbar';
+
+export default async function DashboardPage() {
+  // ...server logic...
+  return (
+    <>
+      <DashboardNavbar /> {/* This is a Client Component */}
+      {/* ...rest of server-rendered page... */}
+    </>
+  );
+}
+```
+
+**Why**: Server Components cannot use client-only features or dynamic imports with SSR disabled. Client Components can be rendered inside Server Components, but not the other way around.
+
+## Next.js 16+ Async Request APIs
+
+In Next.js 16, request-bound APIs are async in the App Router:
+
+```typescript
+// Next.js 16+ — cookies, headers, draftMode are async
+import { cookies, headers } from 'next/headers';
+
+export default async function Page() {
+  const cookieStore = await cookies();
+  const headersList = await headers();
+  // ...
+}
+```
+
+**Route props may be Promises**: `params` and `searchParams` may be Promises in Server Components. Prefer awaiting them:
+
+```typescript
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  // ...
+}
+```
+
+**Dynamic rendering**: Accessing request data (cookies/headers/searchParams) opts the route into dynamic behavior. Read them intentionally and isolate dynamic parts behind `Suspense` boundaries when appropriate.
+
+## API Routes (Route Handlers)
+
+**Location**: Place API routes in `app/api/` (e.g., `app/api/users/route.ts`).
+
+```typescript
+// app/api/users/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const limit = searchParams.get('limit') ?? '10';
+  
+  // ... fetch data
+  return NextResponse.json({ users: [] });
+}
+
+export async function POST(request: NextRequest) {
+  const body = await request.json();
+  // ... validate and create
+  return NextResponse.json({ id: 'new-id' }, { status: 201 });
+}
+```
+
+**Dynamic Segments**: Use `[param]` for dynamic routes (e.g., `app/api/users/[id]/route.ts`).
+
+**Validation**: Always validate input with libraries like `zod`.
+
+**Performance Note**: Do NOT call your own Route Handlers from Server Components (e.g., `fetch('/api/...')`). Extract shared logic into `lib/` modules and call directly to avoid extra server hops.
 
 ## Auto-Refresh via Polling
 
@@ -192,17 +287,77 @@ export default async function Page() {
 
 > **Why sibling, not wrapper?** Wrapping an `async` Server Component return with a `'use client'` component breaks Next.js module resolution for dynamic routes (`[id]`). Always place Client Components as siblings using `<> ... </>`.
 
-## Build Gotchas (Next.js 14)
+## Caching & Revalidation
+
+### Next.js 14.x (fetch cache)
+
+Next.js 14 patches global `fetch` with `cache: 'force-cache'` by default. Override per-fetch or per-client to prevent stale data. See "Data Cache Gotcha" below.
+
+### Next.js 16.x (Cache Components)
+
+Enable in `next.config.*`:
+
+```javascript
+// next.config.mjs
+export default {
+  cacheComponents: true,
+};
+```
+
+Use the `use cache` directive to opt a component/function into caching:
+
+```typescript
+'use cache';
+
+export async function getCachedData() {
+  // This result will be cached
+  return await fetchExpensiveData();
+}
+```
+
+**Cache tagging and lifetimes**:
+
+```typescript
+import { cacheTag, cacheLife } from 'next/cache';
+
+export async function getProducts() {
+  'use cache';
+  cacheTag('products');      // Associate with tag
+  cacheLife('hours');        // Set cache lifetime
+  return await fetchProducts();
+}
+```
+
+**Revalidation**:
+
+```typescript
+import { revalidateTag } from 'next/cache';
+
+// In a Server Action
+export async function refreshProducts() {
+  'use server';
+  revalidateTag('products', 'max'); // stale-while-revalidate
+}
+```
+
+Prefer `revalidateTag(tag, 'max')` for most cases. Use `updateTag(...)` inside Server Actions when you need immediate consistency.
+
+## Build Gotchas (Next.js 14+)
 
 1. **`next.config.ts` not supported** in Next.js 14.2 — use `.mjs` or `.js`
+
 2. **`@apply border-border` fails** unless shadcn/ui color tokens are defined in `tailwind.config.ts` (need `border: 'hsl(var(--border))'` etc.)
+
 3. **Static prerendering fails** when pages use `import 'server-only'` Supabase client — add `export const dynamic = 'force-dynamic'` to all data-fetching pages
+
 4. **Hydration mismatch** — `typeof window !== 'undefined'` evaluates differently server vs client. Defer browser checks to `useEffect`:
 
    ```typescript
    const [isClient, setIsClient] = useState(false);
    useEffect(() => setIsClient(true), []);
    ```
+
+5. **`next/dynamic` with `{ ssr: false }` in Server Components** — Not supported. Move client-only logic to a dedicated Client Component and import it directly.
 
 ## Data Cache Gotcha: Stale Supabase Data (CRITICAL)
 
@@ -230,6 +385,74 @@ client = createClient(url, key, {
 **See also**: database/supabase (client setup with `cache: 'no-store'`)
 **Confidence**: 1.00 | **Validated by**: integration-test | **Source**: DASH-003
 
+## Naming Conventions
+
+### Files and Folders
+
+| Element | Convention | Example |
+|---------|------------|---------|
+| Folders | `kebab-case` | `user-profile/` |
+| Component files | `PascalCase` | `UserCard.tsx` |
+| Utility/hook files | `camelCase` | `useUser.ts` |
+| Static assets | `kebab-case` or `snake_case` | `logo-dark.svg` |
+| Context providers | `XyzProvider` | `ThemeProvider` |
+
+### Code
+
+| Element | Convention | Example |
+|---------|------------|---------|
+| Variables/Functions | `camelCase` | `getUserData` |
+| Types/Interfaces | `PascalCase` | `UserProfile` |
+| Constants | `UPPER_SNAKE_CASE` | `MAX_RETRIES` |
+
+## Component Best Practices
+
+**When to Create a Component:**
+- If a UI pattern is reused more than once
+- If a section of a page is complex or self-contained
+- If it improves readability or testability
+
+**Props:**
+- Use TypeScript interfaces for props
+- Prefer explicit prop types and default values
+
+```typescript
+interface UserCardProps {
+  user: User;
+  showAvatar?: boolean;
+}
+
+export function UserCard({ user, showAvatar = true }: UserCardProps) {
+  // ...
+}
+```
+
+**Component Location:**
+- Place shared components in `components/`
+- Place route-specific components inside the relevant route folder
+
+**Testing:**
+- Co-locate tests with components (e.g., `UserCard.test.tsx`)
+
+## Tooling Updates (Next.js 16)
+
+**Turbopack is the default dev bundler.** Configure via the top-level `turbopack` field in `next.config.*`:
+
+```javascript
+// next.config.mjs
+export default {
+  turbopack: {
+    // turbopack options
+  },
+};
+```
+
+**Typed routes are stable** via `typedRoutes: true` (TypeScript required).
+
+**ESLint**: In Next.js 16, prefer running ESLint via the ESLint CLI (not `next lint`).
+
+**Environment Variables**: `serverRuntimeConfig` / `publicRuntimeConfig` are removed. Use environment variables directly. Note that `NEXT_PUBLIC_` variables are inlined at build time.
+
 ## Best Practices
 
 1. **Server Components by default** — only add `'use client'` when you need hooks, event handlers, or browser APIs
@@ -240,4 +463,8 @@ client = createClient(url, key, {
 6. **Parallel data fetching** — use `Promise.all()` in Server Components to fetch data concurrently
 7. **Loading skeletons** — add `loading.tsx` per route for instant navigation feedback
 8. **Error boundaries** — add `error.tsx` per route (must be `'use client'`)
-9. **Virtual DOM** - Do not manipulate the real DOM. This breaks the oneway data data flow that React is built on. Use 'useState'.
+9. **Virtual DOM** — Do not manipulate the real DOM. Use `useState` for state changes.
+10. **TypeScript strict mode** — Enable `strict: true` in `tsconfig.json`
+11. **Validate all input** — Use libraries like `zod` for API routes and Server Actions
+12. **Use Suspense boundaries** — Isolate async data fetching for progressive loading
+13. **Avoid large client bundles** — Keep most logic in Server Components

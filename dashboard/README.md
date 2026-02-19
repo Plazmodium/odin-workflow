@@ -2,12 +2,6 @@
 
 Web-based dashboard for the Odin SDD Framework. Visualizes system health, feature progress, learnings evolution, and EVALS performance data from your Supabase database.
 
-## One-Click Deploy
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Plazmodium/odin-workflow/tree/main/dashboard&env=SUPABASE_URL,SUPABASE_SECRET_KEY,NEXT_PUBLIC_SUPABASE_URL&envDescription=Supabase%20credentials%20from%20Settings%20→%20API&project-name=odin-dashboard)
-
-> **Note:** This deploys the official Odin dashboard to your Vercel account. If you've forked/cloned this repo and made customizations, connect your fork directly via the [Vercel dashboard](https://vercel.com/new) instead.
-
 ## Pages
 
 | Route | Description |
@@ -40,12 +34,12 @@ Web-based dashboard for the Odin SDD Framework. Visualizes system health, featur
 ### 1. Prerequisites
 
 - Node.js 18+
-- A Supabase project with Odin migrations applied (see `../migrations/`)
+- A Supabase project with Odin migrations applied (see `system/database/supabase-migrations/`)
 
 ### 2. Install Dependencies
 
 ```bash
-cd dashboard
+cd system/dashboard
 npm install
 ```
 

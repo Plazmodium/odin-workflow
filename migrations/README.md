@@ -101,7 +101,7 @@ These consolidated migrations replace the original 28 development migrations (00
 - **Migration 023**: Added author field for multi-developer support
 - **Migration 026**: Added phase_outputs for structured artifacts
 
-The original development migrations are not included in this distribution.
+The original migrations are archived in `docs/archive/migrations/` for reference.
 
 ## Post-Consolidation Migrations
 
