@@ -3,12 +3,20 @@
  *
  * Server component wrapper that fetches data for the CommandPalette client component.
  * Placed in the root layout so it's available on every page.
+ * 
+ * Gracefully handles missing Supabase config during build by returning empty data.
  */
 
 import { getAllFeaturesSummary, getRecentLearnings } from '@/lib/data/health';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { CommandPalette } from './command-palette';
 
 export async function CommandPaletteServer() {
+  // During build, Supabase might not be configured yet - return empty palette
+  if (!isSupabaseConfigured()) {
+    return <CommandPalette features={[]} learnings={[]} />;
+  }
+
   const [features, learnings] = await Promise.all([
     getAllFeaturesSummary(),
     getRecentLearnings(20),

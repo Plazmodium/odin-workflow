@@ -10,6 +10,14 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 let client: SupabaseClient | null = null;
 
+/**
+ * Returns true if Supabase is configured (env vars present).
+ * Use this to gracefully handle missing config during build.
+ */
+export function isSupabaseConfigured(): boolean {
+  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY);
+}
+
 export function createServerClient(): SupabaseClient {
   if (client) return client;
 
@@ -17,6 +25,16 @@ export function createServerClient(): SupabaseClient {
   const key = process.env.SUPABASE_SECRET_KEY;
 
   if (!url || !key) {
+    // During Vercel build, env vars might not be available yet.
+    // Throw a clear error that will show in build logs.
+    const phase = process.env.NEXT_PHASE;
+    if (phase === 'phase-production-build') {
+      throw new Error(
+        'Supabase environment variables not available during build.\n' +
+        'Ensure SUPABASE_URL and SUPABASE_SECRET_KEY are set in Vercel Environment Variables.\n' +
+        'Go to: Vercel Dashboard → Your Project → Settings → Environment Variables'
+      );
+    }
     throw new Error(
       'Missing Supabase configuration. Set SUPABASE_URL and SUPABASE_SECRET_KEY in .env.local\n' +
       '(Find your secret key in: Supabase Dashboard → Settings → API → Secret keys)'
