@@ -14,6 +14,7 @@ import {
   Dialog,
   DialogContent,
   DialogClose,
+  DialogTitle,
 } from '@/components/ui/dialog';
 import { CopyButton } from '@/components/shared/copy-button';
 import { cn } from '@/lib/utils';
@@ -103,7 +104,7 @@ export function ArchiveFileModal({
       <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col p-0">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-          <h2 className="text-sm font-medium truncate">{fileName}</h2>
+          <DialogTitle className="text-sm font-medium truncate">{fileName}</DialogTitle>
           <div className="flex items-center gap-2">
             {content && (
               <CopyButton value={content} label="Copy" />
