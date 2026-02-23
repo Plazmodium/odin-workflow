@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react';
-import { FileText, Archive } from 'lucide-react';
+import { FileText, Archive, AlertTriangle } from 'lucide-react';
 import { cn, formatBytes, formatDate } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -66,7 +66,10 @@ export function ArchivesSection({
         {!isCompleted ? (
           <p className="text-sm text-muted-foreground">Archives available after completion</p>
         ) : !archive ? (
-          <p className="text-sm text-muted-foreground">No archives available</p>
+          <div className="flex items-center gap-2 text-sm text-amber-400">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>Feature is completed but archive metadata is missing</span>
+          </div>
         ) : !hasFiles ? (
           <p className="text-sm text-muted-foreground">No files in archive</p>
         ) : (

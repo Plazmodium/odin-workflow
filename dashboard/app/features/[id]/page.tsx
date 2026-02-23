@@ -45,7 +45,7 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
   const feature = await getFeatureStatus(id);
   if (!feature) notFound();
 
-  const [phases, agents, invocations, gates, blockers, eval_, learnings, transitions, iterations, commits, auditLog, phaseOutputs, archive] =
+  const [phases, agentDurationsResult, invocations, gates, blockers, eval_, learnings, transitions, iterations, commits, auditLog, phaseOutputs, archive] =
     await Promise.all([
       getPhaseDurations(id),
       getAgentDurations(id),
@@ -103,7 +103,7 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
             <CardTitle className="text-sm">Agent Duration Profiler</CardTitle>
           </CardHeader>
           <CardContent>
-            <AgentProfiler durations={agents} />
+            <AgentProfiler durations={agentDurationsResult.durations} error={agentDurationsResult.error} />
           </CardContent>
         </Card>
 
@@ -130,7 +130,7 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
           <CardTitle className="text-sm">Quality Gates</CardTitle>
         </CardHeader>
         <CardContent>
-          <QualityGatesTable gates={gates} />
+          <QualityGatesTable gates={gates} featureStatus={feature.status} />
         </CardContent>
       </Card>
 
