@@ -81,10 +81,76 @@ export async function getAgentDurations(
   }
 
   if (!data) {
+    return fallbackAgentDurations(supabase, featureId);
+  }
+
+  const durations = data as AgentDuration[];
+  if (durations.length > 0) {
+    return { durations, error: null };
+  }
+
+  // Fallback: if RPC returns empty despite invocations existing,
+  // aggregate directly from agent_invocations to keep profiler usable.
+  return fallbackAgentDurations(supabase, featureId);
+
+}
+
+async function fallbackAgentDurations(
+  supabase: ReturnType<typeof createServerClient>,
+  featureId: string
+): Promise<AgentDurationsResult> {
+  const { data, error } = await supabase
+    .from('agent_invocations')
+    .select('phase, agent_name, duration_ms, ended_at')
+    .eq('feature_id', featureId)
+    .not('ended_at', 'is', null)
+    .not('duration_ms', 'is', null);
+
+  if (error || !data || data.length === 0) {
     return { durations: [], error: null };
   }
 
-  return { durations: data as AgentDuration[], error: null };
+  const buckets = new Map<string, {
+    phase: AgentDuration['phase'];
+    agent_name: string;
+    durations: number[];
+  }>();
+
+  for (const row of data as Array<{ phase: AgentDuration['phase']; agent_name: string; duration_ms: number }>) {
+    const key = `${row.phase}::${row.agent_name}`;
+    const bucket = buckets.get(key);
+    if (bucket) {
+      bucket.durations.push(row.duration_ms);
+      continue;
+    }
+    buckets.set(key, {
+      phase: row.phase,
+      agent_name: row.agent_name,
+      durations: [row.duration_ms],
+    });
+  }
+
+  const durations: AgentDuration[] = Array.from(buckets.values())
+    .map((bucket) => {
+      const total = bucket.durations.reduce((sum, d) => sum + d, 0);
+      const min = Math.min(...bucket.durations);
+      const max = Math.max(...bucket.durations);
+      return {
+        phase: bucket.phase,
+        agent_name: bucket.agent_name,
+        invocation_count: bucket.durations.length,
+        total_duration_ms: total,
+        avg_duration_ms: Math.round(total / bucket.durations.length),
+        min_duration_ms: min,
+        max_duration_ms: max,
+      };
+    })
+    .sort((a, b) => {
+      if (a.phase === b.phase) return a.agent_name.localeCompare(b.agent_name);
+      return String(a.phase).localeCompare(String(b.phase), undefined, { numeric: true });
+    });
+
+  return { durations, error: null };
 }
 
 export async function getQualityGates(
