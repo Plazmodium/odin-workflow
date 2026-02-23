@@ -18,6 +18,15 @@ import type {
   PhaseOutput,
 } from '@/lib/types/database';
 
+export interface AgentDurationsResult {
+  durations: AgentDuration[];
+  error: string | null;
+}
+
+function formatMissingRpcError(functionName: string): string {
+  return `RPC function ${functionName} is missing in Supabase. Apply the latest migrations and verify the function exists.`;
+}
+
 export async function getFeatureStatus(
   featureId: string
 ): Promise<FeatureStatusResult | null> {
@@ -55,13 +64,27 @@ export async function getPhaseDurations(
 
 export async function getAgentDurations(
   featureId: string
-): Promise<AgentDuration[]> {
+): Promise<AgentDurationsResult> {
   const supabase = createServerClient();
   const { data, error } = await supabase.rpc('get_agent_durations', {
     p_feature_id: featureId,
   });
-  if (error || !data) return [];
-  return data as AgentDuration[];
+
+  if (error) {
+    const isMissingFunction = error.message.includes('Could not find the function public.get_agent_durations');
+    return {
+      durations: [],
+      error: isMissingFunction
+        ? formatMissingRpcError('get_agent_durations(p_feature_id)')
+        : error.message,
+    };
+  }
+
+  if (!data) {
+    return { durations: [], error: null };
+  }
+
+  return { durations: data as AgentDuration[], error: null };
 }
 
 export async function getQualityGates(

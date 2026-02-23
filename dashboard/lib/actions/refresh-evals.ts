@@ -6,6 +6,14 @@
 import { revalidatePath } from 'next/cache';
 import { createServerClient } from '@/lib/supabase';
 
+function formatRpcError(errorMessage: string, functionName: string): string {
+  if (errorMessage.includes(`Could not find the function public.${functionName}`)) {
+    return `RPC function ${functionName} is missing in Supabase. Apply the latest migrations and verify the function exists.`;
+  }
+
+  return errorMessage;
+}
+
 export async function refreshSystemHealth(periodDays: number = 7) {
   const supabase = createServerClient();
   const { error } = await supabase.rpc('compute_system_health', {
@@ -25,7 +33,10 @@ export async function refreshFeatureEval(featureId: string) {
     p_feature_id: featureId,
   });
   if (error) {
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: formatRpcError(error.message, 'compute_feature_eval'),
+    };
   }
   revalidatePath(`/features/${featureId}`);
   revalidatePath('/');

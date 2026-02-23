@@ -2,15 +2,26 @@ import { GateBadge } from '@/components/shared/status-badge';
 import { PhaseBadge } from '@/components/shared/phase-badge';
 import { EmptyState } from '@/components/layout/empty-state';
 import { formatDateTime } from '@/lib/utils';
-import { ShieldCheck } from 'lucide-react';
-import type { QualityGate } from '@/lib/types/database';
+import { AlertTriangle, ShieldCheck } from 'lucide-react';
+import type { FeatureStatus, QualityGate } from '@/lib/types/database';
 
 interface QualityGatesTableProps {
   gates: QualityGate[];
+  featureStatus: FeatureStatus;
 }
 
-export function QualityGatesTable({ gates }: QualityGatesTableProps) {
+export function QualityGatesTable({ gates, featureStatus }: QualityGatesTableProps) {
   if (gates.length === 0) {
+    if (featureStatus === 'COMPLETED') {
+      return (
+        <EmptyState
+          icon={<AlertTriangle className="h-6 w-6" />}
+          title="Missing quality gate"
+          description="Feature is completed but no Guardian approval gate is recorded"
+        />
+      );
+    }
+
     return (
       <EmptyState
         icon={<ShieldCheck className="h-6 w-6" />}

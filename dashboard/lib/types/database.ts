@@ -597,7 +597,7 @@ export interface PhaseOutput {
   feature_id: string;
   phase: Phase;
   output_type: PhaseOutputType;
-  content: RequirementItem[] | PerspectiveItem[] | TaskItem[];
+  content: unknown;
   created_by: string;
   created_at: string;
 }

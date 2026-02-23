@@ -7,9 +7,18 @@ import type { AgentDuration } from '@/lib/types/database';
 
 interface AgentProfilerProps {
   durations: AgentDuration[];
+  error?: string | null;
 }
 
-export function AgentProfiler({ durations }: AgentProfilerProps) {
+export function AgentProfiler({ durations, error = null }: AgentProfilerProps) {
+  if (error) {
+    return (
+      <p className="text-sm text-critical py-4 text-center">
+        {error}
+      </p>
+    );
+  }
+
   if (durations.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-4 text-center">

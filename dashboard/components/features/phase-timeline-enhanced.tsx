@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { ChevronDown, Clock, CheckCircle, XCircle, AlertTriangle, BookOpen, ListChecks, Eye, ClipboardList } from 'lucide-react';
 import { cn, formatMinutes, formatDuration, phaseName } from '@/lib/utils';
+import { getPhaseOutputArray } from '@/lib/phase-output-content';
 import { Badge } from '@/components/ui/badge';
 import { GATE_COLORS, BLOCKER_SEVERITY_COLORS } from '@/lib/constants';
 import type {
@@ -114,7 +115,7 @@ export function PhaseTimelineEnhanced({
   for (const output of phaseOutputs) {
     if (output.output_type === 'tasks') {
       // Always overwrite — we iterate in phase order (ascending), so last wins
-      latestTasks = (output.content as TaskItem[]).map((t) => ({
+      latestTasks = getPhaseOutputArray<TaskItem>(output.content, ['tasks']).map((t) => ({
         ...t,
         status: normalizeTaskStatus(t.status),
       }));
@@ -279,10 +280,10 @@ export function PhaseTimelineEnhanced({
                 <div>
                   <h5 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
                     <ClipboardList className="h-3 w-3" />
-                    Requirements ({(output.content as RequirementItem[]).length})
+                    Requirements ({getPhaseOutputArray<RequirementItem>(output.content, ['functional_requirements', 'requirements']).length})
                   </h5>
                   <div className="space-y-1">
-                    {(output.content as RequirementItem[]).map((req) => (
+                    {getPhaseOutputArray<RequirementItem>(output.content, ['functional_requirements', 'requirements']).map((req) => (
                       <div key={req.id} className="flex items-center gap-2 text-xs">
                         <span className="font-mono text-muted-foreground/60 shrink-0 w-12">{req.id}</span>
                         <span className="flex-1 truncate">{req.title}</span>
@@ -299,10 +300,10 @@ export function PhaseTimelineEnhanced({
                 <div>
                   <h5 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
                     <Eye className="h-3 w-3" />
-                    Perspectives ({(output.content as PerspectiveItem[]).length})
+                    Perspectives ({getPhaseOutputArray<PerspectiveItem>(output.content, ['perspectives']).length})
                   </h5>
                   <div className="space-y-2">
-                    {(output.content as PerspectiveItem[]).map((p) => (
+                    {getPhaseOutputArray<PerspectiveItem>(output.content, ['perspectives']).map((p) => (
                       <div key={p.name} className="space-y-0.5">
                         <div className="flex items-center gap-2 text-xs">
                           <span className="font-medium">{p.name}</span>
@@ -322,7 +323,7 @@ export function PhaseTimelineEnhanced({
               )}
 
               {output.output_type === 'tasks' && (() => {
-                const tasks = (output.content as TaskItem[]);
+                const tasks = getPhaseOutputArray<TaskItem>(output.content, ['tasks']);
                 const normalizedTasks = tasks.map((t) => ({ ...t, status: normalizeTaskStatus(t.status) }));
                 const done = normalizedTasks.filter((t) => t.status === 'completed').length;
                 return (
