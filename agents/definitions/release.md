@@ -56,6 +56,7 @@ Every step must be executed or explicitly marked N/A with justification. No sile
 
 | # | Step | Status |
 |---|------|--------|
+| 0 | Agent Invocation Coverage Validation (mandatory guardrail) | ⬜ |
 | 1 | Pre-Release Checks (dev branch stable, tests pass) | ⬜ |
 | 2 | Deploy to Staging (staging environment) | ⬜ |
 | 3 | UAT (optional, user acceptance testing) | ⬜ |
@@ -70,6 +71,47 @@ Every step must be executed or explicitly marked N/A with justification. No sile
 ---
 
 ## Release Process
+
+### Step 0: Agent Invocation Coverage Validation (Mandatory)
+
+Run coverage validation before any Phase 7 release actions.
+
+**Pre-release checkpoint**: phases 1-6 must be present and completed (`ended_at IS NOT NULL`, `duration_ms IS NOT NULL`).
+
+```sql
+WITH expected AS (
+  SELECT * FROM (VALUES
+    ('1'::phase, 'discovery-agent'::text),
+    ('2'::phase, 'architect-agent'::text),
+    ('3'::phase, 'guardian-agent'::text),
+    ('4'::phase, 'builder-agent'::text),
+    ('5'::phase, 'integrator-agent'::text),
+    ('6'::phase, 'documenter-agent'::text)
+  ) AS t(phase, agent_name)
+), actual AS (
+  SELECT phase, agent_name
+  FROM agent_invocations
+  WHERE feature_id = :feature_id
+    AND ended_at IS NOT NULL
+    AND duration_ms IS NOT NULL
+)
+SELECT e.phase, e.agent_name
+FROM expected e
+LEFT JOIN actual a
+  ON a.phase = e.phase
+ AND a.agent_name = e.agent_name
+WHERE a.phase IS NULL;
+```
+
+**If missing rows are returned (FAIL):**
+- Record gate failure: `gate_name = 'agent_invocation_coverage'`, `status = 'REJECTED'`
+- Create/update blocker with missing phase/agent pairs
+- Stop release flow immediately (do not continue to Step 1+, do not create PR)
+
+**Final checkpoint before completion**: phases 1-7 must pass coverage before `complete_feature(...)`.
+The database-level guardrail in `complete_feature(...)` enforces this and blocks completion when coverage is incomplete.
+
+---
 
 ### Step 1: Pre-Release Checks
 
@@ -136,6 +178,7 @@ Risks with impact and mitigation
 ### Step 5: Create Pull Request (NEVER Merge Directly)
 
 **CRITICAL**: Create a PR and let the human merge it. NEVER merge PRs yourself.
+Only execute this step if Step 0 telemetry coverage validation has PASS status.
 
 ```bash
 # Push the feature branch (if not already pushed)
@@ -215,6 +258,9 @@ Document rollback notification: what happened, impact, actions taken, next steps
 
 After stable release, archive feature files:
 
+Before calling `complete_feature(...)`, run final coverage validation for phases 1-7 (including `release-agent`).
+If it fails, stop and remediate telemetry coverage first.
+
 **Archive** (to `workflow-archives/[ID]/`): requirements.md, spec-approved.md, tasks.md, context.md, review.md, implementation-notes.md
 
 **Delete** (drafts): spec-draft-v*.md, iteration-report.md, context-references.md
@@ -262,6 +308,7 @@ After stable release, archive feature files:
 
 ### Pre-Release
 - [ ] Tests passing, CI/CD green, no blockers, docs complete
+- [ ] Agent invocation telemetry coverage PASS (phases 1-6 before PR; phases 1-7 before complete)
 
 ### Staging
 - [ ] Deployed, smoke tests passed, no regressions

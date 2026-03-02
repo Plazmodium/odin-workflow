@@ -36,10 +36,23 @@ export function AgentProfiler({ durations, error = null }: AgentProfilerProps) {
     const entry: Record<string, string | number> = { phase: phaseName(phase) };
     agents.forEach((agent) => {
       const match = durations.find((d) => d.phase === phase && d.agent_name === agent);
-      entry[agent] = match ? Math.round(match.total_duration_ms / 1000) : 0;
+      const rawDuration = match ? Number(match.total_duration_ms) : 0;
+      entry[agent] = Number.isFinite(rawDuration) ? Math.round(rawDuration / 1000) : 0;
     });
     return entry;
   });
+
+  const hasNonZeroDuration = chartData.some((entry) =>
+    agents.some((agent) => Number(entry[agent]) > 0)
+  );
+
+  if (!hasNonZeroDuration) {
+    return (
+      <p className="text-sm text-muted-foreground py-4 text-center">
+        Agent invocations exist, but durations are all 0s. Complete invocations with measured runtime to render the graph.
+      </p>
+    );
+  }
 
   return (
     <div className="h-64">
