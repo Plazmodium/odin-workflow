@@ -76,7 +76,7 @@ When developers use AI coding assistants without proper specifications:
 | 4 | Builder | Builder | Implementation |
 | 5 | Integrator | Integrator | Build verification |
 | 6 | Documenter | Documenter | Documentation generation |
-| 7 | Release | Release | PR creation and archival |
+| 7 | Release | Release | PR creation and archival (telemetry gate required) |
 
 ```
 All features: PLANNING -> DISCOVERY -> ARCHITECT -> GUARDIAN -> BUILDER -> INTEGRATOR -> DOCUMENTER -> RELEASE
@@ -487,6 +487,66 @@ Before closing any bug fix, ask: *Is this a learning?* If the fix involved a non
 
 A passing `npm run build` does NOT guarantee correctness. Integrator must spot-check runtime behavior.
 
+### Agent Invocation Coverage Gate (Release)
+
+Before Phase 7 release actions and before calling `complete_feature(...)`, the orchestrator MUST verify agent invocation telemetry coverage.
+
+**Coverage requirement by checkpoint**:
+- Before PR/release actions: phases **1-6** must have completed invocations
+- Before `complete_feature(...)`: phases **1-7** must have completed invocations
+
+**Expected phase/agent mapping**:
+- `1` -> `discovery-agent`
+- `2` -> `architect-agent`
+- `3` -> `guardian-agent`
+- `4` -> `builder-agent`
+- `5` -> `integrator-agent`
+- `6` -> `documenter-agent`
+- `7` -> `release-agent`
+
+**Validation query**:
+```sql
+WITH expected AS (
+  SELECT * FROM (VALUES
+    ('1'::phase, 'discovery-agent'::text),
+    ('2'::phase, 'architect-agent'::text),
+    ('3'::phase, 'guardian-agent'::text),
+    ('4'::phase, 'builder-agent'::text),
+    ('5'::phase, 'integrator-agent'::text),
+    ('6'::phase, 'documenter-agent'::text),
+    ('7'::phase, 'release-agent'::text)
+  ) AS t(phase, agent_name)
+), actual AS (
+  SELECT phase, agent_name
+  FROM agent_invocations
+  WHERE feature_id = :feature_id
+    AND ended_at IS NOT NULL
+    AND duration_ms IS NOT NULL
+)
+SELECT e.phase, e.agent_name
+FROM expected e
+LEFT JOIN actual a
+  ON a.phase = e.phase
+ AND a.agent_name = e.agent_name
+WHERE a.phase IS NULL;
+```
+
+**Pass/fail rule**:
+- **PASS**: query returns zero rows
+- **FAIL**: query returns one or more missing phase/agent pairs
+
+**On FAIL (mandatory)**:
+1. Record quality gate failure with `gate_name = 'agent_invocation_coverage'` and status `REJECTED` (fail semantic)
+2. Create/update a blocker listing missing phase/agent pairs
+3. Halt release progression (do not create PR, do not call `complete_feature(...)`)
+
+**Remediation (explicit only, never silent)**:
+- Optional backfill may derive invocations from `phase_transitions`
+- Backfilled rows must include explicit notes about the source
+- Re-run coverage validation and proceed only after PASS
+
+**Important**: Dashboard fallback aggregation is display resilience only. It does not satisfy workflow correctness.
+
 ---
 
 ## Architecture Notes
@@ -667,6 +727,8 @@ SELECT * FROM approve_gate(
 ```sql
 SELECT * FROM complete_feature('FEAT-001', 'release-agent');
 ```
+
+> **Precondition**: Agent invocation coverage must pass before calling `complete_feature(...)`.
 
 ---
 

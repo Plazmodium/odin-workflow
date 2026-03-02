@@ -236,7 +236,123 @@ COMMENT ON FUNCTION transition_phase IS 'Transition feature to a new phase with 
 -- Complete a feature
 CREATE OR REPLACE FUNCTION complete_feature(p_feature_id TEXT, p_completed_by TEXT)
 RETURNS BOOLEAN AS $$
+DECLARE
+  v_missing_pairs TEXT;
 BEGIN
+  -- Agent invocation telemetry coverage guardrail (phases 1-7)
+  WITH expected AS (
+    SELECT *
+    FROM (VALUES
+      ('1'::phase, 'discovery-agent'::text),
+      ('2'::phase, 'architect-agent'::text),
+      ('3'::phase, 'guardian-agent'::text),
+      ('4'::phase, 'builder-agent'::text),
+      ('5'::phase, 'integrator-agent'::text),
+      ('6'::phase, 'documenter-agent'::text),
+      ('7'::phase, 'release-agent'::text)
+    ) AS t(phase, agent_name)
+  ),
+  actual AS (
+    SELECT DISTINCT phase, agent_name
+    FROM agent_invocations
+    WHERE feature_id = p_feature_id
+      AND ended_at IS NOT NULL
+      AND duration_ms IS NOT NULL
+  ),
+  missing AS (
+    SELECT e.phase, e.agent_name
+    FROM expected e
+    LEFT JOIN actual a
+      ON a.phase = e.phase
+     AND a.agent_name = e.agent_name
+    WHERE a.phase IS NULL
+  )
+  SELECT string_agg(
+    format('phase %s -> %s', m.phase::TEXT, m.agent_name),
+    ', '
+    ORDER BY m.phase::TEXT, m.agent_name
+  )
+  INTO v_missing_pairs
+  FROM missing m;
+
+  IF v_missing_pairs IS NOT NULL THEN
+    -- Record gate failure (status REJECTED conveys FAIL semantics)
+    INSERT INTO quality_gates (
+      feature_id, gate_name, phase, status, approver, approval_notes, decision_log
+    ) VALUES (
+      p_feature_id,
+      'agent_invocation_coverage',
+      '7',
+      'REJECTED',
+      p_completed_by,
+      'Missing completed agent invocation telemetry: ' || v_missing_pairs,
+      'Completion blocked by telemetry coverage guardrail'
+    )
+    ON CONFLICT (feature_id, gate_name, phase)
+    DO UPDATE SET
+      status = EXCLUDED.status,
+      approver = EXCLUDED.approver,
+      approved_at = now(),
+      approval_notes = EXCLUDED.approval_notes,
+      decision_log = EXCLUDED.decision_log;
+
+    -- Create or refresh blocker with missing phase/agent pairs
+    IF NOT EXISTS (
+      SELECT 1
+      FROM blockers
+      WHERE feature_id = p_feature_id
+        AND phase = '7'
+        AND blocker_type = 'VALIDATION_FAILED'
+        AND title = 'Agent invocation telemetry coverage failed'
+        AND status IN ('OPEN', 'IN_PROGRESS')
+    ) THEN
+      INSERT INTO blockers (
+        feature_id, blocker_type, phase, status, severity, title, description, created_by
+      ) VALUES (
+        p_feature_id,
+        'VALIDATION_FAILED',
+        '7',
+        'OPEN',
+        'HIGH',
+        'Agent invocation telemetry coverage failed',
+        'Missing completed agent invocation telemetry: ' || v_missing_pairs,
+        p_completed_by
+      );
+    ELSE
+      UPDATE blockers
+      SET status = 'OPEN',
+          severity = 'HIGH',
+          description = 'Missing completed agent invocation telemetry: ' || v_missing_pairs,
+          escalation_notes = 'Coverage guardrail re-checked and still failing'
+      WHERE feature_id = p_feature_id
+        AND phase = '7'
+        AND blocker_type = 'VALIDATION_FAILED'
+        AND title = 'Agent invocation telemetry coverage failed'
+        AND status IN ('OPEN', 'IN_PROGRESS');
+    END IF;
+
+    -- Reflect blocked state in feature status
+    UPDATE features
+    SET status = 'BLOCKED',
+        updated_at = now()
+    WHERE id = p_feature_id
+      AND status <> 'COMPLETED';
+
+    -- Audit log
+    INSERT INTO audit_log (feature_id, operation, agent_name, details) VALUES (
+      p_feature_id,
+      'AGENT_INVOCATION_COVERAGE_FAILED',
+      p_completed_by,
+      jsonb_build_object(
+        'missing_pairs', v_missing_pairs,
+        'checkpoint', 'complete_feature'
+      )
+    );
+
+    RAISE NOTICE 'Cannot complete feature % - missing telemetry coverage: %', p_feature_id, v_missing_pairs;
+    RETURN FALSE;
+  END IF;
+
   -- Check for open blockers
   IF EXISTS (SELECT 1 FROM blockers WHERE feature_id = p_feature_id AND status = 'OPEN') THEN
     RAISE EXCEPTION 'Cannot complete feature % - has open blockers', p_feature_id;
@@ -271,7 +387,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SET search_path = public;
 
-COMMENT ON FUNCTION complete_feature IS 'Mark feature as completed, transition to phase 8, compute eval';
+COMMENT ON FUNCTION complete_feature IS 'Mark feature as completed, transition to phase 8, compute eval. Returns FALSE if telemetry coverage guardrail fails.';
 
 -- Create a blocker (matches live DB: uses p_severity, returns INTEGER)
 CREATE OR REPLACE FUNCTION create_blocker(
