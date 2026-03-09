@@ -1,6 +1,6 @@
 # Odin SDD Framework - Database Migrations
 
-This directory contains the consolidated database schema for Odin. These 4 files replace the original 28 development migrations, providing a clean starting point for new installations.
+This directory contains the consolidated database schema for Odin plus post-consolidation v2 migrations. The base 4 files replace the original 28 development migrations, providing a clean starting point for new installations.
 
 ## Quick Start
 
@@ -18,6 +18,15 @@ Run these migrations in order on a fresh Supabase project:
 
 -- 4. Seed data (batch templates)
 \i 004_seed.sql
+
+-- 5. Odin v2 schema extensions
+\i 005_odin_v2_schema.sql
+
+-- 6. Odin v2 functions
+\i 006_odin_v2_functions.sql
+
+-- 7. Odin v2 phase alignment
+\i 007_odin_v2_phase_alignment.sql
 ```
 
 Or via Supabase MCP:
@@ -35,6 +44,9 @@ Or via Supabase MCP:
 | `002_functions.sql` | Business logic | 30+ functions (workflow, invocations, git, learnings, evals) |
 | `003_views.sql` | Dashboard views | 12 views (features, learnings, evals, batch) |
 | `004_seed.sql` | Initial data | 5 batch templates |
+| `005_odin_v2_schema.sql` | v2 schema extensions | Product/Reviewer-ready phase enum, watcher/security tables |
+| `006_odin_v2_functions.sql` | v2 verification functions | Claims, policy engine, watcher review, security helpers |
+| `007_odin_v2_phase_alignment.sql` | v2 phase remap | Historical phase remap + v2 phase-numbering overrides |
 
 ## Schema Summary
 
@@ -74,10 +86,10 @@ Or via Supabase MCP:
 SELECT * FROM create_feature('FEAT-001', 'My Feature', 2, 'ROUTINE', NULL, NULL, 'orchestrator', 'jd', 'main', 'John Doe');
 
 -- Transition to a new phase (enforces sequential ordering — no skipping!)
-SELECT * FROM transition_phase('FEAT-001', '2'::phase, 'architect-agent', 'Spec complete');
+SELECT * FROM transition_phase('FEAT-001', '3'::phase, 'architect-agent', 'Spec complete');
 
 -- Track agent work duration
-SELECT * FROM start_agent_invocation('FEAT-001', '2'::phase, 'architect-agent', 'Generating spec', ARRAY['frontend/nextjs-dev']);
+SELECT * FROM start_agent_invocation('FEAT-001', '3'::phase, 'architect-agent', 'Generating spec', ARRAY['frontend/nextjs-dev']);
 SELECT * FROM end_agent_invocation(invocation_id);
 
 -- Complete a feature (computes eval)
@@ -114,9 +126,88 @@ These migrations were applied after the initial consolidation:
 
 **Note**: These changes are already incorporated into the consolidated `002_functions.sql` file. They are listed here for audit trail purposes.
 
+## Odin v2 Migrations
+
+These migrations extend Odin for v2 features. **Run AFTER the base migrations (001-004).**
+
+| Migration | Description |
+|-----------|-------------|
+| `005_odin_v2_schema.sql` | New enums, tables for 11-phase workflow, watchers, security findings |
+| `006_odin_v2_functions.sql` | Functions for claims, policy engine, watcher reviews, security findings |
+| `007_odin_v2_phase_alignment.sql` | Remaps persisted phase values and overrides core workflow functions to use v2 numbering |
+
+### v2 Features
+
+**11-Phase Workflow:**
+```
+Planning(0) → Product(1) → Discovery(2) → Architect(3) → Guardian(4) 
+→ Builder(5) → Reviewer(6) → Integrator(7) → Documenter(8) → Release(9) → Complete(10)
+```
+
+**New Tables:**
+
+| Table | Purpose |
+|-------|---------|
+| `agent_claims` | Structured claims from Builder/Integrator/Release for verification |
+| `policy_verdicts` | Results from deterministic Policy Engine checks |
+| `watcher_reviews` | Results from LLM Watcher escalation reviews |
+| `security_findings` | SAST findings from Semgrep (Reviewer phase) |
+
+**New Enums:**
+
+| Enum | Values |
+|------|--------|
+| `claim_type` | CODE_ADDED, CODE_MODIFIED, TEST_PASSED, BUILD_SUCCEEDED, etc. |
+| `verification_status` | PENDING, PASS, FAIL, NEEDS_REVIEW |
+| `finding_severity` | INFO, LOW, MEDIUM, HIGH, CRITICAL |
+
+**Key Functions:**
+
+```sql
+-- Submit a claim from an agent
+SELECT * FROM submit_claim('FEAT-001', '5'::phase, 'builder-agent', 'CODE_ADDED', 
+  'Added login component', '{"commit_sha": "abc123", "file_paths": ["src/login.tsx"]}'::jsonb, 'LOW');
+
+-- Run policy checks (deterministic)
+SELECT * FROM run_policy_checks('FEAT-001');
+
+-- Get claims needing watcher review
+SELECT * FROM get_claims_needing_review('FEAT-001');
+
+-- Record watcher review (LLM escalation)
+SELECT * FROM record_watcher_review(claim_id, 'PASS', 'Code change verified against spec', 'watcher-agent');
+
+-- Record security finding from Semgrep
+SELECT * FROM record_security_finding('FEAT-001', 'semgrep', 'HIGH', 
+  'Potential SQL injection', 'src/api/users.ts', 42, 'sql-injection');
+
+-- Check if can proceed past Reviewer
+SELECT * FROM can_proceed_past_reviewer('FEAT-001');
+```
+
+### Running v2 Migrations
+
+```sql
+-- After running 001-004, run v2 migrations:
+\i 005_odin_v2_schema.sql
+\i 006_odin_v2_functions.sql
+\i 007_odin_v2_phase_alignment.sql
+```
+
+**Important**: Run `007_odin_v2_phase_alignment.sql` immediately after `005` and `006`, before any v2 workflow activity creates rows in `agent_claims`, `policy_verdicts`, `watcher_reviews`, or `security_findings`.
+
+Or via Supabase MCP:
+```javascript
+// Run via mcp_supabase_apply_migration with name '005_odin_v2_schema'
+// Then run '006_odin_v2_functions'
+// Then run '007_odin_v2_phase_alignment'
+```
+
+---
+
 ## Version
 
-- **Schema Version**: 1.0.1
+- **Schema Version**: 2.0.0
 - **Created**: 2026-02-16
-- **Last Updated**: 2026-02-16 (phase enforcement + schema drift fixes)
+- **Last Updated**: 2026-03-09 (Odin v2 phase alignment migration added)
 - **Consolidated from**: Migrations 001-028

@@ -4,6 +4,26 @@ This file contains common patterns and references shared across all SDD agents. 
 
 ---
 
+## The 11-Phase Workflow (Odin v2)
+
+| Phase | Name | Agent | Watched? | Description |
+|-------|------|-------|----------|-------------|
+| 0 | Planning | Planner | No | Epic decomposition (L3 only) |
+| 1 | Product | Product | No | PRD generation (complexity-gated) |
+| 2 | Discovery | Discovery | No | Requirements gathering |
+| 3 | Architect | Architect | No | Specification drafting |
+| 4 | Guardian | Guardian | No | PRD + Spec review |
+| 5 | Builder | Builder | **YES** | Implementation |
+| 6 | Reviewer | Reviewer | No | SAST/security scan |
+| 7 | Integrator | Integrator | **YES** | Build verification |
+| 8 | Documenter | Documenter | No | Documentation |
+| 9 | Release | Release | **YES** | PR creation + archival |
+| 10 | Complete | - | No | Feature done |
+
+**Watched agents** (Builder, Integrator, Release) emit structured claims that are verified by the Policy Engine and optionally the LLM Watcher.
+
+---
+
 ## Hybrid Orchestration Model
 
 Odin uses a **hybrid orchestration** model:
@@ -24,18 +44,21 @@ Every agent artifact must end with this section:
 ---
 ## State Changes Required
 
-### 1. Track Duration
-- **Phase**: [0-8]
+### 1. Submit Claims (if watched agent: Builder, Integrator, Release)
+[Include structured claims with type, description, risk level, evidence refs]
+
+### 2. Track Duration
+- **Phase**: [0-10]
 - **Agent**: [Your agent name]
 - **Operation**: [Brief description]
 
-### 2. Transition Phase (if applicable)
+### 3. Transition Phase (if applicable)
 - **Feature ID**: [ID]
 - **From Phase**: [N]
 - **To Phase**: [N+1]
 - **Transitioned By**: [Agent name]
 
-### 3. Create Blocker (if applicable)
+### 4. Create Blocker (if applicable)
 - **Blocker Type**: [SPEC_AMBIGUITY | MISSING_CONTEXT | TECHNICAL_IMPOSSIBILITY | EXTERNAL_DEPENDENCY | INTEGRATION_CONFLICT | DURATION_EXCEEDED | ITERATION_LIMIT_EXCEEDED | QUALITY_GATE_REJECTED | OTHER]
 - **Phase**: [N]
 - **Severity**: [LOW | MEDIUM | HIGH | CRITICAL]
@@ -53,6 +76,58 @@ Agent work duration is tracked automatically by the orchestrator using `start_ag
 **If an operation is taking excessively long** (e.g., unbounded iteration, runaway complexity):
 - Stop and document a `DURATION_EXCEEDED` blocker
 - Include what was completed and what remains
+
+---
+
+## Watcher Verification (Builder, Integrator, Release Only)
+
+**Builder, Integrator, and Release are watched agents.** They must emit structured claims for verification.
+
+### How Verification Works
+
+1. **Agent emits claim** (in State Changes Required section)
+2. **Policy Engine** (SQL) performs deterministic checks:
+   - Evidence refs present?
+   - Phase order correct?
+   - Required gates approved?
+3. **If PASS**: Claim verified, workflow continues
+4. **If NEEDS_REVIEW**: Escalated to LLM Watcher for semantic verification
+
+### Escalation Triggers (Any One Triggers LLM Watcher)
+
+- Claim marked `HIGH` risk
+- Evidence refs missing or empty
+- Policy check inconclusive
+
+### Claim Format
+
+```markdown
+### Claim: [CLAIM_TYPE]
+
+- **Claim Type**: CODE_ADDED | CODE_MODIFIED | CODE_DELETED | TEST_ADDED | TEST_PASSED | BUILD_SUCCEEDED | INTEGRATION_VERIFIED | PR_CREATED | ARCHIVE_CREATED
+- **Description**: What was done
+- **Risk Level**: LOW | MEDIUM | HIGH
+- **Evidence Refs**:
+  ```json
+  {
+    "commit_sha": "abc123",
+    "file_paths": ["src/file.ts"],
+    "spec_sections": ["4.2"],
+    "test_output_hash": "sha256:...",
+    ...
+  }
+  ```
+```
+
+### Risk Level Guidelines
+
+| Risk Level | When to Use |
+|------------|-------------|
+| **LOW** | Tests, docs, styling, non-critical code |
+| **MEDIUM** | Business logic, API endpoints, data transformations |
+| **HIGH** | Authentication, authorization, payments, PII, security, deletions |
+
+**HIGH risk claims ALWAYS escalate to LLM Watcher.**
 
 ---
 
@@ -188,15 +263,16 @@ If bugs are found post-release:
 
 ## CRITICAL: NEVER Skip Phases OR Steps
 
-**All 8 phases must be executed for every feature.** This is enforced at the database level — `transition_phase()` will reject any attempt to skip a phase.
+**All 11 phases must be executed for every feature.** This is enforced at the database level — `transition_phase()` will reject any attempt to skip a phase.
 
 **All steps within each phase must also be executed.** Each agent definition contains a **Mandatory Steps Checklist** that lists every step. No step may be silently skipped.
 
-- Forward transitions must be sequential: 0→1→2→3→4→5→6→7
+- Forward transitions must be sequential: 0→1→2→3→4→5→6→7→8→9
 - Complexity level (L1/L2/L3) affects **depth** within each phase and step, not which phases or steps run
 - An L1 phase can be a single sentence, but it must still be recorded
 - An L1 step can produce minimal output, but it must still execute
 - When documenting State Changes, always use `To Phase: [current + 1]`
+- Phase 10 (Complete) is set by `complete_feature()`, not by `transition_phase()`
 
 **If you think a phase or step is unnecessary**: You're wrong. Execute it briefly. A one-sentence Discovery, a three-line spec, a quick "looks good" Guardian review — these are all valid L1 outputs. If a step truly does not apply (e.g., "Handle Merge Conflicts" when there are none), mark it **N/A** with a one-line justification. Never silently skip it.
 
@@ -214,7 +290,7 @@ Before each phase, the orchestrator MUST:
 **Enforcement levels**:
 | Level | What | Enforced By | Mechanism |
 |-------|------|-------------|-----------|
-| Phase | All 8 phases run | Database | `transition_phase()` rejects skips |
+| Phase | All 11 phases run (0-10) | Database | `transition_phase()` rejects skips |
 | Step | All steps within a phase run | Agent checklist | Orchestrator verifies each step |
 
 **Complexity affects depth, not coverage**:
@@ -231,7 +307,7 @@ Before each phase, the orchestrator MUST:
 - Try to call MCP tools directly (you don't have access)
 - Skip documenting State Changes Required
 - Proceed without skills loaded
-- **Skip phases** — all 8 phases must execute, even for L1 tasks (see above)
+- **Skip phases** — all 11 phases must execute, even for L1 tasks (see above)
 - **Skip steps** — all steps within your phase must execute, even for L1 tasks (see above)
 - Continue past reasonable duration for your phase (document DURATION_EXCEEDED blocker and stop)
 - Make up file paths or code patterns — use only what you can verify from context

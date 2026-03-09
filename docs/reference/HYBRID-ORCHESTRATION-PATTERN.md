@@ -47,13 +47,13 @@ After completing this requirements document, the orchestrator should:
    - Complexity: Level 2
 
 2. **Track Duration**:
-   - Phase: 0 (Discovery)
+   - Phase: 2 (Discovery)
    - Agent: Discovery
    - Operation: Requirements gathering
 
 3. **Transition Phase**:
-   - From: Phase 1 (Discovery)
-   - To: Phase 2 (Architect)
+   - From: Phase 2 (Discovery)
+   - To: Phase 3 (Architect)
    - Next Agent: Architect
 ```
 

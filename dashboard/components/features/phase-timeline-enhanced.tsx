@@ -62,7 +62,8 @@ function normalizeTaskStatus(status: string): 'pending' | 'in_progress' | 'compl
   return 'pending';
 }
 
-const ALL_PHASES: Phase[] = ['0', '1', '2', '3', '4', '5', '6', '7', '8'];
+// Odin v2: 11 phases (0-10)
+const ALL_PHASES: Phase[] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
 
 export function PhaseTimelineEnhanced({
   phases,
@@ -77,8 +78,9 @@ export function PhaseTimelineEnhanced({
   const [expandedPhase, setExpandedPhase] = useState<Phase | null>(null);
   const phaseMap = new Map(phases.map((p) => [p.phase, p]));
   // If feature is COMPLETED, treat all phases as done regardless of currentPhase value
+  // Odin v2: 11 phases (0-10), so 11 means "beyond all phases"
   const isFeatureCompleted = featureStatus === 'COMPLETED';
-  const currentPhaseNum = isFeatureCompleted ? 9 : parseInt(currentPhase, 10);
+  const currentPhaseNum = isFeatureCompleted ? 11 : parseInt(currentPhase, 10);
 
   // Group data by phase
   const invocationsByPhase = new Map<string, AgentInvocation[]>();

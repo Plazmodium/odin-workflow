@@ -51,12 +51,13 @@ Task-spawned agents **do not have MCP access**. Only the main orchestrator sessi
 | `SKILLS-SYSTEM.md` | Composable domain-specific knowledge |
 | `docs/archive/CHECKPOINT-6.5-STATUS.md` | Implementation status |
 
-### The 8-Phase Workflow
+### The 11-Phase Workflow
 
 ```
-Level 3 Epics: PLANNING → DISCOVERY → ARCHITECT → GUARDIAN → BUILDER → INTEGRATOR → DOCUMENTER → RELEASE
-Level 1-2:                DISCOVERY → ARCHITECT → GUARDIAN → BUILDER → INTEGRATOR → DOCUMENTER → RELEASE
+All features: PLANNING → PRODUCT → DISCOVERY → ARCHITECT → GUARDIAN → BUILDER → REVIEWER → INTEGRATOR → DOCUMENTER → RELEASE → COMPLETE
 ```
+
+Complexity level affects depth within each phase, not which phases run.
 
 See `agents/definitions/` for complete agent definitions.
 

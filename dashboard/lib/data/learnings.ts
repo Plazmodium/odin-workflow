@@ -11,6 +11,7 @@ import type {
   LearningChainItem,
   LearningChainSummary,
   SkillPropagationItem,
+  SkillPropagationItemWithStatus,
   PropagationStatus,
   LearningPropagationOverview,
 } from '@/lib/types/database';
@@ -153,7 +154,7 @@ export async function getSkillPropagationQueue(): Promise<
 }
 
 export async function getAllSkillPropagationTargets(): Promise<
-  import('@/lib/types/database').SkillPropagationItemWithStatus[]
+  SkillPropagationItemWithStatus[]
 > {
   const supabase = createServerClient();
 

@@ -96,8 +96,68 @@ As a Builder, document the following state changes in your `implementation-notes
 1. **Feature Lock** (start) — request orchestrator acquire lock
 2. **Duration** — tracked automatically by orchestrator
 3. **Blockers** — document any issues preventing implementation
-4. **Lock Release** (end) — ALWAYS document, even if blocked
-5. **Phase Transition** — after successful completion, request transition to Phase 5 (Integrator)
+4. **Claims** — emit structured claims for each major action (see below)
+5. **Lock Release** (end) — ALWAYS document, even if blocked
+6. **Phase Transition** — after successful completion, request transition to Phase 6 (Reviewer)
+
+---
+
+## Emitting Structured Claims (Watcher Verification)
+
+**Builder is a watched agent.** After each major action, you must emit a structured claim. The Policy Engine (deterministic SQL checks) verifies claims automatically. HIGH risk claims or claims with missing evidence are escalated to the LLM Watcher for semantic verification.
+
+### When to Emit Claims
+
+| Action | Claim Type | Risk Level |
+|--------|------------|------------|
+| Create new file | `CODE_ADDED` | LOW (single file) / MEDIUM (multiple) / HIGH (security-related) |
+| Modify existing file | `CODE_MODIFIED` | MEDIUM (default) / HIGH (auth, payment, security) |
+| Delete file | `CODE_DELETED` | HIGH (always) |
+| Add tests | `TEST_ADDED` | LOW |
+| Tests pass | `TEST_PASSED` | LOW (if evidence) / HIGH (if no evidence) |
+| Build succeeds | `BUILD_SUCCEEDED` | LOW |
+
+### Claim Format
+
+Document each claim in your `implementation-notes.md`:
+
+```markdown
+### Claim: CODE_ADDED
+
+- **Claim Type**: CODE_ADDED
+- **Description**: Implemented JWT authentication service with login endpoint
+- **Risk Level**: HIGH (security-related code)
+- **Evidence Refs**:
+  ```json
+  {
+    "commit_sha": "abc123def456",
+    "file_paths": ["src/services/auth.ts", "src/routes/login.ts"],
+    "spec_sections": ["4.2", "4.3"]
+  }
+  ```
+```
+
+### Risk Level Guidelines
+
+| Risk Level | When to Use |
+|------------|-------------|
+| **LOW** | Non-critical code, tests, documentation, styling |
+| **MEDIUM** | Business logic, API endpoints, data transformations |
+| **HIGH** | Authentication, authorization, payments, PII handling, security, data deletion |
+
+**HIGH risk claims are ALWAYS escalated to the LLM Watcher** for semantic verification, regardless of evidence completeness.
+
+### Evidence Requirements
+
+Every claim should include evidence refs to enable verification:
+
+- **`commit_sha`**: Git commit containing the change
+- **`file_paths`**: Files created/modified/deleted
+- **`spec_sections`**: Spec sections this implements
+- **`test_output_hash`**: (for TEST_PASSED) Hash of test output
+- **`build_log_hash`**: (for BUILD_SUCCEEDED) Hash of build log
+
+**Missing evidence triggers Watcher escalation.** Include evidence whenever possible.
 
 ---
 
@@ -427,7 +487,39 @@ npm test          # ✅ All tests passing
 npm run build     # ✅ Build passes with zero errors
 ```
 
-**CRITICAL**: Always run the build before ending the Builder phase. A passing test suite does not guarantee the build will succeed — TypeScript type errors, import issues, and configuration problems are only caught by the full build. The Integrator will also verify the build, but catching errors here avoids unnecessary phase transitions.
+**CRITICAL**: Always run the build before ending the Builder phase. A passing test suite does not guarantee the build will succeed — TypeScript type errors, import issues, and configuration problems are only caught by the full build. The Reviewer and Integrator will also verify, but catching errors here avoids unnecessary phase transitions.
+
+**Emit claims for test and build results**:
+
+```markdown
+### Claim: TEST_PASSED
+
+- **Claim Type**: TEST_PASSED
+- **Description**: All 8 acceptance criteria tests passing
+- **Risk Level**: LOW
+- **Evidence Refs**:
+  ```json
+  {
+    "test_count": 8,
+    "test_output_hash": "sha256:abc123...",
+    "coverage_percent": 95
+  }
+  ```
+
+### Claim: BUILD_SUCCEEDED
+
+- **Claim Type**: BUILD_SUCCEEDED
+- **Description**: TypeScript build completed with zero errors
+- **Risk Level**: LOW
+- **Evidence Refs**:
+  ```json
+  {
+    "build_log_hash": "sha256:def456...",
+    "error_count": 0,
+    "warning_count": 2
+  }
+  ```
+```
 
 #### 5b. Self-Review Checklist
 
@@ -476,18 +568,21 @@ Update `implementation-notes.md`:
 ```markdown
 ## State Changes Required
 
-### 1. Release Feature Lock
+### 1. Submit Claims (for Watcher Verification)
+[Include all claims from implementation - CODE_ADDED, CODE_MODIFIED, TEST_PASSED, BUILD_SUCCEEDED]
+
+### 2. Release Feature Lock
 - **Feature ID**: AUTH-001-jwt-login
 - **Agent**: Builder
 - **Status**: COMPLETED
 
-### 2. Transition Phase
-- **From Phase**: 5 (Implementation)
-- **To Phase**: 6 (Integration)
-- **Notes**: All tasks done, all tests passing. Feature branch ready for integration.
+### 3. Transition Phase
+- **From Phase**: 5 (Builder)
+- **To Phase**: 6 (Reviewer)
+- **Notes**: All tasks done, all tests passing. Feature branch ready for security review.
 ```
 
-**CRITICAL**: Always include this section, even when blocked.
+**CRITICAL**: Always include this section, even when blocked. Claims are still submitted for blocked features to track partial work.
 
 ---
 

@@ -1,16 +1,19 @@
 'use client';
 
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
+import { Shield } from 'lucide-react';
 import { phaseName } from '@/lib/utils';
-import { AGENT_CHART_COLORS } from '@/lib/constants';
+import { AGENT_CHART_COLORS, WATCHED_PHASES } from '@/lib/constants';
 import type { AgentDuration } from '@/lib/types/database';
+import type { ClaimsSummary } from '@/lib/data/claims';
 
 interface AgentProfilerProps {
   durations: AgentDuration[];
   error?: string | null;
+  claimsSummary?: ClaimsSummary | null;
 }
 
-export function AgentProfiler({ durations, error = null }: AgentProfilerProps) {
+export function AgentProfiler({ durations, error = null, claimsSummary = null }: AgentProfilerProps) {
   if (error) {
     return (
       <p className="text-sm text-critical py-4 text-center">
@@ -33,7 +36,11 @@ export function AgentProfiler({ durations, error = null }: AgentProfilerProps) {
 
   // Build chart data: one entry per phase, with agent durations as fields
   const chartData = phases.map((phase) => {
-    const entry: Record<string, string | number> = { phase: phaseName(phase) };
+    const entry: Record<string, string | number | boolean> = { 
+      phase: phaseName(phase),
+      phaseNum: phase,
+      isWatched: WATCHED_PHASES.includes(phase as typeof WATCHED_PHASES[number]),
+    };
     agents.forEach((agent) => {
       const match = durations.find((d) => d.phase === phase && d.agent_name === agent);
       const rawDuration = match ? Number(match.total_duration_ms) : 0;
@@ -78,6 +85,39 @@ export function AgentProfiler({ durations, error = null }: AgentProfilerProps) {
               fontSize: 12,
             }}
             labelStyle={{ color: 'hsl(var(--foreground))' }}
+            content={({ active, payload, label }) => {
+              if (!active || !payload || payload.length === 0) return null;
+              const data = payload[0]?.payload;
+              const isWatched = data?.isWatched;
+              return (
+                <div className="bg-card border border-border rounded-lg p-2 text-xs shadow-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-medium">{label}</span>
+                    {isWatched && (
+                      <span className="flex items-center gap-1 text-primary text-[10px]">
+                        <Shield className="h-3 w-3" />
+                        Watched
+                      </span>
+                    )}
+                  </div>
+                  {payload.map((entry, index) => (
+                    <div key={entry.name ?? index} className="flex items-center gap-2">
+                      <div
+                        className="w-2 h-2 rounded-sm"
+                        style={{ backgroundColor: entry.color ?? '#888' }}
+                      />
+                      <span className="text-muted-foreground">{String(entry.name ?? '')}:</span>
+                      <span>{entry.value}s</span>
+                    </div>
+                  ))}
+                  {isWatched && claimsSummary && claimsSummary.total > 0 && (
+                    <div className="mt-2 pt-2 border-t border-border text-[10px] text-muted-foreground">
+                      Claims: {claimsSummary.passed} passed, {claimsSummary.failed} failed, {claimsSummary.needsReview} pending review
+                    </div>
+                  )}
+                </div>
+              );
+            }}
           />
           <Legend
             wrapperStyle={{ fontSize: 11 }}

@@ -1,6 +1,6 @@
-# Odin Dashboard
+# Odin Dashboard (v2)
 
-Web-based dashboard for the Odin SDD Framework. Visualizes system health, feature progress, learnings evolution, and EVALS performance data from your Supabase database.
+Web-based dashboard for the Odin SDD Framework. Visualizes system health, feature progress, learnings evolution, EVALS performance, **claim verification**, and **security findings** from your Supabase database.
 
 ## Pages
 
@@ -8,7 +8,7 @@ Web-based dashboard for the Odin SDD Framework. Visualizes system health, featur
 |-------|-------------|
 | `/` | **Health Overview** — System health gauge, active alerts (with acknowledge/resolve), features table, quick stats, recent learnings |
 | `/features` | **Features List** — All features with filtering (status, complexity, severity, git, health), sorting, and search |
-| `/features/[id]` | **Feature Detail** — Enhanced phase timeline (clickable/expandable), agent profiler, quality gates, blockers, EVAL breakdown, activity timeline, transition history, commits, **archives** (for completed features) |
+| `/features/[id]` | **Feature Detail** — Enhanced phase timeline (11 phases, clickable/expandable), agent profiler (with watcher indicators), quality gates, blockers, **Watcher Verification panel** (v2), **Security Findings panel** (v2), EVAL breakdown, activity timeline, transition history, commits, **archives** (for completed features) |
 | `/learnings` | **Learnings** — React Flow evolution graph, propagation history (display-only), skill targets, conflicts |
 | `/learnings/[id]` | **Learning Detail** — Full content, evolution chain timeline, propagation status per target |
 | `/evals` | **EVALS History** — Health trend chart, 7/30/90-day period comparison, agent performance, alert history, system activity timeline |
@@ -102,9 +102,10 @@ components/
 │                             # CopyButton, RefreshIndicator, CommandPalette
 ├── realtime/                 # PollingSubscription (Client Component)
 ├── health/                   # AlertsPanel (with AlertActions), FeaturesTable, LearningSummary, QuickStats
-├── features/                 # FeatureHeader (with CopyButton), PhaseTimelineEnhanced (expandable),
-│                             # AgentProfiler, QualityGatesTable, AuditTimeline, ArchivesSection,
-│                             # ArchiveFileModal (markdown viewer with copy)
+├── features/                 # FeatureHeader (with CopyButton), PhaseTimelineEnhanced (11 phases, expandable),
+│                             # AgentProfiler (with watcher indicators), QualityGatesTable, AuditTimeline,
+│                             # ArchivesSection, ArchiveFileModal (markdown viewer with copy),
+│                             # WatcherVerificationPanel (v2), SecurityFindingsPanel (v2)
 ├── learnings/                # LearningGraph, EvolutionChainTimeline, PropagationHistoryTable,
 │                             # PropagationStatusTable, ConflictsTable, SkillPropagationQueue
 └── evals/                    # HealthTrendChart, PeriodComparison, AgentPerformance, AlertHistoryTable
@@ -114,8 +115,8 @@ lib/
 ├── realtime/                 # Auto-refresh infrastructure
 │   ├── realtime-provider.tsx # RefreshProvider context + polling state management (with pause/resume)
 │   └── use-realtime-refresh.ts # Hook: setInterval → router.refresh()
-├── types/database.ts         # All TypeScript interfaces (35+)
-├── constants.ts              # Colors, phase names, chart palettes
+├── types/database.ts         # All TypeScript interfaces (50+, includes v2 types)
+├── constants.ts              # Colors, phase names (11 phases), chart palettes, v2 constants
 ├── utils.ts                  # Formatting helpers (duration, score, confidence, dates)
 ├── data/                     # Server-side data fetching functions
 │   ├── health.ts             # System health, feature overview, alerts, quick stats
@@ -123,7 +124,9 @@ lib/
 │   ├── learnings.ts          # Active learnings, propagation history, conflicts, chains
 │   ├── audit.ts              # Audit log (feature-scoped and system-wide)
 │   ├── evals.ts              # System health history, agent evals, alert history
-│   └── archives.ts           # Feature archive metadata from Supabase Storage
+│   ├── archives.ts           # Feature archive metadata from Supabase Storage
+│   ├── claims.ts             # Agent claims and watcher verification (v2)
+│   └── security.ts           # Security findings from Semgrep (v2)
 └── actions/
     └── refresh-evals.ts      # Server Actions: refresh health, acknowledge/resolve alerts
 ```

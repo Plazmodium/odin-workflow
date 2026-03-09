@@ -9,7 +9,8 @@ interface PhaseTimelineProps {
   currentPhase: Phase;
 }
 
-const ALL_PHASES: Phase[] = ['0', '1', '2', '3', '4', '5', '6', '7', '8'];
+// Odin v2: 11 phases (0-10)
+const ALL_PHASES: Phase[] = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
 
 export function PhaseTimeline({ phases, currentPhase }: PhaseTimelineProps) {
   const phaseMap = new Map(phases.map((p) => [p.phase, p]));

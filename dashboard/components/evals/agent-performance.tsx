@@ -31,7 +31,7 @@ export function AgentPerformance({ agentEvals }: AgentPerformanceProps) {
           <EmptyState
             icon={<Bot className="h-8 w-8" />}
             title="No agent performance data"
-            description="Agent evaluations are computed during workflow execution. Complete features using Odin's 8-phase workflow to generate performance metrics."
+            description="Agent evaluations are computed during workflow execution. Complete features using Odin's 11-phase workflow to generate performance metrics."
           />
         </CardContent>
       </Card>

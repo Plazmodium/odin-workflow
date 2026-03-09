@@ -227,7 +227,8 @@ export async function getTransitions(
     .from('phase_transitions')
     .select('*')
     .eq('feature_id', featureId)
-    .order('transitioned_at', { ascending: true });
+    .order('transitioned_at', { ascending: true })
+    .order('id', { ascending: true });
   if (error || !data) return [];
   return data as PhaseTransition[];
 }

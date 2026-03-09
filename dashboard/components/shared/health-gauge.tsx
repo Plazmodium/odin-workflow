@@ -61,7 +61,7 @@ export function HealthGauge({ score, status, size = 'md', className }: HealthGau
           {score != null ? Math.round(displayScore) : '—'}
         </span>
         <span className="text-xs text-muted-foreground">
-          {status ?? 'No Data'}
+          {status ?? 'Pending EVAL'}
         </span>
       </div>
     </div>
