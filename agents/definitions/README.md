@@ -2,17 +2,17 @@
 
 This directory contains the prompt definitions for all Odin agents. Each agent is a specialized prompt that handles a specific phase of the 11-phase SDD workflow.
 
-## Agent Overview (v2)
+## Agent Overview
 
 | Agent | Phase | File | Description |
 |-------|-------|------|-------------|
 | Planning | 0 | `planning.md` | Epic decomposition into features (L3 only) |
-| **Product** | 1 | `product.md` | PRD generation with complexity-gated templates (NEW in v2) |
+| **Product** | 1 | `product.md` | PRD generation with complexity-gated templates |
 | Discovery | 2 | `discovery.md` | Requirements gathering via stakeholder interviews |
 | Architect | 3 | `architect.md` | Technical specification drafting |
 | Guardian | 4 | `guardian.md` | Multi-perspective review of PRD + spec |
 | Builder | 5 | `builder.md` | Code implementation (emits claims, watched) |
-| **Reviewer** | 6 | `reviewer.md` | SAST/security scanning via Semgrep (NEW in v2) |
+| **Reviewer** | 6 | `reviewer.md` | SAST/security scanning via Semgrep |
 | Integrator | 7 | `integrator.md` | Build verification and integration (emits claims, watched) |
 | Documenter | 8 | `documenter.md` | Documentation updates |
 | Release | 9 | `release.md` | PR creation and archival (emits claims, watched) |
@@ -21,7 +21,7 @@ This directory contains the prompt definitions for all Odin agents. Each agent i
 
 | Agent | File | Description |
 |-------|------|-------------|
-| **Watcher** | `watcher.md` | LLM escalation for claim verification (NEW in v2) |
+| **Watcher** | `watcher.md` | LLM escalation for claim verification |
 | Shared Context | `_shared-context.md` | Common context injected into all agents |
 
 ### Development Agents (Not Part of Workflow)
@@ -31,7 +31,7 @@ This directory contains the prompt definitions for all Odin agents. Each agent i
 | Consultant | `spec-driven-dev-consultant.md` | For analyzing/improving Odin itself |
 | MCP Test | `mcp-test.md` | For testing MCP server functionality |
 
-## Workflow Diagram (v2)
+## Workflow Diagram
 
 ```
                               ┌─────────────────────────────────────────────────────┐
@@ -60,7 +60,7 @@ This directory contains the prompt definitions for all Odin agents. Each agent i
                                                                    └──────────┘
 ```
 
-## New Agents in v2
+## Added Agents
 
 ### Product Agent (Phase 1)
 
@@ -96,7 +96,7 @@ The Watcher agent is called via LLM escalation when the Policy Engine cannot mak
 - **Returns:** PASS/FAIL/NEEDS_REVIEW with reasoning and confidence
 - **Not a phase agent** — runs as a sub-agent when needed
 
-## Watched Agents (v2)
+## Watched Agents
 
 Three agents emit structured **claims** that are verified by the Hybrid Watcher Architecture:
 
@@ -163,7 +163,7 @@ The orchestrator is responsible for:
 
 ## Version History
 
-- **v2.0** (2026-03-06): Added Product, Reviewer, Watcher agents; 11-phase workflow; claim verification
+- **2026-03-06**: Added Product, Reviewer, Watcher agents; 11-phase workflow; claim verification
 - **v1.4** (2026-02-17): Added step-level enforcement checklists
 - **v1.3** (2026-02-09): Added git branch tracking
 - **v1.0** (2026-02-04): Initial 8-agent system

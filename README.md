@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/status-beta-orange" alt="Status">
-  <img src="https://img.shields.io/badge/workflow-v2-blue" alt="Workflow v2">
+  <img src="https://img.shields.io/badge/workflow-11_phase-blue" alt="11-phase workflow">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
 </p>
 
@@ -28,7 +28,7 @@ When developers use AI coding assistants without proper specifications:
 
 Odin fixes that with a spec-first workflow, adaptive complexity, explicit quality gates, persistent learnings, health metrics, and workflow verification.
 
-## What Ships in v2
+## What Odin Includes
 
 - **11-phase workflow** with Product and Reviewer added to the core path
 - **12 specialized agents** with explicit responsibilities
@@ -156,7 +156,7 @@ See [docs/reference/SKILLS-SYSTEM.md](docs/reference/SKILLS-SYSTEM.md).
 
 ## Dashboard
 
-The dashboard lives in `dashboard/` and now supports the Odin v2 workflow:
+The dashboard lives in `dashboard/` and supports the full Odin workflow:
 
 - 11-phase feature timeline
 - watcher verification panel
@@ -198,7 +198,7 @@ odin-workflow/
 
 ## Status
 
-Odin is in active beta. The v2 workflow is implemented and dogfooded, but the framework is still evolving through real usage.
+Odin is in active beta. The current workflow is implemented and dogfooded, but the framework is still evolving through real usage.
 
 ## License
 
