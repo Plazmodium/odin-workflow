@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/status-beta-orange" alt="Status">
+  <img src="https://img.shields.io/badge/version-0.1.5--beta-orange" alt="Version">
   <img src="https://img.shields.io/badge/workflow-11_phase-blue" alt="11-phase workflow">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
 </p>
@@ -188,18 +188,57 @@ odin-workflow/
 
 ## Documentation
 
-- [ODIN.md](ODIN.md) — complete workflow guide
-- [docs/framework/SDD-framework.md](docs/framework/SDD-framework.md) — framework overview
-- [docs/framework/multi-agent-protocol.md](docs/framework/multi-agent-protocol.md) — orchestration model
-- [docs/guides/SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) — Supabase setup
-- [docs/guides/example-workflow.md](docs/guides/example-workflow.md) — worked feature example
-- [docs/reference/SKILLS-SYSTEM.md](docs/reference/SKILLS-SYSTEM.md) — skills system
-- [docs/reference/HYBRID-ORCHESTRATION-PATTERN.md](docs/reference/HYBRID-ORCHESTRATION-PATTERN.md) — MCP orchestration model
+| Document | Description |
+|----------|-------------|
+| [ODIN.md](ODIN.md) | **Start here** — Complete framework guide |
+| [SDD-framework.md](docs/framework/SDD-framework.md) | Spec-Driven Development explained |
+| [multi-agent-protocol.md](docs/framework/multi-agent-protocol.md) | Multi-agent architecture |
+| [SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) | Database setup guide |
+| [example-workflow.md](docs/guides/example-workflow.md) | Complete worked example |
+| [SKILLS-SYSTEM.md](docs/reference/SKILLS-SYSTEM.md) | Skills documentation |
+| [HYBRID-ORCHESTRATION-PATTERN.md](docs/reference/HYBRID-ORCHESTRATION-PATTERN.md) | Why agents can't use MCP directly |
+
+## Key Concepts
+
+### Spec-First Development
+Never write implementation code without an approved specification. The spec is the contract.
+
+### Context Pulling (not Pushing)
+AI agents fetch what they need via MCP instead of you copy-pasting files into prompts.
+
+### Quality Gates
+Guardian agent reviews every spec before implementation. No code without approval.
+
+### Learnings System
+Capture insights during development. High-confidence learnings (>=0.80) propagate to preserve knowledge.
+
+### EVALS
+Monitor feature health (efficiency + quality) and system health over time.
+
+## AI Tool Compatibility
+
+| Tool | MCP Support | Agent Spawning | Status |
+|------|-------------|----------------|--------|
+| **Claude Code** | Native | Task tool | Full support |
+| **OpenCode** | Native | Task tool | Full support |
+| **Cursor** | Recent | Composer | Full support |
+| **Codex CLI** | Yes | Custom agents | Full support |
+| **Windsurf** | Limited | Cascade | Partial |
+| **Continue.dev** | Yes | Custom agents | Full support |
+| **Aider** | No | None | Manual mode |
 
 ## Status
 
 Odin is in active beta. The current workflow is implemented and dogfooded, but the framework is still evolving through real usage.
 
+## Contributing
+
+As Odin is currently in beta, contributions are closed for now. If you have feedback, ideas, or find issues, please [open an issue](https://github.com/Plazmodium/odin-workflow/issues) and we'll look into it.
+
 ## License
 
 MIT — see [LICENSE](LICENSE)
+
+---
+
+**Odin evolves through dogfooding.** This framework follows its own specification-driven process.
