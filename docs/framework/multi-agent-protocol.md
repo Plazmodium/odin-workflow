@@ -46,10 +46,9 @@ Task-spawned agents **do not have MCP access**. Only the main orchestrator sessi
 | Document | Purpose |
 |----------|---------|
 | `SUPABASE-SETUP.md` | Database, Storage, Edge Functions, MCP config |
-| `AGENT-MCP-ACCESS-LIMITATIONS.md` | Why hybrid orchestration is necessary |
-| `ORCHESTRATOR-MEMORY-PATTERN.md` | Memory extraction and persistence |
+| `HYBRID-ORCHESTRATION-PATTERN.md` | Why hybrid orchestration is necessary |
 | `SKILLS-SYSTEM.md` | Composable domain-specific knowledge |
-| `docs/archive/CHECKPOINT-6.5-STATUS.md` | Implementation status |
+| `SDD-framework.md` | Core framework concepts and workflow rules |
 
 ### The 11-Phase Workflow
 

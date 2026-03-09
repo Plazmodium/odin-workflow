@@ -1,7 +1,7 @@
 # ODIN.md
 
 > **Odin** is a Specification-Driven Development (SDD) framework for AI-assisted development.
-> It provides 12 specialized agents, adaptive complexity levels, a learnings system with
+> It provides 11 workflow and support agents, adaptive complexity levels, a learnings system with
 > confidence scoring, EVALS for health monitoring, and Watcher verification for critical phases.
 
 ---
@@ -60,7 +60,7 @@ When developers use AI coding assistants without proper specifications:
 - **Adaptive complexity** (L1/L2/L3) - specs scale to match task size
 - **Learnings system** with confidence scoring and multi-target propagation
 - **EVALS** for health monitoring and performance diagnostics
-- **11-phase workflow** with 12 specialized agents
+- **11-phase workflow** with 11 workflow and support agents
 - **Watcher verification** - Policy Engine + LLM escalation for critical phases
 - **Skills system** with 36+ domain-specific knowledge modules
 
@@ -182,7 +182,7 @@ Before implementation, score your spec:
 
 ---
 
-## The 12 Agents
+## Agents
 
 | Agent | Phases | Watched? | Role |
 |-------|--------|----------|------|
@@ -197,7 +197,6 @@ Before implementation, score your spec:
 | [Documenter](agents/definitions/documenter.md) | 8 | No | Documentation generation |
 | [Release](agents/definitions/release.md) | 9 | **YES** | PR creation and feature archival |
 | [Watcher](agents/definitions/watcher.md) | Any | - | LLM escalation for claim verification |
-| [Consultant](agents/definitions/spec-driven-dev-consultant.md) | Any | No | Spec refinement and analysis |
 
 All agents inherit shared context from [_shared-context.md](agents/definitions/_shared-context.md).
 
@@ -788,7 +787,7 @@ Keep only Context & Goals and Acceptance Criteria.
 | Tool | Purpose | When Used |
 |------|---------|-----------|
 | `context7` | Library docs lookup | Architect, Builder |
-| `semgrep` | SAST scanning | Reviewer phase (v2) |
+| `semgrep` | SAST scanning | Reviewer phase |
 | `sequentialthinking` | Complex multi-step reasoning | Any complex task |
 | `memory` | Knowledge graph | Backup to Supabase |
 
@@ -816,15 +815,14 @@ odin/
 ├── ODIN.md                    # This file
 ├── README.md                  # Quick start
 ├── agents/
-│   ├── definitions/           # 12 agent prompts + shared context
+│   ├── definitions/           # 11 agent prompts + shared context
 │   └── skills/                # 36+ domain skills
 ├── docs/
 │   ├── framework/             # SDD-framework.md, multi-agent-protocol.md
 │   ├── guides/                # example-workflow.md, SUPABASE-SETUP.md
 │   └── reference/             # SKILLS-SYSTEM.md, orchestration patterns
-├── system/
-│   ├── dashboard/             # Next.js monitoring dashboard
-│   └── database/              # Supabase migrations
+├── dashboard/                 # Next.js monitoring dashboard
+├── migrations/                # Supabase migrations
 ├── templates/                 # Spec templates (API, UI, Data, Infrastructure)
 └── examples/                  # Worked examples (DOC-001, API-001)
 ```

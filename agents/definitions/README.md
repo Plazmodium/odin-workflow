@@ -24,13 +24,6 @@ This directory contains the prompt definitions for all Odin agents. Each agent i
 | **Watcher** | `watcher.md` | LLM escalation for claim verification |
 | Shared Context | `_shared-context.md` | Common context injected into all agents |
 
-### Development Agents (Not Part of Workflow)
-
-| Agent | File | Description |
-|-------|------|-------------|
-| Consultant | `spec-driven-dev-consultant.md` | For analyzing/improving Odin itself |
-| MCP Test | `mcp-test.md` | For testing MCP server functionality |
-
 ## Workflow Diagram
 
 ```

@@ -31,7 +31,7 @@ Odin fixes that with a spec-first workflow, adaptive complexity, explicit qualit
 ## What Odin Includes
 
 - **11-phase workflow** with Product and Reviewer added to the core path
-- **12 specialized agents** with explicit responsibilities
+- **11 workflow and support agents** with explicit responsibilities
 - **Watcher verification** using deterministic policy checks plus LLM escalation for watched phases
 - **Semgrep-backed review phase** with severity-based blocking behavior
 - **Supabase-backed learnings and EVALS** for workflow state, memory, and health
@@ -163,9 +163,13 @@ The dashboard lives in `dashboard/` and supports the full Odin workflow:
 - security findings panel
 - learnings and EVALS visualization
 
-Deploy manually with [dashboard/README.md](dashboard/README.md), or use the Vercel button:
+Use the Vercel button for a quick deploy:
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Plazmodium/odin-workflow/tree/main/dashboard&env=SUPABASE_URL,SUPABASE_SECRET_KEY,NEXT_PUBLIC_SUPABASE_URL&envDescription=Supabase%20credentials&project-name=odin-dashboard)
+
+> **Note:** This deploys the official Odin dashboard to your Vercel account. If you've forked/cloned this repo and made customizations, connect your fork directly via the [Vercel dashboard](https://vercel.com/new) instead.
+
+Or deploy manually — see [dashboard/README.md](dashboard/README.md).
 
 ## Project Structure
 

@@ -113,7 +113,7 @@ These consolidated migrations replace the original 28 development migrations (00
 - **Migration 023**: Added author field for multi-developer support
 - **Migration 026**: Added phase_outputs for structured artifacts
 
-The original migrations are archived in `docs/archive/migrations/` for reference.
+The original development migrations are not shipped in this distribution repo; this folder contains the consolidated migration set users should apply.
 
 ## Post-Consolidation Migrations
 
@@ -134,7 +134,7 @@ These migrations extend Odin with the current workflow features. **Run AFTER the
 |-----------|-------------|
 | `005_odin_v2_schema.sql` | New enums, tables for 11-phase workflow, watchers, security findings |
 | `006_odin_v2_functions.sql` | Functions for claims, policy engine, watcher reviews, security findings |
-| `007_odin_v2_phase_alignment.sql` | Remaps persisted phase values and overrides core workflow functions to use v2 numbering |
+| `007_odin_v2_phase_alignment.sql` | Remaps persisted phase values and overrides core workflow functions to use the current numbering |
 
 ### Added Workflow Features
 

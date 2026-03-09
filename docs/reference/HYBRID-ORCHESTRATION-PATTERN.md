@@ -562,7 +562,7 @@ Agents can CREATE pull requests but NEVER merge them. PR merging is ALWAYS a hum
 
 ## Completion Status
 
-1. ✅ Document pain points (AGENT-MCP-ACCESS-LIMITATIONS.md)
+1. ✅ Document pain points and MCP limitations
 2. ✅ Document hybrid orchestration pattern (this document)
 3. ✅ Update all agent instructions for new pattern
 4. ✅ Supabase MCP connected and working

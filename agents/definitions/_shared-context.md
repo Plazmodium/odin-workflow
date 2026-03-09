@@ -4,7 +4,7 @@ This file contains common patterns and references shared across all SDD agents. 
 
 ---
 
-## The 11-Phase Workflow (Odin v2)
+## The 11-Phase Workflow
 
 | Phase | Name | Agent | Watched? | Description |
 |-------|------|-------|----------|-------------|
