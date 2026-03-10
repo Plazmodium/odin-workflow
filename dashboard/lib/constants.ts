@@ -1,20 +1,33 @@
 /**
  * Odin Dashboard - Constants
+ * Updated for Odin v2 (11-phase workflow)
  */
 
-import type { EvalHealth, AlertSeverity, GateStatus, BlockerSeverity, LearningCategory, LearningImportance } from './types/database';
+import type {
+  EvalHealth,
+  AlertSeverity,
+  GateStatus,
+  BlockerSeverity,
+  LearningCategory,
+  LearningImportance,
+  VerificationStatus,
+  FindingSeverity,
+  RiskLevel,
+} from './types/database';
 
-// Phase number → human-readable name
+// Phase number → human-readable name (Odin v2: 11 phases)
 export const PHASE_NAMES: Record<string, string> = {
   '0': 'Planning',
-  '1': 'Discovery',
-  '2': 'Architect',
-  '3': 'Guardian',
-  '4': 'Builder',
-  '5': 'Integrator',
-  '6': 'Documenter',
-  '7': 'Release',
-  '8': 'Complete',
+  '1': 'Product',
+  '2': 'Discovery',
+  '3': 'Architect',
+  '4': 'Guardian',
+  '5': 'Builder',
+  '6': 'Reviewer',
+  '7': 'Integrator',
+  '8': 'Documenter',
+  '9': 'Release',
+  '10': 'Complete',
 };
 
 // Health status → Tailwind color classes
@@ -75,3 +88,34 @@ export const AGENT_CHART_COLORS = [
   '#ec4899', // pink
   '#14b8a6', // teal
 ];
+
+// ============================================================
+// Odin v2: Watcher & Security Constants
+// ============================================================
+
+// Verification status colors (for claims/watcher)
+export const VERIFICATION_STATUS_COLORS: Record<VerificationStatus, { text: string; bg: string; icon: string }> = {
+  PENDING: { text: 'text-zinc-400', bg: 'bg-zinc-400/10', icon: '⏳' },
+  PASS: { text: 'text-healthy', bg: 'bg-healthy-muted', icon: '✓' },
+  FAIL: { text: 'text-critical', bg: 'bg-critical-muted', icon: '✗' },
+  NEEDS_REVIEW: { text: 'text-concerning', bg: 'bg-concerning-muted', icon: '👁' },
+};
+
+// Finding severity colors (for security findings)
+export const FINDING_SEVERITY_COLORS: Record<FindingSeverity, { text: string; bg: string; border: string }> = {
+  INFO: { text: 'text-zinc-400', bg: 'bg-zinc-400/10', border: 'border-zinc-400' },
+  LOW: { text: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400' },
+  MEDIUM: { text: 'text-concerning', bg: 'bg-concerning-muted', border: 'border-concerning' },
+  HIGH: { text: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500' },
+  CRITICAL: { text: 'text-critical', bg: 'bg-critical-muted', border: 'border-critical' },
+};
+
+// Risk level colors (for claims)
+export const RISK_LEVEL_COLORS: Record<RiskLevel, { text: string; bg: string }> = {
+  LOW: { text: 'text-zinc-400', bg: 'bg-zinc-400/10' },
+  MEDIUM: { text: 'text-concerning', bg: 'bg-concerning-muted' },
+  HIGH: { text: 'text-critical', bg: 'bg-critical-muted' },
+};
+
+// Watched phases (phases that emit claims and are subject to watcher verification)
+export const WATCHED_PHASES = ['5', '7', '9'] as const; // Builder, Integrator, Release

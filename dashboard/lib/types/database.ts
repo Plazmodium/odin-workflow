@@ -7,19 +7,22 @@
 // Enums
 // ============================================================
 
+// Odin v2: 11-phase workflow (0-10)
 export const PHASE_NAMES: Record<string, string> = {
   '0': 'Planning',
-  '1': 'Discovery',
-  '2': 'Architect',
-  '3': 'Guardian',
-  '4': 'Builder',
-  '5': 'Integrator',
-  '6': 'Documenter',
-  '7': 'Release',
-  '8': 'Complete',
+  '1': 'Product',
+  '2': 'Discovery',
+  '3': 'Architect',
+  '4': 'Guardian',
+  '5': 'Builder',
+  '6': 'Reviewer',
+  '7': 'Integrator',
+  '8': 'Documenter',
+  '9': 'Release',
+  '10': 'Complete',
 } as const;
 
-export type Phase = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8';
+export type Phase = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10';
 export type FeatureStatus = 'IN_PROGRESS' | 'BLOCKED' | 'COMPLETED' | 'CANCELLED';
 export type Severity = 'ROUTINE' | 'EXPEDITED' | 'CRITICAL';
 export type EvalHealth = 'HEALTHY' | 'CONCERNING' | 'CRITICAL';
@@ -49,6 +52,31 @@ export type BlockerType =
   | 'TECHNICAL_IMPOSSIBILITY'
   | 'BREAKING_CHANGE_DETECTED'
   | 'HUMAN_DECISION_REQUIRED';
+
+// ============================================================
+// Odin v2: Watcher & Security Enums
+// ============================================================
+
+export type ClaimType =
+  | 'CODE_ADDED'
+  | 'CODE_MODIFIED'
+  | 'CODE_DELETED'
+  | 'TEST_ADDED'
+  | 'TEST_PASSED'
+  | 'TEST_FAILED'
+  | 'BUILD_SUCCEEDED'
+  | 'BUILD_FAILED'
+  | 'SECURITY_CHECKED'
+  | 'SECURITY_FINDING_RESOLVED'
+  | 'INTEGRATION_VERIFIED'
+  | 'ARCHIVE_CREATED'
+  | 'PR_CREATED';
+
+export type VerificationStatus = 'PENDING' | 'PASS' | 'FAIL' | 'NEEDS_REVIEW';
+
+export type FindingSeverity = 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 
 // ============================================================
 // Core table row types
@@ -635,4 +663,70 @@ export interface FeatureArchive {
   release_notes: string | null;
   archived_at: string;
   archived_by: string;
+}
+
+// ============================================================
+// Odin v2: Watcher & Security Tables
+// ============================================================
+
+export interface AgentClaim {
+  id: string;
+  feature_id: string;
+  phase: Phase;
+  agent_name: string;
+  invocation_id: string | null;
+  claim_type: ClaimType;
+  claim_description: string;
+  evidence_refs: Record<string, unknown> | null; // {commit_sha, file_paths, test_output_hash}
+  risk_level: RiskLevel;
+  created_at: string;
+}
+
+export interface PolicyVerdict {
+  id: string;
+  claim_id: string;
+  verdict: VerificationStatus;
+  rule_name: string;
+  reason: string | null;
+  evidence_checked: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface WatcherReview {
+  id: string;
+  claim_id: string;
+  verdict: VerificationStatus;
+  confidence: number | null;
+  reasoning: string | null;
+  watcher_agent: string;
+  reviewed_at: string;
+}
+
+export interface SecurityFinding {
+  id: string;
+  feature_id: string;
+  phase: Phase;
+  tool: string; // 'semgrep', 'bandit', etc.
+  rule_id: string | null;
+  severity: FindingSeverity;
+  file_path: string | null;
+  line_number: number | null;
+  column_number: number | null;
+  message: string;
+  snippet: string | null;
+  resolved: boolean;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  resolution_note: string | null;
+  created_at: string;
+}
+
+// Combined claim with verification status (for dashboard display)
+export interface ClaimWithVerification extends AgentClaim {
+  policy_verdict: VerificationStatus | null;
+  policy_reason: string | null;
+  watcher_verdict: VerificationStatus | null;
+  watcher_confidence: number | null;
+  watcher_reasoning: string | null;
+  final_status: VerificationStatus;
 }

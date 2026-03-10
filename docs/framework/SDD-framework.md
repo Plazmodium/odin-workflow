@@ -787,19 +787,39 @@ Traditional single-agent workflows load everything into one context:
 
 ### The Solution: Specialized Agents
 
-**Three-Agent System:**
+**Odin uses an 11-phase workflow with 11 workflow and support agents:**
+
 ```
-[ARCHITECT] → [GUARDIAN] → [BUILDER]
-  Planning      Validation    Implementation
-  ~3,700 tokens ~11,000 tokens ~12,500 tokens
+PLANNING → PRODUCT → DISCOVERY → ARCHITECT → GUARDIAN → BUILDER → REVIEWER → INTEGRATOR → DOCUMENTER → RELEASE → COMPLETE
+   (0)       (1)        (2)        (3)         (4)        (5)        (6)         (7)          (8)         (9)       (10)
 ```
 
+**Added capabilities:**
+- **Product Agent** (Phase 1): PRD generation with complexity-gated templates
+- **Reviewer Agent** (Phase 6): SAST/security scanning via Semgrep
+- **Watcher Agent** (Support): LLM escalation for claim verification
+
 **Key Benefits:**
-- 54% token reduction (27K vs 60K)
-- Focused context (no dilution)
+- Focused context per phase (no dilution)
 - Structural guardrails (validation before implementation)
-- Parallel execution possible (multiple builders)
-- Reusable context bundles
+- **Hybrid Watcher Architecture**: Policy Engine (SQL) + LLM escalation
+- **Security-first**: SAST scanning before integration
+- **Claim verification**: Builder/Integrator/Release emit structured claims
+
+### Hybrid Watcher Architecture
+
+Watched phases (Builder, Integrator, Release) emit **claims** that are verified:
+
+```
+Agent emits claim → Policy Engine (SQL) → PASS/FAIL/NEEDS_REVIEW
+                                              │
+                            NEEDS_REVIEW ─────┴─────▶ LLM Watcher → Final verdict
+```
+
+**Escalation conditions:**
+- HIGH risk claims → always escalate
+- Missing evidence → escalate
+- Policy check inconclusive → escalate
 
 ### When to Use Multi-Agent Protocol
 
@@ -813,6 +833,8 @@ Traditional single-agent workflows load everything into one context:
 - Need faster implementation (parallel builders)
 - Large team with high feature volume
 - Want systematic quality gates
+- Need security scanning (Reviewer)
+- Need claim verification (Watcher)
 
 ### Learn More
 
@@ -822,7 +844,6 @@ See **`multi-agent-protocol.md`** for complete documentation including:
 - File structure and artifact templates
 - Implementation options (AI coding assistant agents, coordinated workflow, separate sessions)
 - Advanced patterns (parallel builders, context caching, incremental loading)
-- 10 open questions for community exploration
 
 ### Try It Out
 
@@ -833,11 +854,19 @@ See **`example-workflow.md`** for a complete example:
 - Step-by-step walkthrough from request to deployed code
 
 **Agent Definitions**: Ready to use in `agents/definitions/` directory
-- `architect.md` - The Planner
-- `guardian.md` - The Validator
-- `builder.md` - The Implementer
+- `planning.md` - Phase 0: Epic decomposition
+- `product.md` - Phase 1: PRD generation
+- `discovery.md` - Phase 2: Requirements gathering
+- `architect.md` - Phase 3: Technical specification
+- `guardian.md` - Phase 4: Multi-perspective review
+- `builder.md` - Phase 5: Implementation (watched)
+- `reviewer.md` - Phase 6: SAST/security
+- `integrator.md` - Phase 7: Integration (watched)
+- `documenter.md` - Phase 8: Documentation
+- `release.md` - Phase 9: PR creation (watched)
+- `watcher.md` - Support: LLM escalation
 
-**Status**: Proposed architecture ready for testing and community feedback.
+**Status**: Current architecture with Hybrid Watcher and Semgrep integration.
 
 ---
 
@@ -877,7 +906,6 @@ See **`example-workflow.md`** for a complete example:
 
 ---
 
-**Version:** 1.0  
-**Last Updated:** 2025  
+**Version:** 2.0  
+**Last Updated:** 2026-03-06  
 **License:** Adapt freely for your organization's use
-

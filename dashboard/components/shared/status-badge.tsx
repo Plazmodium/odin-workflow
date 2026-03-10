@@ -23,7 +23,7 @@ interface HealthBadgeProps {
 }
 
 export function HealthBadge({ status, className }: HealthBadgeProps) {
-  if (!status) return <Badge variant="outline" className={className}>No Data</Badge>;
+  if (!status) return <Badge variant="outline" className={className}>Pending EVAL</Badge>;
   const variant = {
     HEALTHY: 'healthy' as const,
     CONCERNING: 'concerning' as const,

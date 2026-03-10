@@ -47,13 +47,13 @@ After completing this requirements document, the orchestrator should:
    - Complexity: Level 2
 
 2. **Track Duration**:
-   - Phase: 0 (Discovery)
+   - Phase: 2 (Discovery)
    - Agent: Discovery
    - Operation: Requirements gathering
 
 3. **Transition Phase**:
-   - From: Phase 1 (Discovery)
-   - To: Phase 2 (Architect)
+   - From: Phase 2 (Discovery)
+   - To: Phase 3 (Architect)
    - Next Agent: Architect
 ```
 
@@ -562,7 +562,7 @@ Agents can CREATE pull requests but NEVER merge them. PR merging is ALWAYS a hum
 
 ## Completion Status
 
-1. ✅ Document pain points (AGENT-MCP-ACCESS-LIMITATIONS.md)
+1. ✅ Document pain points and MCP limitations
 2. ✅ Document hybrid orchestration pattern (this document)
 3. ✅ Update all agent instructions for new pattern
 4. ✅ Supabase MCP connected and working

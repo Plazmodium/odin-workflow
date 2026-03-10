@@ -1,8 +1,8 @@
 # ODIN.md
 
 > **Odin** is a Specification-Driven Development (SDD) framework for AI-assisted development.
-> It provides 9 specialized agents, adaptive complexity levels, a learnings system with
-> confidence scoring, and EVALS for health monitoring.
+> It provides 11 workflow and support agents, adaptive complexity levels, a learnings system with
+> confidence scoring, EVALS for health monitoring, and Watcher verification for critical phases.
 
 ---
 
@@ -60,42 +60,48 @@ When developers use AI coding assistants without proper specifications:
 - **Adaptive complexity** (L1/L2/L3) - specs scale to match task size
 - **Learnings system** with confidence scoring and multi-target propagation
 - **EVALS** for health monitoring and performance diagnostics
-- **8-phase workflow** with 9 specialized agents
+- **11-phase workflow** with 11 workflow and support agents
+- **Watcher verification** - Policy Engine + LLM escalation for critical phases
 - **Skills system** with 36+ domain-specific knowledge modules
 
 ---
 
-## The 8-Phase Workflow
+## The 11-Phase Workflow
 
-| Phase | Name | Agent | Description |
-|-------|------|-------|-------------|
-| 0 | Planning | Planner | Epic decomposition (L3 only) |
-| 1 | Discovery | Discovery | Requirements gathering |
-| 2 | Architect | Architect | Specification drafting |
-| 3 | Guardian | Guardian | Spec review and approval |
-| 4 | Builder | Builder | Implementation |
-| 5 | Integrator | Integrator | Build verification |
-| 6 | Documenter | Documenter | Documentation generation |
-| 7 | Release | Release | PR creation and archival (telemetry gate required) |
+| Phase | Name | Agent | Watched? | Description |
+|-------|------|-------|----------|-------------|
+| 0 | Planning | Planner | No | Epic decomposition (L3 only) |
+| 1 | Product | Product | No | PRD generation (complexity-gated) |
+| 2 | Discovery | Discovery | No | Requirements gathering |
+| 3 | Architect | Architect | No | Specification drafting |
+| 4 | Guardian | Guardian | No | PRD + Spec review |
+| 5 | Builder | Builder | **YES** | Implementation |
+| 6 | Reviewer | Reviewer | No | SAST/security scan (Semgrep) |
+| 7 | Integrator | Integrator | **YES** | Build verification |
+| 8 | Documenter | Documenter | No | Documentation generation |
+| 9 | Release | Release | **YES** | PR creation and archival |
+| 10 | Complete | - | No | Feature done |
 
 ```
-All features: PLANNING -> DISCOVERY -> ARCHITECT -> GUARDIAN -> BUILDER -> INTEGRATOR -> DOCUMENTER -> RELEASE
+All features: PLANNING -> PRODUCT -> DISCOVERY -> ARCHITECT -> GUARDIAN -> BUILDER -> REVIEWER -> INTEGRATOR -> DOCUMENTER -> RELEASE -> COMPLETE
 ```
 
-> **Note**: L1/L2 features still execute Planning — it's just brief ("No epic decomposition needed").
+> **Note**: L1/L2 features still execute all phases — they're just brief.
 > Complexity level affects **depth** within each phase, not which phases run.
+
+> **Watched agents** (Builder, Integrator, Release) emit structured claims that are verified by the Policy Engine and optionally the LLM Watcher. See [Watcher Verification](#watcher-verification).
 
 > **Detailed Documentation**: See [multi-agent-protocol.md](docs/framework/multi-agent-protocol.md)
 
 ### Task Tracking Protocol
 
-The Architect (Phase 2) records a task breakdown via `record_phase_output()`. The Builder (Phase 4) updates task statuses as work progresses. This drives the dashboard's task progress display.
+The Architect (Phase 3) records a task breakdown via `record_phase_output()`. The Builder (Phase 5) updates task statuses as work progresses. This drives the dashboard's task progress display.
 
-**Architect responsibility** (Phase 2):
+**Architect responsibility** (Phase 3):
 ```sql
 -- Record tasks with explicit 'pending' status for each task
 SELECT * FROM record_phase_output(
-  'FEAT-001', '2'::phase, 'tasks',
+  'FEAT-001', '3'::phase, 'tasks',
   '[
     {"id": "T1", "title": "Create component", "status": "pending"},
     {"id": "T2", "title": "Add tests", "status": "pending"}
@@ -104,11 +110,11 @@ SELECT * FROM record_phase_output(
 );
 ```
 
-**Builder/Orchestrator responsibility** (Phase 4):
+**Builder/Orchestrator responsibility** (Phase 5):
 ```sql
 -- After completing each task, upsert with updated statuses
 SELECT * FROM record_phase_output(
-  'FEAT-001', '2'::phase, 'tasks',
+  'FEAT-001', '3'::phase, 'tasks',
   '[
     {"id": "T1", "title": "Create component", "status": "completed"},
     {"id": "T2", "title": "Add tests", "status": "in-progress"}
@@ -176,21 +182,25 @@ Before implementation, score your spec:
 
 ---
 
-## The 9 Agents
+## Agents
 
-| Agent | Phases | Role |
-|-------|--------|------|
-| [Planner](agents/definitions/planning.md) | 0 | Epic decomposition for L3 features |
-| [Discovery](agents/definitions/discovery.md) | 1 | Requirements gathering from vague inputs |
-| [Architect](agents/definitions/architect.md) | 2 | Specification drafting and task breakdown |
-| [Guardian](agents/definitions/guardian.md) | 3 | Spec review with 3 perspectives |
-| [Builder](agents/definitions/builder.md) | 4 | Code implementation per spec |
-| [Integrator](agents/definitions/integrator.md) | 5 | Build and runtime verification |
-| [Documenter](agents/definitions/documenter.md) | 6 | Documentation generation |
-| [Release](agents/definitions/release.md) | 7 | PR creation and feature archival |
-| [Consultant](agents/definitions/spec-driven-dev-consultant.md) | Any | Spec refinement and analysis |
+| Agent | Phases | Watched? | Role |
+|-------|--------|----------|------|
+| [Planner](agents/definitions/planning.md) | 0 | No | Epic decomposition for L3 features |
+| [Product](agents/definitions/product.md) | 1 | No | PRD generation (complexity-gated) |
+| [Discovery](agents/definitions/discovery.md) | 2 | No | Requirements gathering from vague inputs |
+| [Architect](agents/definitions/architect.md) | 3 | No | Specification drafting and task breakdown |
+| [Guardian](agents/definitions/guardian.md) | 4 | No | PRD + Spec review with 3 perspectives |
+| [Builder](agents/definitions/builder.md) | 5 | **YES** | Code implementation per spec |
+| [Reviewer](agents/definitions/reviewer.md) | 6 | No | SAST/security scan (Semgrep) |
+| [Integrator](agents/definitions/integrator.md) | 7 | **YES** | Build and runtime verification |
+| [Documenter](agents/definitions/documenter.md) | 8 | No | Documentation generation |
+| [Release](agents/definitions/release.md) | 9 | **YES** | PR creation and feature archival |
+| [Watcher](agents/definitions/watcher.md) | Any | - | LLM escalation for claim verification |
 
 All agents inherit shared context from [_shared-context.md](agents/definitions/_shared-context.md).
+
+**Watched agents** emit structured claims. The Policy Engine verifies claims deterministically; the Watcher handles semantic verification when escalated.
 
 ---
 
@@ -274,6 +284,162 @@ Computed over time windows (7/30/90 days):
 
 ---
 
+## Watcher Verification
+
+Builder, Integrator, and Release are **watched agents**. They emit structured claims that are verified to ensure workflow integrity.
+
+### Architecture (Hybrid Verification)
+
+```
+Builder/Integrator/Release emit claims
+         ↓
+   agent_claims (Supabase)
+         ↓
+   Policy Engine (SQL - deterministic)
+         ↓
+   ┌─────┴─────┐
+   ↓           ↓
+  PASS    NEEDS_REVIEW
+              ↓
+        LLM Watcher (semantic)
+```
+
+### Claim Types
+
+| Claim Type | Agent | Description |
+|------------|-------|-------------|
+| `CODE_ADDED` | Builder | New file created |
+| `CODE_MODIFIED` | Builder | Existing file changed |
+| `CODE_DELETED` | Builder | File removed |
+| `TEST_PASSED` | Builder | Tests pass |
+| `BUILD_SUCCEEDED` | Builder | Build completes |
+| `INTEGRATION_VERIFIED` | Integrator | Merge + tests + runtime verified |
+| `PR_CREATED` | Release | Pull request created |
+| `ARCHIVE_CREATED` | Release | Feature archived |
+
+### Risk Levels
+
+| Level | When to Use | Watcher Escalation? |
+|-------|-------------|---------------------|
+| **LOW** | Tests, docs, styling | Only if evidence missing |
+| **MEDIUM** | Business logic, APIs | Only if evidence missing |
+| **HIGH** | Auth, payments, security, PII | **ALWAYS** |
+
+### Escalation Triggers
+
+The LLM Watcher is called when ANY of these are true:
+1. Claim marked `HIGH` risk
+2. Evidence refs missing or empty
+3. Policy Engine check inconclusive
+
+### Key Functions
+
+```sql
+-- Agent submits claim
+SELECT * FROM submit_claim(
+  'FEAT-001', '5'::phase, 'builder-agent',
+  'CODE_ADDED', 'Implemented auth service',
+  '{"commit_sha": "abc123", "file_paths": ["src/auth.ts"]}'::jsonb,
+  'HIGH'  -- risk_level
+);
+
+-- Policy Engine verifies (automatic)
+SELECT * FROM policy_verify_evidence(claim_id);
+
+-- Get claims needing LLM review
+SELECT * FROM get_claims_needing_review('FEAT-001');
+
+-- Record Watcher verdict
+SELECT * FROM record_watcher_review(
+  claim_id, 'PASS', 'Evidence supports claim', 'watcher-agent', 0.90
+);
+```
+
+### Watcher Verdicts
+
+| Verdict | Meaning | Action |
+|---------|---------|--------|
+| `PASS` | Evidence supports claim | Continue workflow |
+| `FAIL` | Evidence contradicts claim | Create blocker |
+| `NEEDS_REVIEW` | Still inconclusive | Escalate to human |
+
+The Watcher is **advisory** — it informs but does not auto-block. The orchestrator decides how to act on verdicts.
+
+---
+
+## Reviewer (SAST/Security)
+
+The Reviewer agent (Phase 6) performs static application security testing using Semgrep.
+
+### How It Works
+
+1. Reviewer scans changed files: `semgrep scan --config=auto --json`
+2. Findings recorded to `security_findings` table
+3. HIGH/CRITICAL findings **block release**
+4. LOW/MEDIUM findings can be deferred with justification
+
+### Severity Levels
+
+| Severity | Action Required |
+|----------|-----------------|
+| CRITICAL | **MUST FIX** - Blocks release |
+| HIGH | **MUST FIX** - Blocks release |
+| MEDIUM | Can defer with justification |
+| LOW | Can defer with justification |
+| INFO | Optional |
+
+### Key Functions
+
+```sql
+-- Record finding
+SELECT * FROM record_security_finding(
+  'FEAT-001', 'semgrep', 'HIGH',
+  'SQL injection vulnerability',
+  'src/api/users.ts', 42, 'sql-injection-rule'
+);
+
+-- Resolve finding
+SELECT * FROM resolve_security_finding(
+  finding_id, 'builder-agent', 'Fixed with parameterized query'
+);
+
+-- Check if feature can proceed
+SELECT * FROM can_proceed_past_reviewer('FEAT-001');
+```
+
+---
+
+## Product Agent (PRD Generation)
+
+The Product agent (Phase 1) generates PRDs before technical specification.
+
+### Complexity-Gated Output
+
+| Complexity | PRD Type | Max Length |
+|------------|----------|------------|
+| L1 | PRD_EXEMPTION | 8 lines |
+| L2 | PRD_LITE | 1 page |
+| L3 | PRD_FULL | Complete |
+
+### PRD_EXEMPTION (L1)
+
+```markdown
+## PRD Exemption
+
+**Problem**: [One sentence]
+**Impact**: [Who is affected]
+**Acceptance Check**: [How to verify]
+**Rollback Note**: [How to revert]
+```
+
+### Key Rules
+
+- Max 1 clarification round with user
+- No technical implementation details (that's Architect's job)
+- If still ambiguous after 1 round → blocker `HUMAN_DECISION_REQUIRED`
+
+---
+
 ## Git Branch Management
 
 Odin tracks git branches per feature.
@@ -295,7 +461,7 @@ The `dev_initials` and `author` parameters in `create_feature()` identify the hu
 
 1. **Orchestrator creates the git branch FIRST**: `git checkout -b {dev_initials}/feature/{FEATURE-ID}` — this must succeed before anything is recorded in the database
 2. **Only after the branch exists**, call `create_feature()` to record the feature in the database
-3. Transition to Phase 1 (Discovery) — all work happens on the feature branch
+3. Transition to Phase 1 (Product) — all work happens on the feature branch
 4. Commits tracked per phase via `record_commit()`
 5. Release phase creates PR via `gh pr create`
 6. Human reviews and merges (NEVER the agent)
@@ -433,7 +599,7 @@ VALUES ('AUTH-001', 'workflow-archives/AUTH-001/', ARRAY['requirements.md', 'spe
 
 ### NEVER Skip Phases OR Steps
 
-**All 8 phases must be executed for every feature.** The `transition_phase()` function enforces this at the database level — attempting to skip a phase will raise an error.
+**All 11 phases must be executed for every feature.** The `transition_phase()` function enforces this at the database level — attempting to skip a phase will raise an error.
 
 **All steps within each phase must also be executed.** Each agent definition contains a **Mandatory Steps Checklist** that must be followed in order. This is enforced at the agent level — the orchestrator must verify each step is completed or explicitly marked N/A with justification.
 
@@ -444,19 +610,21 @@ VALUES ('AUTH-001', 'workflow-archives/AUTH-001/', ARRAY['requirements.md', 'spe
 **Complexity level** (L1/L2/L3) affects the **depth** within each phase and each step, not which phases or steps run:
 - L1 phases can be very brief (a few sentences), but they must still happen
 - L1 steps can produce minimal output, but they must still execute
-- Forward transitions must be sequential: 0→1→2→3→4→5→6→7
+- Forward transitions must be sequential: 0→1→2→3→4→5→6→7→8→9
 - Backward transitions (rework) can go to any earlier phase
-- Phase 8 (Complete) is set by `complete_feature()`, not by `transition_phase()`
+- Phase 10 (Complete) is set by `complete_feature()`, not by `transition_phase()`
 
 **Example**: An L1 bug fix still goes through all phases AND all steps:
 - Phase 0 (Planning): "Single bug fix, no epic"
-- Phase 1 (Discovery): "Bug is X, root cause is Y" (all 7 Discovery steps, briefly)
-- Phase 2 (Architect): "Fix approach: change Z in file W" (all Step A + Step B steps)
-- Phase 3 (Guardian): "Approach is sound, no side effects" (all review steps)
-- Phase 4 (Builder): Implement the fix (all implementation steps)
-- Phase 5 (Integrator): Verify build + runtime (all verification steps)
-- Phase 6 (Documenter): Update relevant docs (if any) (all documentation steps)
-- Phase 7 (Release): Create PR (all release steps)
+- Phase 1 (Product): PRD_EXEMPTION (8 lines max)
+- Phase 2 (Discovery): "Bug is X, root cause is Y" (all Discovery steps, briefly)
+- Phase 3 (Architect): "Fix approach: change Z in file W" (all Step A + Step B steps)
+- Phase 4 (Guardian): "Approach is sound, no side effects" (all review steps)
+- Phase 5 (Builder): Implement the fix (all implementation steps, emit claims)
+- Phase 6 (Reviewer): "No security findings" (scan passes)
+- Phase 7 (Integrator): Verify build + runtime (all verification steps, emit claims)
+- Phase 8 (Documenter): Update relevant docs (if any) (all documentation steps)
+- Phase 9 (Release): Create PR (all release steps, emit claims)
 
 ### Spec-First
 
@@ -489,32 +657,36 @@ A passing `npm run build` does NOT guarantee correctness. Integrator must spot-c
 
 ### Agent Invocation Coverage Gate (Release)
 
-Before Phase 7 release actions and before calling `complete_feature(...)`, the orchestrator MUST verify agent invocation telemetry coverage.
+Before Phase 9 release actions and before calling `complete_feature(...)`, the orchestrator MUST verify agent invocation telemetry coverage.
 
 **Coverage requirement by checkpoint**:
-- Before PR/release actions: phases **1-6** must have completed invocations
-- Before `complete_feature(...)`: phases **1-7** must have completed invocations
+- Before PR/release actions: phases **1-8** must have completed invocations
+- Before `complete_feature(...)`: phases **1-9** must have completed invocations
 
 **Expected phase/agent mapping**:
-- `1` -> `discovery-agent`
-- `2` -> `architect-agent`
-- `3` -> `guardian-agent`
-- `4` -> `builder-agent`
-- `5` -> `integrator-agent`
-- `6` -> `documenter-agent`
-- `7` -> `release-agent`
+- `1` -> `product-agent`
+- `2` -> `discovery-agent`
+- `3` -> `architect-agent`
+- `4` -> `guardian-agent`
+- `5` -> `builder-agent`
+- `6` -> `reviewer-agent`
+- `7` -> `integrator-agent`
+- `8` -> `documenter-agent`
+- `9` -> `release-agent`
 
 **Validation query**:
 ```sql
 WITH expected AS (
   SELECT * FROM (VALUES
-    ('1'::phase, 'discovery-agent'::text),
-    ('2'::phase, 'architect-agent'::text),
-    ('3'::phase, 'guardian-agent'::text),
-    ('4'::phase, 'builder-agent'::text),
-    ('5'::phase, 'integrator-agent'::text),
-    ('6'::phase, 'documenter-agent'::text),
-    ('7'::phase, 'release-agent'::text)
+    ('1'::phase, 'product-agent'::text),
+    ('2'::phase, 'discovery-agent'::text),
+    ('3'::phase, 'architect-agent'::text),
+    ('4'::phase, 'guardian-agent'::text),
+    ('5'::phase, 'builder-agent'::text),
+    ('6'::phase, 'reviewer-agent'::text),
+    ('7'::phase, 'integrator-agent'::text),
+    ('8'::phase, 'documenter-agent'::text),
+    ('9'::phase, 'release-agent'::text)
   ) AS t(phase, agent_name)
 ), actual AS (
   SELECT phase, agent_name
@@ -601,24 +773,38 @@ Keep only Context & Goals and Acceptance Criteria.
 
 ## MCP Context Pulling
 
-### Recommended MCP Servers
+### Required MCP Servers
 
-- `filesystem` - Direct file access
-- `github` - Pull issues, PRs, tickets
-- `postgres`/`sqlite` - Read schemas (read-only!)
-- `supabase` - Database functions and queries
+| Server | Purpose | Required |
+|--------|---------|----------|
+| `supabase` | Workflow state, claims, learnings, EVALS | **Yes** |
+| `docker-gateway` | Hosts toolkit servers (see below) | **Yes** |
+| `filesystem` | Direct file access | Recommended |
+| `github` | Pull issues, PRs, tickets | Optional |
+
+**Docker Gateway Toolkit:**
+
+| Tool | Purpose | When Used |
+|------|---------|-----------|
+| `context7` | Library docs lookup | Architect, Builder |
+| `semgrep` | SAST scanning | Reviewer phase |
+| `sequentialthinking` | Complex multi-step reasoning | Any complex task |
+| `memory` | Knowledge graph | Backup to Supabase |
 
 ### Trigger Phrases
 
 ```
 "Read issue #123 from the repository..."          -> github MCP
-"Check the users table schema..."                 -> postgres MCP
+"Check the users table schema..."                 -> supabase MCP
 "Read src/components/Modal.tsx to understand..."  -> filesystem MCP
+"Run semgrep scan on src/..."                     -> docker-gateway (semgrep)
+"Get Next.js docs for app router..."              -> docker-gateway (context7)
 ```
 
-### Security Rule
+### Security Rules
 
-Database MCP servers must be read-only during spec phase. No INSERT/UPDATE/DELETE.
+- Database MCP: read-only during spec phase (no INSERT/UPDATE/DELETE)
+- Docker Gateway: only invoke tools documented in agent definitions
 
 ---
 
@@ -629,15 +815,14 @@ odin/
 ├── ODIN.md                    # This file
 ├── README.md                  # Quick start
 ├── agents/
-│   ├── definitions/           # 9 agent prompts + shared context
+│   ├── definitions/           # 11 agent prompts + shared context
 │   └── skills/                # 36+ domain skills
 ├── docs/
 │   ├── framework/             # SDD-framework.md, multi-agent-protocol.md
 │   ├── guides/                # example-workflow.md, SUPABASE-SETUP.md
 │   └── reference/             # SKILLS-SYSTEM.md, orchestration patterns
-├── system/
-│   ├── dashboard/             # Next.js monitoring dashboard
-│   └── database/              # Supabase migrations
+├── dashboard/                 # Next.js monitoring dashboard
+├── migrations/                # Supabase migrations
 ├── templates/                 # Spec templates (API, UI, Data, Infrastructure)
 └── examples/                  # Worked examples (DOC-001, API-001)
 ```
@@ -688,7 +873,7 @@ SELECT * FROM create_feature(
 ```sql
 SELECT * FROM transition_phase(
   'FEAT-001',           -- feature_id
-  '2'::phase,           -- to_phase (0-8)
+  '3'::phase,           -- to_phase (0-10)
   'architect-agent',    -- agent_name
   'Notes here'          -- notes (optional)
 );

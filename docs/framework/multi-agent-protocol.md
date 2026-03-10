@@ -46,17 +46,17 @@ Task-spawned agents **do not have MCP access**. Only the main orchestrator sessi
 | Document | Purpose |
 |----------|---------|
 | `SUPABASE-SETUP.md` | Database, Storage, Edge Functions, MCP config |
-| `AGENT-MCP-ACCESS-LIMITATIONS.md` | Why hybrid orchestration is necessary |
-| `ORCHESTRATOR-MEMORY-PATTERN.md` | Memory extraction and persistence |
+| `HYBRID-ORCHESTRATION-PATTERN.md` | Why hybrid orchestration is necessary |
 | `SKILLS-SYSTEM.md` | Composable domain-specific knowledge |
-| `docs/archive/CHECKPOINT-6.5-STATUS.md` | Implementation status |
+| `SDD-framework.md` | Core framework concepts and workflow rules |
 
-### The 8-Phase Workflow
+### The 11-Phase Workflow
 
 ```
-Level 3 Epics: PLANNING → DISCOVERY → ARCHITECT → GUARDIAN → BUILDER → INTEGRATOR → DOCUMENTER → RELEASE
-Level 1-2:                DISCOVERY → ARCHITECT → GUARDIAN → BUILDER → INTEGRATOR → DOCUMENTER → RELEASE
+All features: PLANNING → PRODUCT → DISCOVERY → ARCHITECT → GUARDIAN → BUILDER → REVIEWER → INTEGRATOR → DOCUMENTER → RELEASE → COMPLETE
 ```
+
+Complexity level affects depth within each phase, not which phases run.
 
 See `agents/definitions/` for complete agent definitions.
 

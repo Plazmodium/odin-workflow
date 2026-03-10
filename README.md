@@ -10,48 +10,51 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-0.1.5--beta-orange" alt="Version">
+  <img src="https://img.shields.io/badge/workflow-11_phase-blue" alt="11-phase workflow">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
 </p>
 
-## The Problem
+## Framework Guide
+
+Start with [ODIN.md](ODIN.md). It is the shipped guide for how Odin works.
+
+## What Odin Solves
 
 When developers use AI coding assistants without proper specifications:
 - AI hallucinates business logic and data structures
-- Code contradicts requirements within the same session
-- Developers spend more time fixing AI mistakes than coding
-- No single source of truth exists between spec and implementation
+- code contradicts requirements within the same session
+- developers spend more time fixing AI mistakes than coding
+- no single source of truth exists between spec and implementation
 
-## The Solution: Odin
+Odin fixes that with a spec-first workflow, adaptive complexity, explicit quality gates, persistent learnings, health metrics, and workflow verification.
 
-Odin is an 8-phase workflow framework that makes AI coding assistants actually useful:
+## What Odin Includes
 
-1. **Spec-first**: Every feature starts with a specification, not code
-2. **Adaptive complexity**: Specs scale from 5-minute bug fixes (L1) to multi-day epics (L3)
-3. **8 specialized agents**: Each phase has a dedicated agent with clear responsibilities
-4. **Quality gates**: Guardian agent reviews specs before any code is written
-5. **Learnings system**: Capture insights, evolve knowledge, propagate to future sessions
-6. **EVALS**: Monitor feature and system health over time
+- **11-phase workflow** with Product and Reviewer added to the core path
+- **11 workflow and support agents** with explicit responsibilities
+- **Watcher verification** using deterministic policy checks plus LLM escalation for watched phases
+- **Semgrep-backed review phase** with severity-based blocking behavior
+- **Supabase-backed learnings and EVALS** for workflow state, memory, and health
+- **Dashboard support** for claims, watcher verification, security findings, and the 11-phase model
 
 ## Quick Start
 
-### Prerequisites
-
-- **Supabase account** — [Create one free](https://supabase.com)
-- **AI coding tool with MCP support** — Claude Code, Cursor, OpenCode, etc.
-- **Node.js 18+** — For the dashboard (optional)
-
-### 1. Clone this repo
+### 1. Clone the repo
 
 ```bash
 git clone https://github.com/Plazmodium/odin-workflow.git
 cd odin-workflow
 ```
 
-### 2. Configure your AI tool
+### 2. Configure MCP
 
-Add the Supabase MCP server to your tool's configuration:
+At minimum, configure:
 
-**Claude Code / OpenCode** (`.mcp.json`):
+- **Supabase MCP** — workflow state, learnings, EVALS, claims
+- **Docker Gateway MCP** — Context7, Semgrep, Sequential Thinking, Memory
+
+Example `.mcp.json`:
+
 ```json
 {
   "mcpServers": {
@@ -67,106 +70,100 @@ Add the Supabase MCP server to your tool's configuration:
 }
 ```
 
-### 3. Set up Supabase
+### 3. Apply the migrations
 
-Once MCP is configured, ask your AI assistant to run the migrations:
+Ask your AI assistant to apply the SQL files in `migrations/` to your Supabase project.
 
-> "Apply the Odin migrations from the migrations/ folder to my Supabase project"
+Current shipped migration set:
 
-The AI will use the Supabase MCP to apply all 4 migration files automatically.
-
-**Manual alternative** — run via Supabase CLI or Dashboard SQL Editor:
-
-```bash
-# Using Supabase CLI
-supabase db push --db-url "postgresql://..." < migrations/001_schema.sql
-supabase db push --db-url "postgresql://..." < migrations/002_functions.sql
-supabase db push --db-url "postgresql://..." < migrations/003_views.sql
-supabase db push --db-url "postgresql://..." < migrations/004_seed.sql
+```text
+001_schema.sql
+002_functions.sql
+003_views.sql
+004_seed.sql
+005_odin_v2_schema.sql
+006_odin_v2_functions.sql
+007_odin_v2_phase_alignment.sql
 ```
 
-See [docs/guides/SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) for detailed instructions.
+See [docs/guides/SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) for the detailed setup flow.
 
 ### 4. Start using Odin
 
-Point your AI tool to read `ODIN.md` and you're ready to go!
+Point your AI tool at [ODIN.md](ODIN.md) and use it as the framework guide for real feature work.
 
-## The 8-Phase Workflow
+## The 11-Phase Workflow
 
-| Phase | Agent | What Happens |
-|-------|-------|--------------|
-| 0 | **Planner** | Epic decomposition (L3 only) |
-| 1 | **Discovery** | Gather requirements from vague inputs |
-| 2 | **Architect** | Draft specification with complexity assessment |
-| 3 | **Guardian** | Review spec from 3 perspectives, approve or request changes |
-| 4 | **Builder** | Implement code per approved spec |
-| 5 | **Integrator** | Verify build and runtime behavior |
-| 6 | **Documenter** | Generate/update documentation |
-| 7 | **Release** | Create PR and archive specs |
+| Phase | Agent | Responsibility | Watched? |
+|-------|-------|----------------|----------|
+| 0 | Planning | Human request / planning setup | No |
+| 1 | Product | PRD generation | No |
+| 2 | Discovery | Technical context gathering | No |
+| 3 | Architect | Technical specification | No |
+| 4 | Guardian | PRD + spec review | No |
+| 5 | Builder | Implementation | Yes |
+| 6 | Reviewer | SAST/security review | No |
+| 7 | Integrator | Build and runtime verification | Yes |
+| 8 | Documenter | Documentation updates | No |
+| 9 | Release | PR creation and archival | Yes |
+| 10 | Complete | Feature complete | No |
 
-**Every feature goes through all 8 phases.** Complexity level (L1/L2/L3) affects depth, not which phases run.
+Every feature goes through all 11 phases. Complexity level changes the depth of each phase, not whether the phase runs.
 
-See [ODIN.md](ODIN.md#the-8-phase-workflow) for full workflow details.
+See [ODIN.md](ODIN.md) for the full protocol.
 
 ## Adaptive Complexity
 
-| Level | Name | Use When | Spec Time |
-|-------|------|----------|-----------|
-| **L1** | The Nut | Bug fixes, single-file changes | 5-10 min |
-| **L2** | The Feature | New features, API endpoints | 20-30 min |
-| **L3** | The Epic | Multi-file refactors, new subsystems | 1-2 hours |
+| Level | Name | Use When |
+|-------|------|----------|
+| **L1** | The Nut | Bug fixes, tiny tweaks, single-file changes |
+| **L2** | The Feature | Standard features, APIs, UI work |
+| **L3** | The Epic | Multi-file systems, major refactors, large workflow changes |
 
-The Architect agent assesses complexity using 3 dimensions (Scope, Risk, Integration) scored 1-5 each.
+## Agents
 
-See [ODIN.md](ODIN.md#adaptive-complexity) for complexity scoring details.
+All workflow agents live in `agents/definitions/`:
 
-## The 9 Agents
+- `planning.md`
+- `product.md`
+- `discovery.md`
+- `architect.md`
+- `guardian.md`
+- `builder.md`
+- `reviewer.md`
+- `integrator.md`
+- `documenter.md`
+- `release.md`
+- `watcher.md`
+- `_shared-context.md`
 
-All agents live in `agents/definitions/`:
-
-| Agent | File | Role |
-|-------|------|------|
-| Planner | `planning.md` | Epic decomposition |
-| Discovery | `discovery.md` | Requirements gathering |
-| Architect | `architect.md` | Specification drafting |
-| Guardian | `guardian.md` | Multi-perspective review |
-| Builder | `builder.md` | Code implementation |
-| Integrator | `integrator.md` | Build & runtime verification |
-| Documenter | `documenter.md` | Documentation generation |
-| Release | `release.md` | PR creation & archival |
-
-All agents inherit shared context from `_shared-context.md`.
-
-See [ODIN.md](ODIN.md#the-8-agents) for agent details.
+See [agents/definitions/README.md](agents/definitions/README.md) for the agent index.
 
 ## Skills System
 
-Skills are domain-specific knowledge modules in `agents/skills/`:
+Skills live in `agents/skills/` and are organized by domain:
 
-| Category | Skills |
-|----------|--------|
-| **Frontend** | nextjs-dev, react-patterns, tailwindcss, angular, vue, svelte, astro, htmx, alpine |
-| **Backend** | nodejs-express, nodejs-fastify, python-fastapi, python-django, golang-gin |
-| **Database** | supabase, postgresql, prisma-orm, mongodb, redis |
-| **Testing** | jest, vitest, playwright, cypress |
-| **DevOps** | docker, kubernetes, terraform, github-actions, aws |
-| **API** | rest-api, graphql, trpc, grpc |
-| **Architecture** | clean-architecture, DDD, event-driven, microservices |
+- frontend
+- backend
+- database
+- testing
+- devops
+- api
+- architecture
+- generic-dev
 
-The orchestrator auto-detects your tech stack and injects relevant skills into agent prompts.
+See [docs/reference/SKILLS-SYSTEM.md](docs/reference/SKILLS-SYSTEM.md).
 
-See [docs/reference/SKILLS-SYSTEM.md](docs/reference/SKILLS-SYSTEM.md) for full skills documentation.
+## Dashboard
 
-## Dashboard (Optional)
+The dashboard lives in `dashboard/` and supports the full Odin workflow:
 
-Monitor your workflow with a real-time web dashboard:
+- 11-phase feature timeline
+- watcher verification panel
+- security findings panel
+- learnings and EVALS visualization
 
-- System health gauge and alerts
-- Feature progress tracking
-- Learnings evolution graph
-- EVALS performance metrics
-
-**One-click deploy:**
+Use the Vercel button for a quick deploy:
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Plazmodium/odin-workflow/tree/main/dashboard&env=SUPABASE_URL,SUPABASE_SECRET_KEY,NEXT_PUBLIC_SUPABASE_URL&envDescription=Supabase%20credentials&project-name=odin-dashboard)
 
@@ -176,20 +173,21 @@ Or deploy manually — see [dashboard/README.md](dashboard/README.md).
 
 ## Project Structure
 
-```
+```text
 odin-workflow/
-├── ODIN.md                 # Complete framework guide (start here)
+├── ODIN.md
+├── README.md
 ├── agents/
-│   ├── definitions/        # 8 agent prompts
-│   └── skills/             # 36+ domain skills
+│   ├── definitions/
+│   └── skills/
 ├── docs/
-│   ├── framework/          # Core concepts
-│   ├── guides/             # How-to guides
-│   └── reference/          # Reference material
-├── dashboard/              # Next.js monitoring app
-├── migrations/             # Supabase SQL files
-├── templates/              # Spec templates
-└── examples/               # Worked examples
+│   ├── framework/
+│   ├── guides/
+│   └── reference/
+├── dashboard/
+├── migrations/
+├── templates/
+└── examples/
 ```
 
 ## Documentation
@@ -235,9 +233,7 @@ Monitor feature health (efficiency + quality) and system health over time.
 
 ## Status
 
-**Version**: 0.1.4-beta
-
-Odin is in active development. The workflow is stable and used in production, but APIs may change.
+Odin is in active beta. The current workflow is implemented and dogfooded, but the framework is still evolving through real usage.
 
 ## Contributing
 

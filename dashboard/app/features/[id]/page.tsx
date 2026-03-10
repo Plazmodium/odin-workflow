@@ -17,6 +17,8 @@ import {
 } from '@/lib/data/features';
 import { getFeatureArchive } from '@/lib/data/archives';
 import { getFeatureAuditLog } from '@/lib/data/audit';
+import { getFeatureClaimsWithVerification, getClaimsSummary } from '@/lib/data/claims';
+import { getSecurityFindings, getSecuritySummary } from '@/lib/data/security';
 import { refreshFeatureEval } from '@/lib/actions/refresh-evals';
 import { FeatureHeader } from '@/components/features/feature-header';
 import { PhaseTimelineEnhanced } from '@/components/features/phase-timeline-enhanced';
@@ -28,6 +30,8 @@ import { TransitionHistory } from '@/components/features/transition-history';
 import { CommitsTable } from '@/components/features/commits-table';
 import { AuditTimeline } from '@/components/features/audit-timeline';
 import { ArchivesSection } from '@/components/features/archives-section';
+import { WatcherVerificationPanel } from '@/components/features/watcher-verification-panel';
+import { SecurityFindingsPanel } from '@/components/features/security-findings-panel';
 import { RefreshEvalsButton } from '@/components/shared/refresh-evals-button';
 import { PollingSubscription } from '@/components/realtime/realtime-page';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -45,7 +49,7 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
   const feature = await getFeatureStatus(id);
   if (!feature) notFound();
 
-  const [phases, agentDurationsResult, invocations, gates, blockers, eval_, learnings, transitions, iterations, commits, auditLog, phaseOutputs, archive] =
+  const [phases, agentDurationsResult, invocations, gates, blockers, eval_, learnings, transitions, iterations, commits, auditLog, phaseOutputs, archive, claims, claimsSummary, securityFindings, securitySummary] =
     await Promise.all([
       getPhaseDurations(id),
       getAgentDurations(id),
@@ -60,6 +64,10 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
       getFeatureAuditLog(id),
       getPhaseOutputs(id),
       getFeatureArchive(id),
+      getFeatureClaimsWithVerification(id),
+      getClaimsSummary(id),
+      getSecurityFindings(id),
+      getSecuritySummary(id),
     ]);
 
   return (
@@ -103,7 +111,7 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
             <CardTitle className="text-sm">Agent Duration Profiler</CardTitle>
           </CardHeader>
           <CardContent>
-            <AgentProfiler durations={agentDurationsResult.durations} error={agentDurationsResult.error} />
+            <AgentProfiler durations={agentDurationsResult.durations} error={agentDurationsResult.error} claimsSummary={claimsSummary} />
           </CardContent>
         </Card>
 
@@ -143,6 +151,29 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
           <BlockersTable blockers={blockers} />
         </CardContent>
       </Card>
+
+      {/* Watcher Verification & Security Findings - side by side (Odin v2) */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Watcher Verification Panel */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Watcher Verification</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <WatcherVerificationPanel claims={claims} summary={claimsSummary} />
+          </CardContent>
+        </Card>
+
+        {/* Security Findings Panel */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Security Findings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SecurityFindingsPanel findings={securityFindings} summary={securitySummary} />
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Commits & Archives - side by side */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

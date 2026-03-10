@@ -19,7 +19,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 import Link from 'next/link';
-import { formatRelativeTime } from '@/lib/utils';
+import { formatConfidence, formatRelativeTime, phaseName } from '@/lib/utils';
 import { EmptyState } from '@/components/layout/empty-state';
 import type { AuditLogEntry } from '@/lib/types/database';
 
@@ -97,16 +97,58 @@ const OPERATION_CONFIG: Record<
     color: 'text-indigo-400',
     label: 'Skills Loaded',
   },
+  CLAIM_SUBMITTED: {
+    icon: Activity,
+    color: 'text-sky-400',
+    label: 'Claim Submitted',
+  },
+  POLICY_VERDICT: {
+    icon: CheckCircle,
+    color: 'text-cyan-400',
+    label: 'Policy Verdict',
+  },
+  WATCHER_REVIEW: {
+    icon: Brain,
+    color: 'text-violet-400',
+    label: 'Watcher Review',
+  },
+  SECURITY_FINDING: {
+    icon: AlertTriangle,
+    color: 'text-orange-400',
+    label: 'Security Finding',
+  },
+  FINDING_RESOLVED: {
+    icon: CheckCircle,
+    color: 'text-emerald-400',
+    label: 'Finding Resolved',
+  },
+  MIGRATION_007_PHASE_ALIGNMENT_APPLIED: {
+    icon: ArrowUpCircle,
+    color: 'text-cyan-400',
+    label: 'Phase Alignment Applied',
+  },
 };
 
+function formatOperationLabel(operation: string): string {
+  return operation
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function formatPhaseWithId(phase: string): string {
+  return `${phaseName(phase)} (${phase})`;
+}
+
 function getOperationConfig(operation: string) {
-  return (
-    OPERATION_CONFIG[operation] ?? {
-      icon: Activity,
-      color: 'text-muted-foreground',
-      label: operation.replace(/_/g, ' '),
-    }
-  );
+    return (
+      OPERATION_CONFIG[operation] ?? {
+        icon: Activity,
+        color: 'text-muted-foreground',
+        label: formatOperationLabel(operation),
+      }
+    );
 }
 
 function formatDetails(
@@ -119,7 +161,9 @@ function formatDetails(
     case 'PHASE_TRANSITION': {
       const from = details.from_phase as string | undefined;
       const to = details.to_phase as string | undefined;
-      if (from != null && to != null) return `Phase ${from} → Phase ${to}`;
+      if (from != null && to != null) {
+        return `${formatPhaseWithId(from)} → ${formatPhaseWithId(to)}`;
+      }
       return null;
     }
     case 'FEATURE_CREATED': {
@@ -162,6 +206,40 @@ function formatDetails(
       const skills = details.skills as string[] | undefined;
       if (skills && skills.length > 0) return skills.join(', ');
       return null;
+    }
+    case 'CLAIM_SUBMITTED': {
+      const claimType = details.claim_type as string | undefined;
+      const riskLevel = details.risk_level as string | undefined;
+      if (claimType && riskLevel) return `${claimType} (${riskLevel})`;
+      return claimType ?? riskLevel ?? null;
+    }
+    case 'POLICY_VERDICT': {
+      const verdict = details.verdict as string | undefined;
+      const ruleName = details.rule_name as string | undefined;
+      if (ruleName && verdict) return `${ruleName}: ${verdict}`;
+      return verdict ?? ruleName ?? null;
+    }
+    case 'WATCHER_REVIEW': {
+      const verdict = details.verdict as string | undefined;
+      const confidence = details.confidence as number | undefined;
+      if (verdict && confidence != null) {
+        return `${verdict} (${formatConfidence(confidence)})`;
+      }
+      return verdict ?? null;
+    }
+    case 'SECURITY_FINDING': {
+      const severity = details.severity as string | undefined;
+      const ruleId = details.rule_id as string | undefined;
+      if (severity && ruleId) return `${severity} · ${ruleId}`;
+      return severity ?? ruleId ?? null;
+    }
+    case 'FINDING_RESOLVED': {
+      const note = details.resolution_note as string | undefined;
+      return note ?? 'Security finding resolved';
+    }
+    case 'MIGRATION_007_PHASE_ALIGNMENT_APPLIED': {
+      const mapping = details.mapping as string | undefined;
+      return mapping ?? null;
     }
     default:
       return null;
