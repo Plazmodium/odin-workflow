@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.0] - 2026-03-10
+
+### Added
+- Product, Reviewer, and Watcher agent definitions for the current 11-phase workflow.
+- Workflow extension migrations `005_odin_v2_schema.sql`, `006_odin_v2_functions.sql`, and `007_odin_v2_phase_alignment.sql`.
+- Dashboard support for watcher verification and security findings.
+
+### Changed
+- Updated `ODIN.md`, README files, and shipped docs to reflect the current public workflow and repo structure.
+- Updated dashboard UI copy and activity rendering for the 11-phase workflow, watcher verification, and Reviewer semantics.
+
+### Validated
+- End-to-end dogfooding completed before sync to `odin-workflow`.
+- Dashboard build validation passed.
+- Reviewer/Semgrep validation completed with `0 findings` and `0 parser warnings`.
+
 ## [0.1.4] - 2026-02-23
 
 ### Fixed
