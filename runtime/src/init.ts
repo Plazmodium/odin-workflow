@@ -16,8 +16,6 @@ const CONFIG_TEMPLATE = [
   'supabase:',
   '  url: ${SUPABASE_URL}',
   '  secret_key: ${SUPABASE_SECRET_KEY}',
-  '  publishable_key: ${SUPABASE_PUBLISHABLE_KEY}',
-  '  anon_key: ${SUPABASE_ANON_KEY}',
   '',
   'skills:',
   '  paths:',
@@ -40,8 +38,6 @@ const CONFIG_TEMPLATE = [
 const ENV_LINES = [
   'SUPABASE_URL=https://your-project.supabase.co',
   'SUPABASE_SECRET_KEY=your-secret-key',
-  'SUPABASE_PUBLISHABLE_KEY=your-publishable-key',
-  'SUPABASE_ANON_KEY=your-anon-key',
   'SUPABASE_ACCESS_TOKEN=your-management-api-access-token',
 ];
 
