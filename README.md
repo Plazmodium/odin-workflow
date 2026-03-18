@@ -59,28 +59,39 @@ npm install
 npm run build
 ```
 
-Add Odin to your `.mcp.json`:
+Bootstrap your project config (recommended):
+
+```bash
+# For Amp / Claude Code / OpenCode:
+npm run init:project --prefix runtime -- --project-root /path/to/your/project --tool amp --write-mcp
+
+# For Codex:
+npm run init:project --prefix runtime -- --project-root /path/to/your/project --tool codex --write-mcp
+```
+
+This creates `.odin/config.yaml`, `.env.example`, and your harness config file. Secrets stay in `.env` — never in the MCP config.
+
+Or manually add this MCP server entry to your tool's settings file:
 
 ```json
 {
-  "mcpServers": {
-    "odin": {
-      "command": "node",
-      "args": ["runtime/dist/server.js"],
-      "env": {
-        "SUPABASE_URL": "https://your-project.supabase.co",
-        "SUPABASE_SECRET_KEY": "your-secret-key"
-      }
+  "odin": {
+    "command": "node",
+    "args": ["/absolute/path/to/runtime/dist/server.js"],
+    "env": {
+      "ODIN_PROJECT_ROOT": "/absolute/path/to/your/project"
     }
   }
 }
 ```
 
-Or bootstrap your project config:
-
-```bash
-npm run init:project --prefix runtime -- --project-root /path/to/your/project
-```
+| Tool | Where to add it |
+|------|----------------|
+| **Amp** | `settings.json` → `mcpServers` |
+| **Claude Code** | `.mcp.json` → `mcpServers` |
+| **OpenCode** | `.mcp.json` → `mcpServers` |
+| **Cursor** | Settings → MCP Servers |
+| **Codex** | `.codex/config.toml` (`[mcp_servers.odin]`) |
 
 See [runtime/README.md](runtime/README.md) for full configuration, available tools, and adapter architecture.
 
