@@ -1,0 +1,45 @@
+{
+  "name": "odin-runtime",
+  "version": "0.3.0",
+  "description": "Odin MCP runtime server for the 11-phase workflow",
+  "type": "module",
+  "main": "./dist/server.js",
+  "bin": {
+    "odin-runtime": "./dist/server.js",
+    "odin-runtime-init": "./dist/init.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "init:project": "node dist/init.js",
+    "start": "node dist/server.js",
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "odin",
+    "mcp",
+    "model-context-protocol",
+    "workflow",
+    "runtime"
+  ],
+  "author": "Odin Framework Contributors",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.0",
+    "@supabase/supabase-js": "^2.49.1",
+    "dotenv": "^16.4.7",
+    "postgres": "^3.4.8",
+    "yaml": "^2.7.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

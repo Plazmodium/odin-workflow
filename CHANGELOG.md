@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.0] - 2026-03-18
+
+### Added
+- **Provider-agnostic migrations** (`odin.apply_migrations`): new `SqlExecutor` adapter interface with two implementations — `DirectPostgresExecutor` (any PostgreSQL via `DATABASE_URL`) and `SupabaseManagementApiExecutor` (Supabase Management API).
+- **Auto-bootstrap**: `apply_migrations` detects existing Odin schema on first run and seeds the `odin_migrations` tracking table so already-applied migrations are not re-run.
+- `DATABASE_URL` config support — Odin now works with any PostgreSQL provider (Neon, Railway, self-hosted, etc.), not just Supabase.
+- `postgres` (postgres.js) dependency for direct PostgreSQL connections.
+- Knowledge exploration tool (`odin.explore_knowledge`) for domain cluster inspection, cross-domain bridges, and resonance ranking.
+- TLA+ formal design verification skill (`agents/skills/architecture/tla-precheck/`).
+- Dashboard domain cluster map component for learnings visualization.
+
+### Changed
+- **ODIN.md comprehensively rewritten**: all raw SQL replaced with `odin.*` tool calls, added Orchestrator Loop section, updated State Management, Required MCP Servers, Project Structure, and Quick Reference.
+- Runtime README updated for provider-agnostic setup with dual connection methods.
+- `apply-migrations.ts` rewritten to v0.2.0 using the adapter pattern.
+- `config.ts` updated with `database.url` field.
+- Runtime `package.json` bumped to `0.3.0`.
+- Agent definitions and shared context updated for current workflow semantics.
+
 ## [0.2.0] - 2026-03-10
 
 ### Added

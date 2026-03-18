@@ -1,7 +1,7 @@
 # ODIN.md
 
 > **Odin** is a Specification-Driven Development (SDD) framework for AI-assisted development.
-> It provides 11 workflow and support agents, adaptive complexity levels, a learnings system with
+> It provides 12 specialized agents, adaptive complexity levels, a learnings system with
 > confidence scoring, EVALS for health monitoring, and Watcher verification for critical phases.
 
 ---
@@ -60,7 +60,7 @@ When developers use AI coding assistants without proper specifications:
 - **Adaptive complexity** (L1/L2/L3) - specs scale to match task size
 - **Learnings system** with confidence scoring and multi-target propagation
 - **EVALS** for health monitoring and performance diagnostics
-- **11-phase workflow** with 11 workflow and support agents
+- **11-phase workflow** with 12 specialized agents
 - **Watcher verification** - Policy Engine + LLM escalation for critical phases
 - **Skills system** with 36+ domain-specific knowledge modules
 
@@ -93,40 +93,71 @@ All features: PLANNING -> PRODUCT -> DISCOVERY -> ARCHITECT -> GUARDIAN -> BUILD
 
 > **Detailed Documentation**: See [multi-agent-protocol.md](docs/framework/multi-agent-protocol.md)
 
+### Orchestrator Loop
+
+This is the canonical step-by-step workflow the orchestrator follows for every feature:
+
+```
+1. git checkout -b {initials}/feature/{ID}         # Create branch FIRST
+2. odin.start_feature({ id, name, ... })           # Record in database
+3. For each phase 0→9:
+   a. odin.get_next_phase({ feature_id })           # Confirm next phase
+   b. odin.prepare_phase_context({ feature_id, phase, agent_name })
+                                                     # Get agent bundle
+   c. Read agent definition from agents/definitions/ # Load mandatory checklist
+   d. Invoke agent (Task tool or inline)             # Agent produces output
+   e. odin.record_phase_artifact({ ... })            # Persist artifacts
+   f. Phase-specific actions:
+      - Phase 4 (Guardian): verify spec quality rubric scores 2/2
+      - Phase 5 (Builder): update task statuses after each task
+      - Phase 6 (Reviewer): odin.run_review_checks({ ... })
+      - Phase 9 (Release): odin.verify_claims({ ... }), check coverage,
+                            odin.archive_feature_release({ ... }),
+                            gh pr create
+   g. odin.record_phase_result({ ..., outcome: "completed" })
+                                                     # Advance to next phase
+4. STOP after PR creation — wait for human to merge
+```
+
+> **Remember**: Only the main orchestrator session can call `odin.*` tools. Task-spawned sub-agents cannot access MCP — they produce output that the orchestrator persists.
+
 ### Task Tracking Protocol
 
-The Architect (Phase 3) records a task breakdown via `record_phase_output()`. The Builder (Phase 5) updates task statuses as work progresses. This drives the dashboard's task progress display.
+The Architect (Phase 3) records a task breakdown. The orchestrator updates task statuses during the Builder phase (Phase 5). This drives the dashboard's task progress display.
 
-**Architect responsibility** (Phase 3):
-```sql
--- Record tasks with explicit 'pending' status for each task
-SELECT * FROM record_phase_output(
-  'FEAT-001', '3'::phase, 'tasks',
-  '[
-    {"id": "T1", "title": "Create component", "status": "pending"},
-    {"id": "T2", "title": "Add tests", "status": "pending"}
-  ]'::jsonb,
-  'architect-agent'
-);
+**Architect phase** — orchestrator records initial tasks:
+```
+odin.record_phase_artifact({
+  feature_id: "FEAT-001",
+  phase: "3",
+  output_type: "tasks",
+  content: [
+    { id: "T1", title: "Create component", status: "pending" },
+    { id: "T2", title: "Add tests", status: "pending" }
+  ],
+  created_by: "architect-agent"
+})
 ```
 
-**Builder/Orchestrator responsibility** (Phase 5):
-```sql
--- After completing each task, upsert with updated statuses
-SELECT * FROM record_phase_output(
-  'FEAT-001', '3'::phase, 'tasks',
-  '[
-    {"id": "T1", "title": "Create component", "status": "completed"},
-    {"id": "T2", "title": "Add tests", "status": "in-progress"}
-  ]'::jsonb,
-  'builder-agent'
-);
+**Builder phase** — orchestrator updates task statuses after each task completes:
 ```
+odin.record_phase_artifact({
+  feature_id: "FEAT-001",
+  phase: "3",
+  output_type: "tasks",
+  content: [
+    { id: "T1", title: "Create component", status: "completed" },
+    { id: "T2", title: "Add tests", status: "in-progress" }
+  ],
+  created_by: "builder-agent"
+})
+```
+
+> **Note**: Task artifacts always target **phase "3"** (where they were defined), even when updated during phase 5. This is an upsert — same feature/phase/output_type replaces the previous record.
 
 **Rules**:
 - Every task object MUST include `id`, `title`, and `status` fields
 - Valid statuses: `pending`, `in-progress`, `completed` (also accepts `done`)
-- `record_phase_output()` is an upsert — same feature/phase/type replaces the previous record
 - The orchestrator MUST call this after each task completion, not just at the end of the Builder phase
 
 ---
@@ -182,7 +213,7 @@ Before implementation, score your spec:
 
 ---
 
-## Agents
+## The 12 Agents
 
 | Agent | Phases | Watched? | Role |
 |-------|--------|----------|------|
@@ -197,6 +228,7 @@ Before implementation, score your spec:
 | [Documenter](agents/definitions/documenter.md) | 8 | No | Documentation generation |
 | [Release](agents/definitions/release.md) | 9 | **YES** | PR creation and feature archival |
 | [Watcher](agents/definitions/watcher.md) | Any | - | LLM escalation for claim verification |
+| [Consultant](agents/definitions/spec-driven-dev-consultant.md) | Any | No | Spec refinement and analysis |
 
 All agents inherit shared context from [_shared-context.md](agents/definitions/_shared-context.md).
 
@@ -293,15 +325,21 @@ Builder, Integrator, and Release are **watched agents**. They emit structured cl
 ```
 Builder/Integrator/Release emit claims
          ↓
-   agent_claims (Supabase)
+   Odin Runtime (agent_claims table)
          ↓
-   Policy Engine (SQL - deterministic)
+   Policy Engine (deterministic)
          ↓
    ┌─────┴─────┐
    ↓           ↓
   PASS    NEEDS_REVIEW
               ↓
         LLM Watcher (semantic)
+```
+
+Claims are submitted automatically by the runtime when agents record phase results. The orchestrator verifies claims using:
+
+```
+odin.verify_claims({ feature_id: "FEAT-001" })
 ```
 
 ### Claim Types
@@ -332,29 +370,6 @@ The LLM Watcher is called when ANY of these are true:
 2. Evidence refs missing or empty
 3. Policy Engine check inconclusive
 
-### Key Functions
-
-```sql
--- Agent submits claim
-SELECT * FROM submit_claim(
-  'FEAT-001', '5'::phase, 'builder-agent',
-  'CODE_ADDED', 'Implemented auth service',
-  '{"commit_sha": "abc123", "file_paths": ["src/auth.ts"]}'::jsonb,
-  'HIGH'  -- risk_level
-);
-
--- Policy Engine verifies (automatic)
-SELECT * FROM policy_verify_evidence(claim_id);
-
--- Get claims needing LLM review
-SELECT * FROM get_claims_needing_review('FEAT-001');
-
--- Record Watcher verdict
-SELECT * FROM record_watcher_review(
-  claim_id, 'PASS', 'Evidence supports claim', 'watcher-agent', 0.90
-);
-```
-
 ### Watcher Verdicts
 
 | Verdict | Meaning | Action |
@@ -373,10 +388,16 @@ The Reviewer agent (Phase 6) performs static application security testing using 
 
 ### How It Works
 
-1. Reviewer scans changed files: `semgrep scan --config=auto --json`
-2. Findings recorded to `security_findings` table
-3. HIGH/CRITICAL findings **block release**
-4. LOW/MEDIUM findings can be deferred with justification
+The orchestrator calls:
+```
+odin.run_review_checks({
+  feature_id: "FEAT-001",
+  initiated_by: "reviewer-agent",
+  changed_files: ["src/auth.ts", "src/api/users.ts"]
+})
+```
+
+The runtime handles everything: runs Semgrep, records findings, and reports results. The orchestrator does NOT need to run Semgrep directly or record findings manually.
 
 ### Severity Levels
 
@@ -387,25 +408,6 @@ The Reviewer agent (Phase 6) performs static application security testing using 
 | MEDIUM | Can defer with justification |
 | LOW | Can defer with justification |
 | INFO | Optional |
-
-### Key Functions
-
-```sql
--- Record finding
-SELECT * FROM record_security_finding(
-  'FEAT-001', 'semgrep', 'HIGH',
-  'SQL injection vulnerability',
-  'src/api/users.ts', 42, 'sql-injection-rule'
-);
-
--- Resolve finding
-SELECT * FROM resolve_security_finding(
-  finding_id, 'builder-agent', 'Fixed with parameterized query'
-);
-
--- Check if feature can proceed
-SELECT * FROM can_proceed_past_reviewer('FEAT-001');
-```
 
 ---
 
@@ -451,35 +453,21 @@ Example: `jd/feature/AUTH-001`
 
 ### Developer Identity
 
-The `dev_initials` and `author` parameters in `create_feature()` identify the human developer. The orchestrator must **never guess** these values. To obtain them:
+The `dev_initials` and `author` parameters in `odin.start_feature` identify the human developer. The orchestrator must **never guess** these values. To obtain them:
 
 1. **Check git config**: `git config user.name` for author, derive initials from the name
-2. **Check recent features**: Query `SELECT dev_initials, author FROM features WHERE dev_initials IS NOT NULL ORDER BY created_at DESC LIMIT 1`
-3. **Ask the developer** if neither source is available
+2. **Ask the developer** if git config is not available
 
 ### Workflow
 
 1. **Orchestrator creates the git branch FIRST**: `git checkout -b {dev_initials}/feature/{FEATURE-ID}` — this must succeed before anything is recorded in the database
-2. **Only after the branch exists**, call `create_feature()` to record the feature in the database
+2. **Only after the branch exists**, call `odin.start_feature` to record the feature
 3. Transition to Phase 1 (Product) — all work happens on the feature branch
-4. Commits tracked per phase via `record_commit()`
+4. Each phase: `odin.prepare_phase_context` → agent work → `odin.record_phase_artifact` → `odin.record_phase_result`
 5. Release phase creates PR via `gh pr create`
 6. Human reviews and merges (NEVER the agent)
 
-> **CRITICAL**: Create the git branch BEFORE calling `create_feature()`. If branch creation fails (e.g., branch already exists, git error), do NOT create the feature in the database — you would have a dead DB record with no branch. The branch is the real artifact; the DB record is just tracking.
-
-### Key Functions
-
-```sql
--- Track commit per phase
-SELECT * FROM record_commit('FEAT-001', 'abc123', '4'::phase, 'feat: add login');
-
--- Record PR creation
-SELECT * FROM record_pr('FEAT-001', 'https://github.com/org/repo/pull/42', 42);
-
--- Record merge (human only)
-SELECT * FROM record_merge('FEAT-001', 'human');
-```
+> **CRITICAL**: Create the git branch BEFORE calling `odin.start_feature`. If branch creation fails (e.g., branch already exists, git error), do NOT create the feature — you would have a dead DB record with no branch. The branch is the real artifact; the DB record is tracking.
 
 ---
 
@@ -515,75 +503,28 @@ The archive modal renders files using `react-markdown`. If you upload raw JSON (
 - Response time < 200ms for login endpoint
 ```
 
-**Wrong**: Uploading raw JSON from `record_phase_output()`:
+**Wrong**: Uploading raw JSON output directly:
 ```json
 [{"id":"REQ-1","title":"User can log in","priority":"HIGH","type":"functional"}]
 ```
 
 The Release Agent must transform phase output JSON into human-readable markdown before passing files to the archive upload.
 
-### Archive Storage
+### Archive Workflow
 
-Files are uploaded to Supabase Storage bucket `workflow-archives/{FEATURE-ID}/`:
+The orchestrator archives features using:
 
 ```
-workflow-archives/
-├── AUTH-001/
-│   ├── requirements.md
-│   ├── spec.md
-│   └── tasks.md
-├── USER-042/
-│   └── ...
+odin.archive_feature_release({
+  feature_id: "AUTH-001",
+  summary: "JWT authentication implementation",
+  archived_by: "release-agent",
+  release_version: "1.0.0",              // optional
+  release_notes: "Added JWT login flow"   // optional
+})
 ```
 
-### Archive Workflow (Hybrid Orchestration)
-
-1. **Release Agent** documents files to archive in State Changes
-2. **Orchestrator** uploads files via `archive-upload` Edge Function
-
-**IMPORTANT**: Use Node.js (not curl) to preserve newlines in markdown files:
-
-```javascript
-// Archive files with proper newline preservation
-node -e "
-const fs = require('fs');
-const https = require('https');
-
-const payload = JSON.stringify({
-  feature_id: 'AUTH-001',
-  files: [
-    { name: 'requirements.md', content: fs.readFileSync('specs/AUTH-001/requirements.md', 'utf8') },
-    { name: 'spec.md', content: fs.readFileSync('specs/AUTH-001/spec.md', 'utf8') }
-  ]
-});
-
-const req = https.request({
-  hostname: '[project-ref].supabase.co',
-  path: '/functions/v1/archive-upload',
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer [anon-key]',
-    'Content-Type': 'application/json',
-    'Content-Length': Buffer.byteLength(payload)
-  }
-}, (res) => {
-  let data = '';
-  res.on('data', chunk => data += chunk);
-  res.on('end', () => console.log(data));
-});
-req.write(payload);
-req.end();
-"
-```
-
-> **WARNING**: Do NOT use curl with shell substitution like `$(cat file | tr '\n' ' ')` — this strips newlines and breaks markdown rendering.
-
-3. **Orchestrator** records archive in database:
-
-```sql
-INSERT INTO feature_archives (feature_id, storage_path, files_archived, ...)
-VALUES ('AUTH-001', 'workflow-archives/AUTH-001/', ARRAY['requirements.md', 'spec.md'], ...);
-```
+The runtime handles file upload (to Supabase Storage) and database recording automatically. The orchestrator does NOT need to call Edge Functions or insert archive records manually.
 
 ### Why Archive?
 
@@ -599,12 +540,12 @@ VALUES ('AUTH-001', 'workflow-archives/AUTH-001/', ARRAY['requirements.md', 'spe
 
 ### NEVER Skip Phases OR Steps
 
-**All 11 phases must be executed for every feature.** The `transition_phase()` function enforces this at the database level — attempting to skip a phase will raise an error.
+**All 11 phases must be executed for every feature.** The runtime enforces this at the database level — `odin.record_phase_result` with a forward transition will raise an error if phases are skipped.
 
 **All steps within each phase must also be executed.** Each agent definition contains a **Mandatory Steps Checklist** that must be followed in order. This is enforced at the agent level — the orchestrator must verify each step is completed or explicitly marked N/A with justification.
 
 **Two levels of enforcement**:
-- **Phase enforcement**: Database-level. `transition_phase()` rejects forward skips.
+- **Phase enforcement**: Database-level. The runtime rejects forward phase skips.
 - **Step enforcement**: Agent-level. Each agent has a mandatory checklist. The orchestrator reads the agent definition before each phase and executes every step.
 
 **Complexity level** (L1/L2/L3) affects the **depth** within each phase and each step, not which phases or steps run:
@@ -612,7 +553,7 @@ VALUES ('AUTH-001', 'workflow-archives/AUTH-001/', ARRAY['requirements.md', 'spe
 - L1 steps can produce minimal output, but they must still execute
 - Forward transitions must be sequential: 0→1→2→3→4→5→6→7→8→9
 - Backward transitions (rework) can go to any earlier phase
-- Phase 10 (Complete) is set by `complete_feature()`, not by `transition_phase()`
+- Phase 10 (Complete) is set automatically when the release phase completes successfully
 
 **Example**: An L1 bug fix still goes through all phases AND all steps:
 - Phase 0 (Planning): "Single bug fix, no epic"
@@ -657,67 +598,32 @@ A passing `npm run build` does NOT guarantee correctness. Integrator must spot-c
 
 ### Agent Invocation Coverage Gate (Release)
 
-Before Phase 9 release actions and before calling `complete_feature(...)`, the orchestrator MUST verify agent invocation telemetry coverage.
+Before Phase 9 release actions, the orchestrator MUST verify that all phases have recorded agent invocations. Use:
 
-**Coverage requirement by checkpoint**:
-- Before PR/release actions: phases **1-8** must have completed invocations
-- Before `complete_feature(...)`: phases **1-9** must have completed invocations
-
-**Expected phase/agent mapping**:
-- `1` -> `product-agent`
-- `2` -> `discovery-agent`
-- `3` -> `architect-agent`
-- `4` -> `guardian-agent`
-- `5` -> `builder-agent`
-- `6` -> `reviewer-agent`
-- `7` -> `integrator-agent`
-- `8` -> `documenter-agent`
-- `9` -> `release-agent`
-
-**Validation query**:
-```sql
-WITH expected AS (
-  SELECT * FROM (VALUES
-    ('1'::phase, 'product-agent'::text),
-    ('2'::phase, 'discovery-agent'::text),
-    ('3'::phase, 'architect-agent'::text),
-    ('4'::phase, 'guardian-agent'::text),
-    ('5'::phase, 'builder-agent'::text),
-    ('6'::phase, 'reviewer-agent'::text),
-    ('7'::phase, 'integrator-agent'::text),
-    ('8'::phase, 'documenter-agent'::text),
-    ('9'::phase, 'release-agent'::text)
-  ) AS t(phase, agent_name)
-), actual AS (
-  SELECT phase, agent_name
-  FROM agent_invocations
-  WHERE feature_id = :feature_id
-    AND ended_at IS NOT NULL
-    AND duration_ms IS NOT NULL
-)
-SELECT e.phase, e.agent_name
-FROM expected e
-LEFT JOIN actual a
-  ON a.phase = e.phase
- AND a.agent_name = e.agent_name
-WHERE a.phase IS NULL;
+```
+odin.get_feature_status({ feature_id: "FEAT-001" })
 ```
 
-**Pass/fail rule**:
-- **PASS**: query returns zero rows
-- **FAIL**: query returns one or more missing phase/agent pairs
+Check the returned status for invocation coverage across phases 1-8 (before PR) and 1-9 (before completion).
 
-**On FAIL (mandatory)**:
-1. Record quality gate failure with `gate_name = 'agent_invocation_coverage'` and status `REJECTED` (fail semantic)
-2. Create/update a blocker listing missing phase/agent pairs
-3. Halt release progression (do not create PR, do not call `complete_feature(...)`)
+**Expected phase/agent mapping**:
 
-**Remediation (explicit only, never silent)**:
-- Optional backfill may derive invocations from `phase_transitions`
-- Backfilled rows must include explicit notes about the source
-- Re-run coverage validation and proceed only after PASS
+| Phase | Agent |
+|-------|-------|
+| 1 | product-agent |
+| 2 | discovery-agent |
+| 3 | architect-agent |
+| 4 | guardian-agent |
+| 5 | builder-agent |
+| 6 | reviewer-agent |
+| 7 | integrator-agent |
+| 8 | documenter-agent |
+| 9 | release-agent |
 
-**Important**: Dashboard fallback aggregation is display resilience only. It does not satisfy workflow correctness.
+**On missing coverage (mandatory)**:
+1. Do NOT create PR or complete the feature
+2. Identify which phases are missing invocations
+3. Backfill or re-run the missing phases before proceeding
 
 ---
 
@@ -725,7 +631,13 @@ WHERE a.phase IS NULL;
 
 ### State Management
 
-All Odin state uses Supabase PostgreSQL via `mcp_supabase_execute_sql`.
+Odin state is managed through the **Odin MCP Runtime** (`odin` server) — a single-install TypeScript MCP server that provides all workflow tools (`odin.start_feature`, `odin.prepare_phase_context`, `odin.record_phase_artifact`, etc.).
+
+The runtime supports any PostgreSQL provider as its backend:
+- **Direct PostgreSQL** via `DATABASE_URL` (Neon, Railway, self-hosted, etc.)
+- **Supabase Management API** via `SUPABASE_URL` + `SUPABASE_ACCESS_TOKEN`
+
+Database schema is applied via `odin.apply_migrations`, which auto-detects existing schemas and tracks applied migrations. See [runtime/README.md](runtime/README.md) for full configuration.
 
 ### MCP Limitation
 
@@ -777,33 +689,35 @@ Keep only Context & Goals and Acceptance Criteria.
 
 | Server | Purpose | Required |
 |--------|---------|----------|
-| `supabase` | Workflow state, claims, learnings, EVALS | **Yes** |
-| `docker-gateway` | Hosts toolkit servers (see below) | **Yes** |
+| `odin` | Workflow state, phase context, artifacts, learnings, reviews, migrations | **Yes** |
+| `docker-gateway` | Hosts toolkit servers (see below) | Recommended |
 | `filesystem` | Direct file access | Recommended |
 | `github` | Pull issues, PRs, tickets | Optional |
+
+The `odin` server is the Odin MCP Runtime. It provides all `odin.*` tools and manages workflow state via PostgreSQL (any provider). See [runtime/README.md](runtime/README.md) for setup.
 
 **Docker Gateway Toolkit:**
 
 | Tool | Purpose | When Used |
 |------|---------|-----------|
 | `context7` | Library docs lookup | Architect, Builder |
-| `semgrep` | SAST scanning | Reviewer phase |
 | `sequentialthinking` | Complex multi-step reasoning | Any complex task |
-| `memory` | Knowledge graph | Backup to Supabase |
+| `memory` | Knowledge graph | Optional knowledge backup |
 
 ### Trigger Phrases
 
 ```
 "Read issue #123 from the repository..."          -> github MCP
-"Check the users table schema..."                 -> supabase MCP
-"Read src/components/Modal.tsx to understand..."  -> filesystem MCP
-"Run semgrep scan on src/..."                     -> docker-gateway (semgrep)
+"Start feature FEAT-001..."                       -> odin MCP (odin.start_feature)
+"What phase is next?..."                          -> odin MCP (odin.get_next_phase)
+"Apply database migrations..."                    -> odin MCP (odin.apply_migrations)
+"Read src/components/Modal.tsx to understand..."   -> filesystem MCP
 "Get Next.js docs for app router..."              -> docker-gateway (context7)
 ```
 
 ### Security Rules
 
-- Database MCP: read-only during spec phase (no INSERT/UPDATE/DELETE)
+- Odin runtime handles database access — agents use `odin.*` tools, not raw SQL
 - Docker Gateway: only invoke tools documented in agent definitions
 
 ---
@@ -815,14 +729,16 @@ odin/
 ├── ODIN.md                    # This file
 ├── README.md                  # Quick start
 ├── agents/
-│   ├── definitions/           # 11 agent prompts + shared context
+│   ├── definitions/           # 12 agent prompts + shared context
 │   └── skills/                # 36+ domain skills
+├── runtime/                   # Odin MCP Runtime (TypeScript)
+│   ├── src/                   # Source code
+│   └── migrations/            # Bundled database migrations
 ├── docs/
 │   ├── framework/             # SDD-framework.md, multi-agent-protocol.md
 │   ├── guides/                # example-workflow.md, SUPABASE-SETUP.md
 │   └── reference/             # SKILLS-SYSTEM.md, orchestration patterns
 ├── dashboard/                 # Next.js monitoring dashboard
-├── migrations/                # Supabase migrations
 ├── templates/                 # Spec templates (API, UI, Data, Infrastructure)
 └── examples/                  # Worked examples (DOC-001, API-001)
 ```
@@ -849,81 +765,113 @@ odin/
 
 ---
 
-## Quick Reference
+## Quick Reference: Odin Runtime Tools
+
+All workflow operations use `odin.*` tools provided by the Odin MCP Runtime.
+
+### Setup & Migrations
+
+```
+odin.apply_migrations({ dry_run: false })
+```
+Applies pending database migrations. Auto-detects existing schemas on first run. Supports `DATABASE_URL` (any PostgreSQL provider) or Supabase Management API.
 
 ### Create a Feature
 
-```sql
-SELECT * FROM create_feature(
-  'FEAT-001',           -- id
-  'My Feature',         -- name
-  2,                    -- complexity_level (1, 2, or 3)
-  'ROUTINE',            -- severity (ROUTINE, EXPEDITED, CRITICAL)
-  NULL,                 -- epic_id (optional)
-  NULL,                 -- requirements_path (optional)
-  'orchestrator',       -- created_by
-  'jd',                 -- dev_initials (optional)
-  'main',               -- base_branch (optional)
-  'John Doe'            -- author (optional)
-);
+```
+odin.start_feature({
+  id: "FEAT-001",
+  name: "My Feature",
+  complexity_level: 2,        // 1, 2, or 3
+  severity: "ROUTINE",        // ROUTINE, EXPEDITED, CRITICAL
+  dev_initials: "jd",         // optional
+  base_branch: "main",        // optional
+  author: "John Doe"          // optional
+})
 ```
 
-### Transition Phase
+### Phase Workflow
 
-```sql
-SELECT * FROM transition_phase(
-  'FEAT-001',           -- feature_id
-  '3'::phase,           -- to_phase (0-10)
-  'architect-agent',    -- agent_name
-  'Notes here'          -- notes (optional)
-);
+```
+odin.get_next_phase({ feature_id: "FEAT-001" })
+
+odin.prepare_phase_context({
+  feature_id: "FEAT-001",
+  phase: "3",
+  agent_name: "architect-agent"
+})
+
+odin.record_phase_artifact({
+  feature_id: "FEAT-001",
+  phase: "3",
+  output_type: "spec",
+  content: { ... },
+  created_by: "architect-agent"
+})
+
+odin.record_phase_result({
+  feature_id: "FEAT-001",
+  phase: "3",
+  outcome: "completed",
+  summary: "Spec drafted",
+  created_by: "architect-agent"
+})
 ```
 
-### Track Agent Work
+### Review & Verification
 
-```sql
--- Start tracking
-SELECT * FROM start_agent_invocation(
-  'FEAT-001',
-  '2'::phase,
-  'architect-agent',
-  'Operation description',
-  ARRAY['frontend/nextjs-dev']  -- skills_used (optional)
-);
+```
+odin.run_review_checks({
+  feature_id: "FEAT-001",
+  initiated_by: "reviewer-agent",
+  changed_files: ["src/auth.ts"]
+})
 
--- End tracking (calculates duration)
-SELECT * FROM end_agent_invocation(invocation_id);
+odin.verify_claims({ feature_id: "FEAT-001" })
 ```
 
-### Approve Quality Gate
+### Learnings & Knowledge
 
-```sql
-SELECT * FROM approve_gate(
-  'FEAT-001',
-  'guardian_approval',
-  'APPROVED',
-  'guardian-agent',
-  'Spec meets all criteria'
-);
+```
+odin.capture_learning({
+  feature_id: "FEAT-001",
+  phase: "5",
+  title: "Cache invalidation pattern",
+  content: "...",
+  category: "PATTERN",
+  domain_tags: ["nextjs", "caching"],
+  created_by: "builder-agent"
+})
+
+odin.explore_knowledge({
+  tags: ["nextjs", "caching"]
+})
 ```
 
-### Complete Feature
+### Status & Release
 
-```sql
-SELECT * FROM complete_feature('FEAT-001', 'release-agent');
+```
+odin.get_feature_status({ feature_id: "FEAT-001" })
+
+odin.archive_feature_release({
+  feature_id: "FEAT-001",
+  summary: "JWT auth implementation",
+  archived_by: "release-agent"
+})
 ```
 
-> **Precondition**: Agent invocation coverage must pass before calling `complete_feature(...)`.
+> **Precondition**: Agent invocation coverage must pass before completing a feature.
 
 ---
 
 ## Getting Started
 
 1. **Read the framework**: [SDD-framework.md](docs/framework/SDD-framework.md)
-2. **Understand agents**: [multi-agent-protocol.md](docs/framework/multi-agent-protocol.md)
-3. **See an example**: [example-workflow.md](docs/guides/example-workflow.md)
-4. **Set up Supabase**: [SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md)
-5. **Explore skills**: [SKILLS-SYSTEM.md](docs/reference/SKILLS-SYSTEM.md)
+2. **Set up the runtime**: [runtime/README.md](runtime/README.md)
+3. **Understand agents**: [multi-agent-protocol.md](docs/framework/multi-agent-protocol.md)
+4. **See an example**: [example-workflow.md](docs/guides/example-workflow.md)
+5. **Database setup**: [SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md)
+6. **Explore skills**: [SKILLS-SYSTEM.md](docs/reference/SKILLS-SYSTEM.md)
 
 ---
 

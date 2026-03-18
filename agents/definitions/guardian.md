@@ -222,11 +222,32 @@ Covers: technical approach, dependencies, error handling, architecture alignment
 - [ ] Is data flow logical?
 - [ ] Are performance implications considered?
 
+**Formal Design Verification** (when `design_verification` artifact exists in phase context):
+- [ ] Did all identified state flows pass proof? (`overall_status: VERIFIED`)
+- [ ] Is the TLA+ spec equivalent to the TypeScript interpreter for each machine? (`equivalent: true`)
+- [ ] Are all declared invariants verified with zero violations?
+- [ ] Are the state flow boundaries correct? (not too narrow — missing transitions; not too wide — modeling unrelated state)
+
+**Three-tier gating** — only score proof results when ALL gates passed:
+1. **Repo enabled**: `formal_verification.provider = tla-precheck` in config
+2. **Feature applicable**: spec contains state flows (lifecycle transitions, concurrent shared state, invariants)
+3. **Environment available**: `isAvailable()` returned true (Java + tla-precheck present)
+
+**Scoring impact of proof results**:
+- All gates pass + all machines `VERIFIED` → supports **Good** on Technical Soundness
+- All gates pass + any machine `VIOLATION` → **Blocking** (design must be fixed before approval)
+- All gates pass + any machine `INVALID_MODEL` → **Needs Work** (DSL error, not design error — request Architect fix and re-run)
+- All gates pass + state flows in spec but no proof run → **Needs Work** (request Architect run `odin.verify_design`)
+- Gate 1 or 3 not satisfied (not configured / tool unavailable) → **N/A**, no impact on scoring
+- Gate 2 not satisfied (no state flows in feature) → **N/A**, no impact on scoring
+
 **Common Issues**:
 - ❌ Conflicts with existing architectural patterns
 - ❌ Missing error handling for critical paths
 - ❌ Unclear separation of concerns
 - ❌ N+1 query problems in proposed design
+- ❌ State machine invariant violations (when proof results present)
+- ❌ State flows identified but not formally verified
 
 **Example Feedback**:
 ```markdown

@@ -30,7 +30,7 @@ This guide walks you through setting up Supabase as the backend for the Odin's w
 1. Go to [Supabase Dashboard](https://app.supabase.com)
 2. Click **New Project**
 3. Fill in:
-   - **Name**: `odin-workflow` (or your preference)
+   - **Name**: `sdd-framework` (or your preference)
    - **Database Password**: Generate a strong password (save this!)
    - **Region**: Choose closest to you
 4. Click **Create new project**
@@ -66,7 +66,7 @@ Odin uses 4 consolidated migration files (replacing the original 28 development 
 ### Option A: Via Supabase Dashboard (Recommended)
 
 1. Go to **SQL Editor** in Supabase Dashboard
-2. Run each migration file in order from `migrations/`
+2. Run each migration file in order from `system/database/supabase-migrations/`
 3. Run migrations 001 through 004 sequentially
 
 ### Option B: Via Supabase MCP (If Already Configured)
@@ -357,7 +357,7 @@ DELETE FROM features WHERE id = 'TEST-001';
 
 ### Test Dashboard Connection
 
-1. Start dashboard: `cd dashboard && npm run dev`
+1. Start dashboard: `cd system/dashboard && npm run dev`
 2. Open http://localhost:3000
 3. Verify Health Overview loads (may show "No features found" if empty)
 4. Create a test feature via SQL and verify it appears
@@ -505,8 +505,9 @@ WHERE bucket_id = 'workflow-archives' AND name LIKE 'SETUP-TEST/%';
 | [ODIN.md](../../ODIN.md) | Framework overview |
 | [multi-agent-protocol.md](../framework/multi-agent-protocol.md) | Multi-agent workflow |
 | [SKILLS-SYSTEM.md](../reference/SKILLS-SYSTEM.md) | Composable skills |
-| [HYBRID-ORCHESTRATION-PATTERN.md](../reference/HYBRID-ORCHESTRATION-PATTERN.md) | MCP orchestration model |
-| [README.md](../../migrations/README.md) | Migration details |
+| [ORCHESTRATOR-MEMORY-PATTERN.md](../reference/ORCHESTRATOR-MEMORY-PATTERN.md) | Memory persistence |
+| [SEQUENTIAL-THINKING-USAGE.md](../reference/SEQUENTIAL-THINKING-USAGE.md) | Complex reasoning |
+| [supabase-migrations/README.md](../../system/database/supabase-migrations/README.md) | Migration details |
 
 ---
 

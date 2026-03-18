@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.2.0--beta-orange" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.3.0--beta-orange" alt="Version">
   <img src="https://img.shields.io/badge/workflow-11_phase-blue" alt="11-phase workflow">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
 </p>
@@ -35,6 +35,9 @@ Odin fixes that with a spec-first workflow, adaptive complexity, explicit qualit
 - **Watcher verification** using deterministic policy checks plus LLM escalation for watched phases
 - **Semgrep-backed review phase** with severity-based blocking behavior
 - **Supabase-backed learnings and EVALS** for workflow state, memory, and health
+- **Odin MCP Runtime** — single-install TypeScript MCP server as the agent control plane
+- **Memory Palace** — semantic learning propagation with domain matching and cross-feature knowledge corridors
+- **TLA+ formal verification** — opt-in design verification for state machine specs via tla-precheck
 - **Dashboard support** for claims, watcher verification, security findings, and the 11-phase model
 
 ## Quick Start
@@ -48,45 +51,62 @@ cd odin-workflow
 
 ### 2. Configure MCP
 
-At minimum, configure:
+At minimum, configure the **Odin Runtime** MCP server. It provides all domain-level workflow tools (start features, prepare phase context, record artifacts, capture learnings, run reviews, and more).
 
-- **Supabase MCP** — workflow state, learnings, EVALS, claims
-- **Docker Gateway MCP** — Context7, Semgrep, Sequential Thinking, Memory
+```bash
+cd runtime
+npm install
+npm run build
+```
 
-Example `.mcp.json`:
+Add Odin to your `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
-    "supabase": {
-      "command": "npx",
-      "args": ["-y", "@supabase/mcp-server"],
+    "odin": {
+      "command": "node",
+      "args": ["runtime/dist/server.js"],
       "env": {
         "SUPABASE_URL": "https://your-project.supabase.co",
-        "SUPABASE_SERVICE_ROLE_KEY": "your-service-role-key"
+        "SUPABASE_SECRET_KEY": "your-secret-key"
       }
     }
   }
 }
 ```
 
-### 3. Apply the migrations
+Or bootstrap your project config:
 
-Ask your AI assistant to apply the SQL files in `migrations/` to your Supabase project.
-
-Current shipped migration set:
-
-```text
-001_schema.sql
-002_functions.sql
-003_views.sql
-004_seed.sql
-005_odin_v2_schema.sql
-006_odin_v2_functions.sql
-007_odin_v2_phase_alignment.sql
+```bash
+npm run init:project --prefix runtime -- --project-root /path/to/your/project
 ```
 
-See [docs/guides/SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) for the detailed setup flow.
+See [runtime/README.md](runtime/README.md) for full configuration, available tools, and adapter architecture.
+
+### 3. Apply the migrations
+
+Odin can apply its database migrations automatically via the runtime:
+
+```
+Use odin.apply_migrations to set up the database schema.
+```
+
+The tool works with any PostgreSQL provider. Configure one of these in your `.env`:
+
+```env
+# Option A: Direct PostgreSQL (Neon, Railway, self-hosted, etc.)
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+
+# Option B: Supabase Management API
+SUPABASE_ACCESS_TOKEN=sbp_your-access-token
+```
+
+`DATABASE_URL` takes priority if both are set. For Supabase, generate the access token at [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens).
+
+The tool reads migration files bundled with the runtime, applies any that haven't been run yet, and tracks them in an `odin_migrations` table. On first run against an existing database, it auto-detects the schema and seeds the tracking table so nothing is re-applied. Use `dry_run: true` to preview without applying.
+
+See [docs/guides/SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) for manual setup or troubleshooting.
 
 ### 4. Start using Odin
 
@@ -180,6 +200,7 @@ odin-workflow/
 ├── agents/
 │   ├── definitions/
 │   └── skills/
+├── runtime/               # Odin MCP Runtime (TypeScript)
 ├── docs/
 │   ├── framework/
 │   ├── guides/
@@ -233,7 +254,16 @@ Monitor feature health (efficiency + quality) and system health over time.
 
 ## Status
 
-Odin is in active beta. The current workflow is implemented and dogfooded, but the framework is still evolving through real usage.
+Odin is in active beta. The current workflow is implemented and dogfooded.
+
+### What Works
+
+- 11-phase workflow with database-enforced sequential phase transitions
+- Odin MCP Runtime — single-install TypeScript MCP server (13 tools, including self-service migrations)
+- Memory Palace — semantic learning propagation with domain matching and cross-feature knowledge corridors
+- TLA+ formal verification — opt-in design verification for state machine specs
+- Dashboard with 11-phase timeline, watcher verification, security findings, learnings
+- 36+ skills across frontend, backend, database, testing, devops, API, architecture
 
 ## Contributing
 
