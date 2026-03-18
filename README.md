@@ -244,6 +244,7 @@ Monitor feature health (efficiency + quality) and system health over time.
 
 | Tool | MCP Support | Agent Spawning | Status |
 |------|-------------|----------------|--------|
+| **Amp** | Native | Task tool | Full support |
 | **Claude Code** | Native | Task tool | Full support |
 | **OpenCode** | Native | Task tool | Full support |
 | **Cursor** | Recent | Composer | Full support |
