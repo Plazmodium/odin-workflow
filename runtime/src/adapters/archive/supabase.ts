@@ -1,6 +1,9 @@
 /**
  * Supabase Archive Adapter
- * Version: 0.1.0
+ * Version: 0.2.0
+ *
+ * Uploads archive files directly to Supabase Storage using the service_role
+ * client. No Edge Function required.
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -11,22 +14,22 @@ import type { ArchiveAdapter, RecordArchiveInput, UploadArchiveInput } from './t
 
 type JsonRecord = { [key: string]: unknown };
 
+const STORAGE_BUCKET = 'feature-archives';
+
 function requireArchiveConfig(config: RuntimeConfig): {
   url: string;
   secret_key: string;
-  invoke_key: string;
 } {
   const url = config.supabase?.url;
   const secret_key = config.supabase?.secret_key;
-  const invoke_key = config.supabase?.anon_key ?? config.supabase?.publishable_key;
 
-  if (!url || !secret_key || !invoke_key) {
+  if (!url || !secret_key) {
     throw new Error(
-      'Supabase archive adapter requires SUPABASE_URL, SUPABASE_SECRET_KEY, and a JWT-capable invoke key (prefer SUPABASE_ANON_KEY).' 
+      'Supabase archive adapter requires SUPABASE_URL and SUPABASE_SECRET_KEY.'
     );
   }
 
-  return { url, secret_key, invoke_key };
+  return { url, secret_key };
 }
 
 function toArchiveRecord(row: JsonRecord): FeatureArchiveRecord {
@@ -49,18 +52,11 @@ function toArchiveRecord(row: JsonRecord): FeatureArchiveRecord {
 
 export class SupabaseArchiveAdapter implements ArchiveAdapter {
   private readonly db: SupabaseClient;
-  private readonly invokeClient: SupabaseClient;
 
   constructor(config: RuntimeConfig) {
-    const { url, secret_key, invoke_key } = requireArchiveConfig(config);
+    const { url, secret_key } = requireArchiveConfig(config);
 
     this.db = createClient(url, secret_key, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
-    this.invokeClient = createClient(url, invoke_key, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -69,18 +65,39 @@ export class SupabaseArchiveAdapter implements ArchiveAdapter {
   }
 
   async uploadArchive(input: UploadArchiveInput): Promise<ArchiveUploadResult> {
-    const { data, error } = await this.invokeClient.functions.invoke('archive-upload', {
-      body: {
-        feature_id: input.feature_id,
-        files: input.files,
-      },
-    });
+    await this.ensureBucket();
 
-    if (error != null || data == null) {
-      throw new Error(`Archive upload failed: ${error?.message ?? 'No result returned.'}`);
+    const folder = `${input.feature_id}`;
+    const files_uploaded: string[] = [];
+    const errors: string[] = [];
+    let total_size_bytes = 0;
+
+    for (const file of input.files) {
+      const path = `${folder}/${file.name}`;
+      const content = new TextEncoder().encode(file.content);
+      total_size_bytes += content.byteLength;
+
+      const { error } = await this.db.storage
+        .from(STORAGE_BUCKET)
+        .upload(path, content, {
+          contentType: 'text/markdown',
+          upsert: true,
+        });
+
+      if (error != null) {
+        errors.push(`${file.name}: ${error.message}`);
+      } else {
+        files_uploaded.push(file.name);
+      }
     }
 
-    return data as ArchiveUploadResult;
+    return {
+      success: errors.length === 0,
+      storage_path: folder,
+      files_uploaded,
+      total_size_bytes,
+      errors: errors.length > 0 ? errors : undefined,
+    };
   }
 
   async recordArchive(input: RecordArchiveInput): Promise<FeatureArchiveRecord> {
@@ -122,5 +139,18 @@ export class SupabaseArchiveAdapter implements ArchiveAdapter {
     }
 
     return (data as JsonRecord[]).map(toArchiveRecord);
+  }
+
+  private async ensureBucket(): Promise<void> {
+    const { data } = await this.db.storage.getBucket(STORAGE_BUCKET);
+    if (data != null) return;
+
+    const { error } = await this.db.storage.createBucket(STORAGE_BUCKET, {
+      public: false,
+    });
+
+    if (error != null && !error.message.includes('already exists')) {
+      throw new Error(`Failed to create storage bucket "${STORAGE_BUCKET}": ${error.message}`);
+    }
   }
 }

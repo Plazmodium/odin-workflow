@@ -24,8 +24,6 @@ export interface RuntimeConfig {
   supabase?: {
     url?: string;
     secret_key?: string;
-    publishable_key?: string;
-    anon_key?: string;
     access_token?: string;
   };
   review?: {
@@ -134,8 +132,6 @@ export function loadRuntimeConfig(project_root: string): RuntimeConfig {
     supabase: {
       url: process.env.SUPABASE_URL,
       secret_key: process.env.SUPABASE_SECRET_KEY,
-      publishable_key: process.env.SUPABASE_PUBLISHABLE_KEY,
-      anon_key: process.env.SUPABASE_ANON_KEY,
       access_token: process.env.SUPABASE_ACCESS_TOKEN,
     },
   };
