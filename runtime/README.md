@@ -125,8 +125,10 @@ SUPABASE_ACCESS_TOKEN=your-management-api-access-token
 
 ### Runtime Modes
 
-- **`supabase`** — Full workflow state backed by Supabase. Requires `SUPABASE_URL` and `SUPABASE_SECRET_KEY`. The runtime will fail fast with a clear error if credentials are missing.
+- **`supabase`** (recommended) — Full workflow state backed by Supabase. Requires `SUPABASE_URL` and `SUPABASE_SECRET_KEY`. The runtime will fail fast with a clear error if credentials are missing. Provides all features including release archival via Supabase Edge Functions + Storage.
 - **`in_memory`** — Local-only scaffold mode. No external dependencies. State is lost when the process exits. Useful for testing the runtime surface without a Supabase project.
+
+> **Note on `DATABASE_URL`**: Using direct PostgreSQL (Neon, Railway, etc.) provides full workflow state and migrations, but **release archival** (`odin.archive_feature_release`) requires Supabase (Edge Functions + Storage). If you use `DATABASE_URL` without Supabase credentials, the archive tool will return an error. All other tools work normally.
 
 ## Project-Local Skills
 
