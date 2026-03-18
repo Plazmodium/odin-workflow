@@ -40,6 +40,14 @@ Odin fixes that with a spec-first workflow, adaptive complexity, explicit qualit
 - **TLA+ formal verification** — opt-in design verification for state machine specs via tla-precheck
 - **Dashboard support** for claims, watcher verification, security findings, and the 11-phase model
 
+## Prerequisites
+
+- **Node.js 18+** and **npm**
+- **PostgreSQL database** — any provider: [Supabase](https://supabase.com) (recommended), [Neon](https://neon.tech), [Railway](https://railway.app), self-hosted, etc.
+- **AI coding assistant** with MCP support (Amp, Claude Code, Cursor, etc.)
+
+> **Supabase recommended**: Provides full feature set including release archival (Edge Functions + Storage) and the monitoring dashboard. Other PostgreSQL providers work for all workflow tools except `odin.archive_feature_release`.
+
 ## Quick Start
 
 ### 1. Clone the repo
@@ -49,9 +57,7 @@ git clone https://github.com/Plazmodium/odin-workflow.git
 cd odin-workflow
 ```
 
-### 2. Configure MCP
-
-At minimum, configure the **Odin Runtime** MCP server. It provides all domain-level workflow tools (start features, prepare phase context, record artifacts, capture learnings, run reviews, and more).
+### 2. Install & bootstrap the Odin Runtime
 
 ```bash
 cd runtime
@@ -63,13 +69,13 @@ Bootstrap your project config (recommended):
 
 ```bash
 # For Amp / Claude Code / OpenCode:
-npm run init:project --prefix runtime -- --project-root /path/to/your/project --tool amp --write-mcp
+npm run init:project -- --project-root /path/to/your/project --tool amp --write-mcp
 
 # For Codex:
-npm run init:project --prefix runtime -- --project-root /path/to/your/project --tool codex --write-mcp
+npm run init:project -- --project-root /path/to/your/project --tool codex --write-mcp
 ```
 
-This creates `.odin/config.yaml`, `.env.example`, and your harness config file. Secrets stay in `.env` — never in the MCP config.
+This creates `.odin/config.yaml`, `.odin/skills/`, `.env.example`, and your harness config file. Secrets stay in `.env` — never in the MCP config.
 
 Or manually add this MCP server entry to your tool's settings file:
 
@@ -95,31 +101,40 @@ Or manually add this MCP server entry to your tool's settings file:
 
 See [runtime/README.md](runtime/README.md) for full configuration, available tools, and adapter architecture.
 
-### 3. Apply the migrations
+### 3. Add your database credentials
 
-Odin can apply its database migrations automatically via the runtime:
+```bash
+cp .env.example .env
+# Edit .env with your database credentials
+```
+
+Choose one:
+
+- **Direct PostgreSQL** (any provider):
+  ```env
+  DATABASE_URL=postgresql://user:password@host:5432/dbname
+  ```
+
+- **Supabase** (recommended — enables all features including archival):
+  ```env
+  SUPABASE_URL=https://your-project.supabase.co
+  SUPABASE_SECRET_KEY=your-secret-key
+  SUPABASE_ACCESS_TOKEN=your-management-api-access-token
+  ```
+
+`DATABASE_URL` takes priority if both are set. For Supabase, generate the access token at [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens).
+
+### 4. Apply database migrations
+
+Odin applies its schema automatically via the runtime:
 
 ```
 Use odin.apply_migrations to set up the database schema.
 ```
 
-The tool works with any PostgreSQL provider. Configure one of these in your `.env`:
+The tool auto-detects existing schemas on first run. Use `dry_run: true` to preview. See [docs/guides/SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) for manual setup or troubleshooting.
 
-```env
-# Option A: Direct PostgreSQL (Neon, Railway, self-hosted, etc.)
-DATABASE_URL=postgresql://user:password@host:5432/dbname
-
-# Option B: Supabase Management API
-SUPABASE_ACCESS_TOKEN=sbp_your-access-token
-```
-
-`DATABASE_URL` takes priority if both are set. For Supabase, generate the access token at [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens).
-
-The tool reads migration files bundled with the runtime, applies any that haven't been run yet, and tracks them in an `odin_migrations` table. On first run against an existing database, it auto-detects the schema and seeds the tracking table so nothing is re-applied. Use `dry_run: true` to preview without applying.
-
-See [docs/guides/SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) for manual setup or troubleshooting.
-
-### 4. Start using Odin
+### 5. Start using Odin
 
 Point your AI tool at [ODIN.md](ODIN.md) and use it as the framework guide for real feature work.
 
