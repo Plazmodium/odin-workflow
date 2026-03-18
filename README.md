@@ -46,7 +46,7 @@ Odin fixes that with a spec-first workflow, adaptive complexity, explicit qualit
 - **PostgreSQL database** — any provider: [Supabase](https://supabase.com) (recommended), [Neon](https://neon.tech), [Railway](https://railway.app), self-hosted, etc.
 - **AI coding assistant** with MCP support (Amp, Claude Code, Cursor, etc.)
 
-> **Supabase recommended**: Provides full feature set including release archival (Edge Functions + Storage) and the monitoring dashboard. Other PostgreSQL providers work for all workflow tools except `odin.archive_feature_release`.
+> **Supabase recommended**: Provides full feature set including release archival (Supabase Storage) and the monitoring dashboard. Other PostgreSQL providers work for all workflow tools except `odin.archive_feature_release`.
 
 ## Quick Start
 
