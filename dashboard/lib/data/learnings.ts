@@ -4,9 +4,14 @@
 import { createServerClient } from '@/lib/supabase';
 import type {
   ActiveLearning,
+  BridgeLearning,
+  DomainCluster,
+  DomainClusterLearning,
   Learning,
+  LearningCategory,
   PropagationQueueItem,
   PropagationHistoryItem,
+  PropagationTargetType,
   OpenConflict,
   LearningChainItem,
   LearningChainSummary,
@@ -282,4 +287,146 @@ export async function getLearningPropagationOverview(): Promise<
     .order('pending_count', { ascending: false });
   if (error || !data) return [];
   return data as LearningPropagationOverview[];
+}
+
+// ============================================================
+// Knowledge Map (Memory Palace visualization)
+// ============================================================
+
+export async function getDomainClusters(): Promise<{
+  clusters: DomainCluster[];
+  bridges: BridgeLearning[];
+}> {
+  const supabase = createServerClient();
+
+  // Get all propagation targets with learning details
+  const { data: targets, error: targetsError } = await supabase
+    .from('learning_propagation_targets')
+    .select(`
+      learning_id,
+      target_type,
+      target_path,
+      relevance_score,
+      learnings!inner (
+        id,
+        title,
+        category,
+        confidence_score,
+        feature_id,
+        is_superseded
+      )
+    `);
+
+  if (targetsError || !targets) return { clusters: [], bridges: [] };
+
+  // Get completed propagations for is_propagated status
+  const { data: propagations } = await supabase
+    .from('learning_propagations')
+    .select('learning_id, target_type, target_path');
+
+  const propagatedSet = new Set(
+    (propagations ?? []).map((p: Record<string, unknown>) =>
+      `${p.learning_id}|${p.target_type}|${p.target_path ?? ''}`
+    )
+  );
+
+  // Group by domain (target_type + target_path)
+  const domainMap = new Map<string, {
+    target_type: PropagationTargetType;
+    target_path: string | null;
+    learnings: Map<string, DomainClusterLearning>;
+    propagated_count: number;
+  }>();
+
+  // Track which domains each learning appears in (for bridges)
+  const learningDomains = new Map<string, { title: string; category: LearningCategory; domains: string[] }>();
+
+  for (const row of targets as Record<string, unknown>[]) {
+    const learning = row.learnings as {
+      id: string; title: string; category: string;
+      confidence_score: number; feature_id: string | null; is_superseded: boolean;
+    };
+
+    if (learning.is_superseded) continue;
+
+    const targetType = row.target_type as PropagationTargetType;
+    const targetPath = row.target_path as string | null;
+    const domainKey = `${targetType}|${targetPath ?? ''}`;
+    const propKey = `${learning.id}|${targetType}|${targetPath ?? ''}`;
+    const isPropagated = propagatedSet.has(propKey);
+
+    if (!domainMap.has(domainKey)) {
+      domainMap.set(domainKey, {
+        target_type: targetType,
+        target_path: targetPath,
+        learnings: new Map(),
+        propagated_count: 0,
+      });
+    }
+
+    const domain = domainMap.get(domainKey)!;
+    if (!domain.learnings.has(learning.id)) {
+      domain.learnings.set(learning.id, {
+        id: learning.id,
+        title: learning.title,
+        category: learning.category as LearningCategory,
+        confidence_score: learning.confidence_score,
+        feature_id: learning.feature_id,
+        is_propagated: isPropagated,
+      });
+    }
+    if (isPropagated) domain.propagated_count++;
+
+    // Track for bridge detection
+    const existing = learningDomains.get(learning.id);
+    if (existing) {
+      if (!existing.domains.includes(domainKey)) {
+        existing.domains.push(domainKey);
+      }
+    } else {
+      learningDomains.set(learning.id, {
+        title: learning.title,
+        category: learning.category as LearningCategory,
+        domains: [domainKey],
+      });
+    }
+  }
+
+  // Build clusters
+  const clusters: DomainCluster[] = [];
+  for (const [domainKey, domain] of domainMap) {
+    const label = domain.target_type === 'agents_md'
+      ? 'AGENTS.md'
+      : domain.target_path ?? domain.target_type;
+
+    clusters.push({
+      domain_key: domainKey,
+      domain_label: label,
+      target_type: domain.target_type,
+      target_path: domain.target_path,
+      learnings: Array.from(domain.learnings.values())
+        .sort((a, b) => b.confidence_score - a.confidence_score),
+      density: domain.learnings.size,
+      propagated_count: domain.propagated_count,
+    });
+  }
+
+  clusters.sort((a, b) => b.density - a.density);
+
+  // Build bridges (learnings in 2+ domains)
+  const bridges: BridgeLearning[] = [];
+  for (const [id, info] of learningDomains) {
+    if (info.domains.length >= 2) {
+      bridges.push({
+        id,
+        title: info.title,
+        category: info.category,
+        domains: info.domains,
+      });
+    }
+  }
+
+  bridges.sort((a, b) => b.domains.length - a.domains.length);
+
+  return { clusters, bridges };
 }

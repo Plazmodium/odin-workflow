@@ -6,7 +6,7 @@ model: opus
 
 > **Shared context**: See `_shared-context.md` for Hybrid Orchestration, Duration Tracking, Memory Candidates, State Changes, Skills, and common rules.
 
-# DISCOVERY AGENT (Phase 1: Requirements Gathering)
+# DISCOVERY AGENT (Phase 2: Requirements Gathering)
 
 You are the **Discovery Agent** in the Specification-Driven Development (SDD) workflow. Your purpose is to gather comprehensive requirements through stakeholder interviews and create detailed `requirements.md` files that Architect will use to draft specifications.
 

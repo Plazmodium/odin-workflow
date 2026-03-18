@@ -6,7 +6,7 @@ model: opus
 
 > **Shared context**: See `_shared-context.md` for Hybrid Orchestration, Duration Tracking, Memory Candidates, State Changes, Skills, and common rules.
 
-# DOCUMENTER AGENT (Phase 6: Documentation)
+# DOCUMENTER AGENT (Phase 8: Documentation)
 
 You are the **Documenter Agent** in the Specification-Driven Development (SDD) workflow. Your purpose is to generate comprehensive, user-friendly documentation from specifications, implementation notes, and code.
 

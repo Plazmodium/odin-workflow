@@ -785,16 +785,16 @@ Traditional single-agent workflows load everything into one context:
 - Role confusion (agent switches between planning and coding)
 - Cannot parallelize work
 
-### The Solution: Specialized Agents
+### The Solution: Specialized Agents (v2)
 
-**Odin uses an 11-phase workflow with 11 workflow and support agents:**
+**Odin v2 uses an 11-phase workflow with 12 specialized agents:**
 
 ```
 PLANNING → PRODUCT → DISCOVERY → ARCHITECT → GUARDIAN → BUILDER → REVIEWER → INTEGRATOR → DOCUMENTER → RELEASE → COMPLETE
    (0)       (1)        (2)        (3)         (4)        (5)        (6)         (7)          (8)         (9)       (10)
 ```
 
-**Added capabilities:**
+**v2 Additions:**
 - **Product Agent** (Phase 1): PRD generation with complexity-gated templates
 - **Reviewer Agent** (Phase 6): SAST/security scanning via Semgrep
 - **Watcher Agent** (Support): LLM escalation for claim verification
@@ -806,7 +806,7 @@ PLANNING → PRODUCT → DISCOVERY → ARCHITECT → GUARDIAN → BUILDER → RE
 - **Security-first**: SAST scanning before integration
 - **Claim verification**: Builder/Integrator/Release emit structured claims
 
-### Hybrid Watcher Architecture
+### Hybrid Watcher Architecture (v2)
 
 Watched phases (Builder, Integrator, Release) emit **claims** that are verified:
 
@@ -833,8 +833,8 @@ Agent emits claim → Policy Engine (SQL) → PASS/FAIL/NEEDS_REVIEW
 - Need faster implementation (parallel builders)
 - Large team with high feature volume
 - Want systematic quality gates
-- Need security scanning (Reviewer)
-- Need claim verification (Watcher)
+- Need security scanning (v2 Reviewer)
+- Need claim verification (v2 Watcher)
 
 ### Learn More
 
@@ -853,20 +853,20 @@ See **`example-workflow.md`** for a complete example:
 - All artifacts produced at each stage
 - Step-by-step walkthrough from request to deployed code
 
-**Agent Definitions**: Ready to use in `agents/definitions/` directory
+**Agent Definitions**: Ready to use in `agents/definitions/` directory (12 agents in v2)
 - `planning.md` - Phase 0: Epic decomposition
-- `product.md` - Phase 1: PRD generation
+- `product.md` - Phase 1: PRD generation (NEW in v2)
 - `discovery.md` - Phase 2: Requirements gathering
 - `architect.md` - Phase 3: Technical specification
 - `guardian.md` - Phase 4: Multi-perspective review
 - `builder.md` - Phase 5: Implementation (watched)
-- `reviewer.md` - Phase 6: SAST/security
+- `reviewer.md` - Phase 6: SAST/security (NEW in v2)
 - `integrator.md` - Phase 7: Integration (watched)
 - `documenter.md` - Phase 8: Documentation
 - `release.md` - Phase 9: PR creation (watched)
-- `watcher.md` - Support: LLM escalation
+- `watcher.md` - Support: LLM escalation (NEW in v2)
 
-**Status**: Current architecture with Hybrid Watcher and Semgrep integration.
+**Status**: v2 architecture with Hybrid Watcher and Semgrep integration.
 
 ---
 
@@ -909,3 +909,4 @@ See **`example-workflow.md`** for a complete example:
 **Version:** 2.0  
 **Last Updated:** 2026-03-06  
 **License:** Adapt freely for your organization's use
+

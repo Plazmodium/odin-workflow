@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic';
 
-import { getActiveLearnings, getPropagationHistory, getOpenConflicts, getAllSkillPropagationTargets, getAllPropagationTargets } from '@/lib/data/learnings';
+import { getActiveLearnings, getPropagationHistory, getOpenConflicts, getAllSkillPropagationTargets, getAllPropagationTargets, getDomainClusters } from '@/lib/data/learnings';
 import { LearningGraph } from '@/components/learnings/learning-graph';
+import { DomainClusterMap } from '@/components/learnings/domain-cluster-map';
 import { PropagationHistoryTable } from '@/components/learnings/propagation-history-table';
 import { SkillPropagationQueue } from '@/components/learnings/skill-propagation-queue';
 import { ConflictsTable } from '@/components/learnings/conflicts-table';
@@ -9,16 +10,17 @@ import { PollingSubscription } from '@/components/realtime/realtime-page';
 import { PanelInfoTooltip } from '@/components/shared/panel-info-tooltip';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Brain, CheckCircle, ShieldAlert, FileCode } from 'lucide-react';
+import { Brain, CheckCircle, ShieldAlert, FileCode, Network } from 'lucide-react';
 import { EmptyState } from '@/components/layout/empty-state';
 
 export default async function LearningsPage() {
-  const [learnings, propagationHistory, allSkillTargets, conflicts, propagationTargets] = await Promise.all([
+  const [learnings, propagationHistory, allSkillTargets, conflicts, propagationTargets, domainData] = await Promise.all([
     getActiveLearnings(),
     getPropagationHistory(),
     getAllSkillPropagationTargets(),
     getOpenConflicts(),
     getAllPropagationTargets(),
+    getDomainClusters(),
   ]);
 
   if (learnings.length === 0) {
@@ -96,6 +98,15 @@ export default async function LearningsPage() {
             <Brain className="h-3.5 w-3.5 mr-1.5" />
             Evolution Graph
           </TabsTrigger>
+          <TabsTrigger value="knowledge-map">
+            <Network className="h-3.5 w-3.5 mr-1.5" />
+            Knowledge Map
+            {domainData.clusters.length > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">
+                {domainData.clusters.length}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="propagation">
             <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
             Propagation History
@@ -127,6 +138,10 @@ export default async function LearningsPage() {
 
         <TabsContent value="graph">
           <LearningGraph learnings={learnings} propagationTargets={propagationTargets} />
+        </TabsContent>
+
+        <TabsContent value="knowledge-map">
+          <DomainClusterMap clusters={domainData.clusters} bridges={domainData.bridges} />
         </TabsContent>
 
         <TabsContent value="propagation">

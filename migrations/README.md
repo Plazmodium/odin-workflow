@@ -1,6 +1,6 @@
 # Odin SDD Framework - Database Migrations
 
-This directory contains the consolidated database schema for Odin plus the later workflow extension migrations. The base 4 files replace the original 28 development migrations, providing a clean starting point for new installations.
+This directory contains the consolidated database schema for Odin plus post-consolidation v2 migrations. The base 4 files replace the original 28 development migrations, providing a clean starting point for new installations.
 
 ## Quick Start
 
@@ -19,13 +19,13 @@ Run these migrations in order on a fresh Supabase project:
 -- 4. Seed data (batch templates)
 \i 004_seed.sql
 
--- 5. Workflow extension schema
+-- 5. Odin v2 schema extensions
 \i 005_odin_v2_schema.sql
 
--- 6. Workflow extension functions
+-- 6. Odin v2 functions
 \i 006_odin_v2_functions.sql
 
--- 7. Phase alignment
+-- 7. Odin v2 phase alignment
 \i 007_odin_v2_phase_alignment.sql
 ```
 
@@ -44,9 +44,9 @@ Or via Supabase MCP:
 | `002_functions.sql` | Business logic | 30+ functions (workflow, invocations, git, learnings, evals) |
 | `003_views.sql` | Dashboard views | 12 views (features, learnings, evals, batch) |
 | `004_seed.sql` | Initial data | 5 batch templates |
-| `005_odin_v2_schema.sql` | Workflow extension schema | Product/Reviewer-ready phase enum, watcher/security tables |
-| `006_odin_v2_functions.sql` | Workflow extension functions | Claims, policy engine, watcher review, security helpers |
-| `007_odin_v2_phase_alignment.sql` | Phase alignment | Historical phase remap + current phase-numbering overrides |
+| `005_odin_v2_schema.sql` | v2 schema extensions | Product/Reviewer-ready phase enum, watcher/security tables |
+| `006_odin_v2_functions.sql` | v2 verification functions | Claims, policy engine, watcher review, security helpers |
+| `007_odin_v2_phase_alignment.sql` | v2 phase remap | Historical phase remap + v2 phase-numbering overrides |
 
 ## Schema Summary
 
@@ -113,7 +113,7 @@ These consolidated migrations replace the original 28 development migrations (00
 - **Migration 023**: Added author field for multi-developer support
 - **Migration 026**: Added phase_outputs for structured artifacts
 
-The original development migrations are not shipped in this distribution repo; this folder contains the consolidated migration set users should apply.
+The original migrations are archived in `docs/archive/migrations/` for reference.
 
 ## Post-Consolidation Migrations
 
@@ -126,17 +126,18 @@ These migrations were applied after the initial consolidation:
 
 **Note**: These changes are already incorporated into the consolidated `002_functions.sql` file. They are listed here for audit trail purposes.
 
-## Workflow Extension Migrations
+## Odin v2 Migrations
 
-These migrations extend Odin with the current workflow features. **Run AFTER the base migrations (001-004).**
+These migrations extend Odin for v2 features. **Run AFTER the base migrations (001-004).**
 
 | Migration | Description |
 |-----------|-------------|
 | `005_odin_v2_schema.sql` | New enums, tables for 11-phase workflow, watchers, security findings |
 | `006_odin_v2_functions.sql` | Functions for claims, policy engine, watcher reviews, security findings |
-| `007_odin_v2_phase_alignment.sql` | Remaps persisted phase values and overrides core workflow functions to use the current numbering |
+| `007_odin_v2_phase_alignment.sql` | Remaps persisted phase values and overrides core workflow functions to use v2 numbering |
+| `008_related_learnings.sql` | `get_related_learnings()` function for cross-feature knowledge retrieval via shared propagation targets (Memory Palace Wave 2) |
 
-### Added Workflow Features
+### v2 Features
 
 **11-Phase Workflow:**
 ```
@@ -185,16 +186,16 @@ SELECT * FROM record_security_finding('FEAT-001', 'semgrep', 'HIGH',
 SELECT * FROM can_proceed_past_reviewer('FEAT-001');
 ```
 
-### Running the Extension Migrations
+### Running v2 Migrations
 
 ```sql
--- After running 001-004, run the extension migrations:
+-- After running 001-004, run v2 migrations:
 \i 005_odin_v2_schema.sql
 \i 006_odin_v2_functions.sql
 \i 007_odin_v2_phase_alignment.sql
 ```
 
-**Important**: Run `007_odin_v2_phase_alignment.sql` immediately after `005` and `006`, before any workflow activity creates rows in `agent_claims`, `policy_verdicts`, `watcher_reviews`, or `security_findings`.
+**Important**: Run `007_odin_v2_phase_alignment.sql` immediately after `005` and `006`, before any v2 workflow activity creates rows in `agent_claims`, `policy_verdicts`, `watcher_reviews`, or `security_findings`.
 
 Or via Supabase MCP:
 ```javascript
@@ -209,5 +210,5 @@ Or via Supabase MCP:
 
 - **Schema Version**: 2.0.0
 - **Created**: 2026-02-16
-- **Last Updated**: 2026-03-09 (phase alignment migration added)
+- **Last Updated**: 2026-03-17 (Memory Palace Wave 2 — related learnings function)
 - **Consolidated from**: Migrations 001-028

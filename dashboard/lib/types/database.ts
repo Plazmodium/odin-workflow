@@ -537,6 +537,36 @@ export interface PropagationHistoryItem {
 }
 
 // ============================================================
+// Knowledge Map (Memory Palace visualization)
+// ============================================================
+
+export interface DomainClusterLearning {
+  id: string;
+  title: string;
+  category: LearningCategory;
+  confidence_score: number;
+  feature_id: string | null;
+  is_propagated: boolean;
+}
+
+export interface DomainCluster {
+  domain_key: string;
+  domain_label: string;
+  target_type: PropagationTargetType;
+  target_path: string | null;
+  learnings: DomainClusterLearning[];
+  density: number;
+  propagated_count: number;
+}
+
+export interface BridgeLearning {
+  id: string;
+  title: string;
+  category: LearningCategory;
+  domains: string[];
+}
+
+// ============================================================
 // Audit Log
 // ============================================================
 
