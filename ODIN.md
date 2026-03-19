@@ -121,6 +121,23 @@ This is the canonical step-by-step workflow the orchestrator follows for every f
 
 > **Remember**: Only the main orchestrator session can call `odin.*` tools. Task-spawned sub-agents cannot access MCP — they produce output that the orchestrator persists.
 
+### Feature Is the Unit of Execution
+
+Odin executes work at the **feature** level.
+
+- One `odin.start_feature` call represents one coherent feature moving through the workflow
+- One feature maps to one feature branch, one phase history, and one PR review boundary
+- The `tasks` artifact tracks progress **within** a feature; it does not define independent concurrent sub-feature workflows
+- Do NOT invent intra-feature swarms, isolated worktree coordination, or parallel Builder subflows unless the Odin runtime explicitly supports them
+- If work should happen in parallel, split it into multiple independent features, each with its own branch and workflow record
+
+**Implication for orchestrators and agents**:
+- Use `odin.prepare_phase_context`, `odin.record_phase_artifact`, and `odin.record_phase_result` assuming a single feature-level source of truth
+- Update task status serially through the orchestrator as progress tracking
+- Keep human review at the PR boundary for the feature as a whole
+
+In short: Odin orchestrates **features**, not concurrent sub-task swarms inside a feature.
+
 ### Task Tracking Protocol
 
 The Architect (Phase 3) records a task breakdown. The orchestrator updates task statuses during the Builder phase (Phase 5). This drives the dashboard's task progress display.
