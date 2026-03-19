@@ -116,7 +116,7 @@ review:
   provider: semgrep
 
 formal_verification:
-  provider: none           # set to "tla-precheck" to enable
+  provider: none           # set to "tla-precheck" after installing Java 17+ and `npm install -D tla-precheck`
   timeout_seconds: 120
 
 archive:
@@ -141,6 +141,37 @@ SUPABASE_ACCESS_TOKEN=your-management-api-access-token
 - **`in_memory`** — Local-only scaffold mode. No external dependencies. State is lost when the process exits. Useful for testing the runtime surface without a Supabase project.
 
 > **Note on `DATABASE_URL`**: Using direct PostgreSQL (Neon, Railway, etc.) provides full workflow state and migrations, but **release archival** (`odin.archive_feature_release`) requires Supabase Storage. If you use `DATABASE_URL` without Supabase credentials, the archive tool will return an error. All other tools work normally.
+
+## Optional: TLA+ Design Verification
+
+`odin.verify_design` is optional and stays disabled while `formal_verification.provider` is `none`.
+
+Install it in the **target project Odin runs against**, not in the runtime package:
+
+```bash
+# In your target project root
+npm install -D tla-precheck
+```
+
+Requirements and setup:
+
+- Install **Java 17+** locally for the TLC model checker
+- Install `tla-precheck` as a dev dependency in the target project so Odin can resolve it from `node_modules/.bin`
+- Enable it in `.odin/config.yaml`
+
+```yaml
+formal_verification:
+  provider: tla-precheck
+  timeout_seconds: 120
+```
+
+Typical usage:
+
+1. Create a state-machine file such as `specs/BILLING-001/subscription.machine.ts`
+2. Ask Odin to run `odin.verify_design` with that relative `machine_path`
+3. Review the result in Architect/Guardian before implementation
+
+If Java or `tla-precheck` is missing, Odin returns an `UNAVAILABLE` / `NOT_CONFIGURED` result for design verification instead of enabling it silently.
 
 ## Project-Local Skills
 

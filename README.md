@@ -158,6 +158,26 @@ Choose one:
 
 `DATABASE_URL` takes priority if both are set. For Supabase, generate the access token at [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens).
 
+### Optional: Enable TLA+ design verification
+
+If you want `odin.verify_design` for state-heavy features, install `tla-precheck` in the **target project root** that Odin runs against:
+
+```bash
+npm install -D tla-precheck
+```
+
+- Requires **Java 17+** locally
+- Leave `formal_verification.provider: none` if you do not need it; Odin still loads normally
+- To enable it, set this in `.odin/config.yaml`:
+
+```yaml
+formal_verification:
+  provider: tla-precheck
+  timeout_seconds: 120
+```
+
+Typical flow: write a `.machine.ts` file for a stateful design, then call `odin.verify_design` with the file's relative `machine_path` during Architect/Guardian work.
+
 ### 4. Apply database migrations
 
 Odin applies its schema automatically via the runtime:
