@@ -7,12 +7,14 @@ A single-install MCP server that gives your AI coding agent an 11-phase developm
 ### 1. Install
 
 ```bash
-cd system/mcp-servers/odin-runtime
+cd runtime
 npm install
 npm run build
 ```
 
 ### 2. Bootstrap your project
+
+Run these commands from `odin-workflow/runtime`. The `init:project` script is defined in this package, not in your target project.
 
 ```bash
 # For Amp
@@ -26,6 +28,13 @@ npm run init:project -- --project-root /path/to/your/project --tool opencode --w
 
 # For Codex
 npm run init:project -- --project-root /path/to/your/project --tool codex --write-mcp
+```
+
+If you want to run the bootstrap from inside your target project directory, call the built init CLI directly instead of `npm run`:
+
+```bash
+cd /path/to/your/project
+node /absolute/path/to/odin-workflow/runtime/dist/init.js --tool amp --write-mcp
 ```
 
 This creates:

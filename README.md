@@ -65,7 +65,7 @@ npm install
 npm run build
 ```
 
-Bootstrap your project config (recommended):
+Run the bootstrap commands from `odin-workflow/runtime` (the script lives in `runtime/package.json`):
 
 ```bash
 # For Amp / Claude Code / OpenCode:
@@ -73,6 +73,13 @@ npm run init:project -- --project-root /path/to/your/project --tool amp --write-
 
 # For Codex:
 npm run init:project -- --project-root /path/to/your/project --tool codex --write-mcp
+```
+
+If you prefer to run the bootstrap from inside your target project directory, call the built init CLI directly instead of `npm run`:
+
+```bash
+cd /path/to/your/project
+node /absolute/path/to/odin-workflow/runtime/dist/init.js --tool amp --write-mcp
 ```
 
 This creates `.odin/config.yaml`, `.odin/skills/`, `.env.example`, and your harness config file. Secrets stay in `.env` — never in the MCP config.
