@@ -41,7 +41,9 @@ This creates:
 - `.odin/config.yaml` — runtime configuration (commit this)
 - `.odin/skills/` — project-local skill overrides (commit this)
 - `.env.example` — required environment variables (commit this)
-- Your harness config file (`.mcp.json` or `.codex/config.toml`)
+- Your harness config file (`opencode.json`, `.mcp.json`, or `.codex/config.toml`, depending on tool)
+
+Important: Odin bootstraps with `runtime.mode: supabase` by default. Before your harness can load the Odin MCP server, your project root must have a `.env` or `.env.local` file with `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (or those values must be set directly in `.odin/config.yaml`). If those values are missing, the Odin server exits at startup and your harness will show the MCP as failed/closed. If you are only testing MCP wiring first, change `.odin/config.yaml` to `runtime.mode: in_memory`.
 
 ### 3. Add your database credentials
 
@@ -49,6 +51,8 @@ This creates:
 cp .env.example .env
 # Edit .env with your database credentials
 ```
+
+Use the project root `.env` or `.env.local` file that lives next to your MCP config and `.odin/`. Odin does not read env files from nested app directories.
 
 Odin supports two database connection methods:
 
