@@ -28,6 +28,51 @@ When developers use AI coding assistants without proper specifications:
 
 Odin fixes that with a spec-first workflow, adaptive complexity, explicit quality gates, persistent learnings, health metrics, and workflow verification.
 
+## Feature-Oriented By Design
+
+Odin is built around a simple idea: ship software **by feature**, not by scattering dozens of tiny concurrent coding tasks across the codebase.
+
+A feature in Odin moves through a defined workflow:
+- a branch is created for the feature
+- requirements and specification are made explicit
+- implementation happens against that approved spec
+- verification runs through the workflow
+- a human reviews the result at the pull request stage
+
+This is intentional. Odin is not trying to become a swarm scheduler, IDE replacement, or background agent platform. Its job is to help an AI coding assistant build a **coherent feature slice** with clear contracts, strong guardrails, and a clean human checkpoint at the end.
+
+### What Odin Optimizes For
+
+- **Feature-level flow** — one feature branch, one feature spec, one feature moving through the workflow
+- **Spec discipline** — implementation follows an approved spec instead of drifting through ad-hoc prompts
+- **Clear accountability** — each phase produces artifacts, checks, and state transitions that can be inspected later
+- **Human review at the right boundary** — the PR is the final approval point for integration and merge decisions
+- **Low coordination overhead** — less time orchestrating agent swarms, more time getting a feature to done
+
+### What Odin Does Not Try To Be
+
+Odin is **not** designed around:
+- parallel sub-agents editing different parts of the same feature at the same time
+- intra-feature task swarms with isolated worktrees and merge-back coordination
+- continuous spec mutation while implementation is already underway
+- autonomous branch merging by agents
+- replacing normal software development structure with constant micro-dispatch
+
+Those patterns can be powerful in some systems, but they also add coordination state, conflict handling, and workflow complexity. Odin deliberately stays narrower.
+
+### Where Parallelism Belongs In Odin
+
+If work should happen in parallel, Odin prefers parallelism at the **feature level**, not inside a single feature.
+
+That means:
+- split large initiatives into multiple independent features
+- give each feature its own branch and workflow
+- review each feature as a coherent unit
+
+This keeps Odin aligned with how many teams already build software: define the feature, implement the feature, review the feature, merge the feature.
+
+In short: **Odin is a feature workflow system, not a sub-task swarm orchestrator.**
+
 ## What Odin Includes
 
 - **11-phase workflow** with Product and Reviewer added to the core path
