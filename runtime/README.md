@@ -7,12 +7,14 @@ A single-install MCP server that gives your AI coding agent an 11-phase developm
 ### 1. Install
 
 ```bash
-cd system/mcp-servers/odin-runtime
+cd runtime
 npm install
 npm run build
 ```
 
 ### 2. Bootstrap your project
+
+Run these commands from `odin-workflow/runtime`. The `init:project` script is defined in this package, not in your target project.
 
 ```bash
 # For Amp
@@ -28,11 +30,20 @@ npm run init:project -- --project-root /path/to/your/project --tool opencode --w
 npm run init:project -- --project-root /path/to/your/project --tool codex --write-mcp
 ```
 
+If you want to run the bootstrap from inside your target project directory, call the built init CLI directly instead of `npm run`:
+
+```bash
+cd /path/to/your/project
+node /absolute/path/to/odin-workflow/runtime/dist/init.js --tool amp --write-mcp
+```
+
 This creates:
 - `.odin/config.yaml` — runtime configuration (commit this)
 - `.odin/skills/` — project-local skill overrides (commit this)
 - `.env.example` — required environment variables (commit this)
-- Your harness config file (`.mcp.json` or `.codex/config.toml`)
+- Your harness config file (`opencode.json`, `.mcp.json`, or `.codex/config.toml`, depending on tool)
+
+Important: Odin bootstraps with `runtime.mode: supabase` by default. Before your harness can load the Odin MCP server, your project root must have a `.env` or `.env.local` file with `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (or those values must be set directly in `.odin/config.yaml`). If those values are missing, the Odin server exits at startup and your harness will show the MCP as failed/closed. If you are only testing MCP wiring first, change `.odin/config.yaml` to `runtime.mode: in_memory`.
 
 ### 3. Add your database credentials
 
@@ -40,6 +51,8 @@ This creates:
 cp .env.example .env
 # Edit .env with your database credentials
 ```
+
+Use the project root `.env` or `.env.local` file that lives next to your MCP config and `.odin/`. Odin does not read env files from nested app directories.
 
 Odin supports two database connection methods:
 
@@ -103,7 +116,7 @@ review:
   provider: semgrep
 
 formal_verification:
-  provider: none           # set to "tla-precheck" to enable
+  provider: none           # set to "tla-precheck" after installing Java 17+ and `npm install -D tla-precheck`
   timeout_seconds: 120
 
 archive:
@@ -128,6 +141,37 @@ SUPABASE_ACCESS_TOKEN=your-management-api-access-token
 - **`in_memory`** — Local-only scaffold mode. No external dependencies. State is lost when the process exits. Useful for testing the runtime surface without a Supabase project.
 
 > **Note on `DATABASE_URL`**: Using direct PostgreSQL (Neon, Railway, etc.) provides full workflow state and migrations, but **release archival** (`odin.archive_feature_release`) requires Supabase Storage. If you use `DATABASE_URL` without Supabase credentials, the archive tool will return an error. All other tools work normally.
+
+## Optional: TLA+ Design Verification
+
+`odin.verify_design` is optional and stays disabled while `formal_verification.provider` is `none`.
+
+Install it in the **target project Odin runs against**, not in the runtime package:
+
+```bash
+# In your target project root
+npm install -D tla-precheck
+```
+
+Requirements and setup:
+
+- Install **Java 17+** locally for the TLC model checker
+- Install `tla-precheck` as a dev dependency in the target project so Odin can resolve it from `node_modules/.bin`
+- Enable it in `.odin/config.yaml`
+
+```yaml
+formal_verification:
+  provider: tla-precheck
+  timeout_seconds: 120
+```
+
+Typical usage:
+
+1. Create a state-machine file such as `specs/BILLING-001/subscription.machine.ts`
+2. Ask Odin to run `odin.verify_design` with that relative `machine_path`
+3. Review the result in Architect/Guardian before implementation
+
+If Java or `tla-precheck` is missing, Odin returns an `UNAVAILABLE` / `NOT_CONFIGURED` result for design verification instead of enabling it silently.
 
 ## Project-Local Skills
 

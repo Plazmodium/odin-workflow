@@ -65,7 +65,7 @@ npm install
 npm run build
 ```
 
-Bootstrap your project config (recommended):
+Run the bootstrap commands from `odin-workflow/runtime` (the script lives in `runtime/package.json`):
 
 ```bash
 # For Amp / Claude Code / OpenCode:
@@ -75,17 +75,49 @@ npm run init:project -- --project-root /path/to/your/project --tool amp --write-
 npm run init:project -- --project-root /path/to/your/project --tool codex --write-mcp
 ```
 
-This creates `.odin/config.yaml`, `.odin/skills/`, `.env.example`, and your harness config file. Secrets stay in `.env` — never in the MCP config.
+If you prefer to run the bootstrap from inside your target project directory, call the built init CLI directly instead of `npm run`:
 
-Or manually add this MCP server entry to your tool's settings file:
+```bash
+cd /path/to/your/project
+node /absolute/path/to/odin-workflow/runtime/dist/init.js --tool amp --write-mcp
+```
+
+This creates `.odin/config.yaml`, `.odin/skills/`, `.env.example`, and your harness config file. For OpenCode, that file is `opencode.json`. Secrets stay in `.env` — never in the MCP config.
+
+Important: Odin bootstraps with `runtime.mode: supabase` by default. Before your harness can load the Odin MCP server, your project root must have a `.env` or `.env.local` file with `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (or those values must be set directly in `.odin/config.yaml`). If those values are missing, the Odin server exits at startup and your harness will show the MCP as failed/closed. If you are only testing MCP wiring first, change `.odin/config.yaml` to `runtime.mode: in_memory`.
+
+For Claude Code / Amp, manually add this server entry:
 
 ```json
 {
-  "odin": {
-    "command": "node",
-    "args": ["/absolute/path/to/runtime/dist/server.js"],
-    "env": {
-      "ODIN_PROJECT_ROOT": "/absolute/path/to/your/project"
+  "mcpServers": {
+    "odin": {
+      "command": "node",
+      "args": ["/absolute/path/to/runtime/dist/server.js"],
+      "env": {
+        "ODIN_PROJECT_ROOT": "/absolute/path/to/your/project"
+      }
+    }
+  }
+}
+```
+
+For OpenCode, add this to `opencode.json` in your project root:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "odin": {
+      "type": "local",
+      "command": [
+        "node",
+        "/absolute/path/to/runtime/dist/server.js"
+      ],
+      "enabled": true,
+      "environment": {
+        "ODIN_PROJECT_ROOT": "/absolute/path/to/your/project"
+      }
     }
   }
 }
@@ -95,7 +127,7 @@ Or manually add this MCP server entry to your tool's settings file:
 |------|----------------|
 | **Amp** | `settings.json` → `mcpServers` |
 | **Claude Code** | `.mcp.json` → `mcpServers` |
-| **OpenCode** | `.mcp.json` → `mcpServers` |
+| **OpenCode** | `opencode.json` → `mcp` |
 | **Cursor** | Settings → MCP Servers |
 | **Codex** | `.codex/config.toml` (`[mcp_servers.odin]`) |
 
@@ -107,6 +139,8 @@ See [runtime/README.md](runtime/README.md) for full configuration, available too
 cp .env.example .env
 # Edit .env with your database credentials
 ```
+
+Use the project root `.env` or `.env.local` file that lives next to your MCP config and `.odin/`. Odin does not read env files from nested app directories.
 
 Choose one:
 
@@ -123,6 +157,26 @@ Choose one:
   ```
 
 `DATABASE_URL` takes priority if both are set. For Supabase, generate the access token at [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens).
+
+### Optional: Enable TLA+ design verification
+
+If you want `odin.verify_design` for state-heavy features, install `tla-precheck` in the **target project root** that Odin runs against:
+
+```bash
+npm install -D tla-precheck
+```
+
+- Requires **Java 17+** locally
+- Leave `formal_verification.provider: none` if you do not need it; Odin still loads normally
+- To enable it, set this in `.odin/config.yaml`:
+
+```yaml
+formal_verification:
+  provider: tla-precheck
+  timeout_seconds: 120
+```
+
+Typical flow: write a `.machine.ts` file for a stateful design, then call `odin.verify_design` with the file's relative `machine_path` during Architect/Guardian work.
 
 ### 4. Apply database migrations
 
