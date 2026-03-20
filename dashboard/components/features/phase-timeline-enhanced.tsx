@@ -58,7 +58,7 @@ const TASK_STATUS_COLORS: Record<string, string> = {
 /** Normalize task status values — workflow may record 'done' instead of 'completed' */
 function normalizeTaskStatus(status: string): 'pending' | 'in_progress' | 'completed' {
   if (status === 'done' || status === 'completed') return 'completed';
-  if (status === 'in_progress') return 'in_progress';
+  if (status === 'in_progress' || status === 'in-progress') return 'in_progress';
   return 'pending';
 }
 

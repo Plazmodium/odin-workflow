@@ -80,6 +80,18 @@ describe('odin-runtime-init', () => {
     expect(mcp.mcpServers.odin.command).toBe('node');
   });
 
+  it('writes opencode.json with --tool opencode --write-mcp', () => {
+    runInit(`--project-root ${tmpDir} --tool opencode --write-mcp`);
+
+    expect(existsSync(join(tmpDir, 'opencode.json'))).toBe(true);
+    const config = JSON.parse(readFileSync(join(tmpDir, 'opencode.json'), 'utf8'));
+    expect(config.$schema).toBe('https://opencode.ai/config.json');
+    expect(config.mcp.odin).toBeDefined();
+    expect(config.mcp.odin.type).toBe('local');
+    expect(config.mcp.odin.command[0]).toBe('node');
+    expect(config.mcp.odin.environment.ODIN_PROJECT_ROOT).toBe(tmpDir);
+  });
+
   it('writes .codex/config.toml with --tool codex --write-mcp', () => {
     runInit(`--project-root ${tmpDir} --tool codex --write-mcp`);
 
@@ -99,10 +111,31 @@ describe('odin-runtime-init', () => {
     const existing = { mcpServers: { other: { command: 'other-cmd', args: [] } } };
     writeFileSync(join(tmpDir, '.mcp.json'), JSON.stringify(existing, null, 2), 'utf8');
 
-    runInit(`--project-root ${tmpDir} --tool opencode --write-mcp`);
+    runInit(`--project-root ${tmpDir} --tool amp --write-mcp`);
 
     const mcp = JSON.parse(readFileSync(join(tmpDir, '.mcp.json'), 'utf8'));
     expect(mcp.mcpServers.other).toBeDefined();
     expect(mcp.mcpServers.odin).toBeDefined();
+  });
+
+  it('merges into existing opencode.json without clobbering other config', () => {
+    const existing = {
+      $schema: 'https://opencode.ai/config.json',
+      model: 'anthropic/claude-sonnet-4-5',
+      mcp: {
+        other: {
+          type: 'local',
+          command: ['npx', '-y', '@modelcontextprotocol/server-everything'],
+        },
+      },
+    };
+    writeFileSync(join(tmpDir, 'opencode.json'), JSON.stringify(existing, null, 2), 'utf8');
+
+    runInit(`--project-root ${tmpDir} --tool opencode --write-mcp`);
+
+    const config = JSON.parse(readFileSync(join(tmpDir, 'opencode.json'), 'utf8'));
+    expect(config.model).toBe('anthropic/claude-sonnet-4-5');
+    expect(config.mcp.other).toBeDefined();
+    expect(config.mcp.odin).toBeDefined();
   });
 });

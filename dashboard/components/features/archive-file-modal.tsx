@@ -4,7 +4,7 @@
  * ArchiveFileModal
  *
  * Displays archived file content in a dialog with proper markdown rendering.
- * Fetches file from public Supabase storage URL.
+ * Fetches file through the dashboard's server-side archive route.
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -27,12 +27,9 @@ interface ArchiveFileModalProps {
   onClose: () => void;
 }
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-
 function getArchiveFileUrl(storagePath: string, fileName: string): string {
-  // storagePath is like "workflow-archives/DASH-001"
-  // fileName is like "requirements.md"
-  return `${SUPABASE_URL}/storage/v1/object/public/${storagePath}/${fileName}`;
+  const params = new URLSearchParams({ storagePath, fileName });
+  return `/api/archives?${params.toString()}`;
 }
 
 export function ArchiveFileModal({
@@ -47,7 +44,7 @@ export function ArchiveFileModal({
   const [error, setError] = useState<string | null>(null);
 
   const fetchFile = useCallback(async () => {
-    if (!fileName || !storagePath || !SUPABASE_URL) {
+    if (!fileName || !storagePath) {
       return;
     }
 
@@ -60,7 +57,7 @@ export function ArchiveFileModal({
 
     try {
       const url = getArchiveFileUrl(storagePath, fileName);
-      const response = await fetch(url, { signal: controller.signal });
+      const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
 
       clearTimeout(timeoutId);
 

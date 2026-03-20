@@ -28,7 +28,10 @@ import {
   GetFeatureStatusInputSchema,
   GetNextPhaseInputSchema,
   PreparePhaseContextInputSchema,
+  RecordCommitInputSchema,
+  RecordMergeInputSchema,
   RecordPhaseArtifactInputSchema,
+  RecordPullRequestInputSchema,
   RecordPhaseResultInputSchema,
   RunReviewChecksInputSchema,
   StartFeatureInputSchema,
@@ -42,7 +45,10 @@ import { handleExploreKnowledge } from './tools/explore-knowledge.js';
 import { handleGetFeatureStatus } from './tools/get-feature-status.js';
 import { handleGetNextPhase } from './tools/get-next-phase.js';
 import { handlePreparePhaseContext } from './tools/prepare-phase-context.js';
+import { handleRecordCommit } from './tools/record-commit.js';
+import { handleRecordMerge } from './tools/record-merge.js';
 import { handleRecordPhaseArtifact } from './tools/record-phase-artifact.js';
+import { handleRecordPullRequest } from './tools/record-pull-request.js';
 import { handleRecordPhaseResult } from './tools/record-phase-result.js';
 import { handleRunReviewChecks } from './tools/run-review-checks.js';
 import { handleStartFeature } from './tools/start-feature.js';
@@ -192,6 +198,36 @@ server.registerTool(
     inputSchema: RecordPhaseArtifactInputSchema,
   },
   safeToolHandler(async (input) => handleRecordPhaseArtifact(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.record_commit',
+  {
+    title: 'Record Commit',
+    description: 'Record git commit metadata for a feature.',
+    inputSchema: RecordCommitInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordCommit(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.record_pr',
+  {
+    title: 'Record Pull Request',
+    description: 'Record the GitHub pull request created for a feature.',
+    inputSchema: RecordPullRequestInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordPullRequest(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.record_merge',
+  {
+    title: 'Record Merge',
+    description: 'Record that a human merged the feature pull request.',
+    inputSchema: RecordMergeInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordMerge(workflow_state, input))
 );
 
 server.registerTool(

@@ -105,10 +105,11 @@ Bootstrap Odin configuration for a project.
 Options:
   --project-root <path>  Target project directory (default: cwd)
   --tool <name>          Harness to generate config for:
-                           opencode, claude-code, amp, codex, generic (default)
+                            opencode, claude-code, amp, codex, generic (default)
   --write-mcp            Write the harness config file directly
-                           (.mcp.json for opencode/claude-code/amp,
-                            .codex/config.toml for codex)
+                            (opencode.json for opencode,
+                             .mcp.json for claude-code/amp,
+                             .codex/config.toml for codex)
   --force                Overwrite existing config files
   -h, --help             Show this help message
 
@@ -168,7 +169,15 @@ function ensureEnvExample(projectRoot: string, force: boolean): { path: string; 
   return { path: envExamplePath, changed: false };
 }
 
-function createHarnessSnippet(projectRoot: string) {
+function asRecord(value: unknown): Record<string, unknown> {
+  if (value != null && typeof value === 'object' && !Array.isArray(value)) {
+    return { ...value };
+  }
+
+  return {};
+}
+
+function createMcpJsonSnippet(projectRoot: string) {
   const currentFile = fileURLToPath(import.meta.url);
   const distDir = dirname(currentFile);
   const serverPath = join(distDir, 'server.js');
@@ -179,6 +188,26 @@ function createHarnessSnippet(projectRoot: string) {
         command: 'node',
         args: [serverPath],
         env: {
+          ODIN_PROJECT_ROOT: projectRoot,
+        },
+      },
+    },
+  };
+}
+
+function createOpenCodeSnippet(projectRoot: string) {
+  const currentFile = fileURLToPath(import.meta.url);
+  const distDir = dirname(currentFile);
+  const serverPath = join(distDir, 'server.js');
+
+  return {
+    $schema: 'https://opencode.ai/config.json',
+    mcp: {
+      odin: {
+        type: 'local',
+        command: ['node', serverPath],
+        enabled: true,
+        environment: {
           ODIN_PROJECT_ROOT: projectRoot,
         },
       },
@@ -212,7 +241,7 @@ function parseJsonFile(path: string): { [key: string]: unknown } {
   }
 }
 
-function writeMcpFile(projectRoot: string, snippet: ReturnType<typeof createHarnessSnippet>, force: boolean): { path: string; changed: boolean } {
+function writeMcpFile(projectRoot: string, snippet: ReturnType<typeof createMcpJsonSnippet>, force: boolean): { path: string; changed: boolean } {
   const mcpPath = join(projectRoot, '.mcp.json');
 
   if (!existsSync(mcpPath)) {
@@ -220,11 +249,12 @@ function writeMcpFile(projectRoot: string, snippet: ReturnType<typeof createHarn
     return { path: mcpPath, changed: true };
   }
 
-  const existing = parseJsonFile(mcpPath) as { mcpServers?: Record<string, unknown> };
+  const existing = parseJsonFile(mcpPath);
+  const existingServers = asRecord(existing.mcpServers);
   const merged = {
     ...existing,
     mcpServers: {
-      ...(existing.mcpServers ?? {}),
+      ...existingServers,
       ...snippet.mcpServers,
     },
   };
@@ -237,6 +267,39 @@ function writeMcpFile(projectRoot: string, snippet: ReturnType<typeof createHarn
 
   writeFileSync(mcpPath, `${JSON.stringify(merged, null, 2)}\n`, 'utf8');
   return { path: mcpPath, changed: true };
+}
+
+function writeOpenCodeConfig(projectRoot: string, force: boolean): { path: string; changed: boolean } {
+  const configPath = join(projectRoot, 'opencode.json');
+  const snippet = createOpenCodeSnippet(projectRoot);
+
+  if (!existsSync(configPath)) {
+    writeFileSync(configPath, `${JSON.stringify(snippet, null, 2)}\n`, 'utf8');
+    return { path: configPath, changed: true };
+  }
+
+  const existing = parseJsonFile(configPath);
+  const existingMcp = asRecord(existing.mcp);
+  const merged = {
+    ...existing,
+    $schema:
+      typeof existing.$schema === 'string' && existing.$schema.length > 0
+        ? existing.$schema
+        : 'https://opencode.ai/config.json',
+    mcp: {
+      ...existingMcp,
+      ...snippet.mcp,
+    },
+  };
+
+  const current = JSON.stringify(existing, null, 2);
+  const next = JSON.stringify(merged, null, 2);
+  if (current === next && !force) {
+    return { path: configPath, changed: false };
+  }
+
+  writeFileSync(configPath, `${JSON.stringify(merged, null, 2)}\n`, 'utf8');
+  return { path: configPath, changed: true };
 }
 
 function upsertCodexBlock(existing: string, snippet: string): { content: string; changed: boolean } {
@@ -280,11 +343,13 @@ function writeCodexConfig(projectRoot: string, force: boolean): { path: string; 
 }
 
 function isMcpJsonTool(tool: HarnessTool): boolean {
-  return tool === 'opencode' || tool === 'claude-code' || tool === 'amp';
+  return tool === 'claude-code' || tool === 'amp';
 }
 
 function printHarnessSnippet(projectRoot: string, tool: HarnessTool): void {
-  const target = isMcpJsonTool(tool)
+  const target = tool === 'opencode'
+    ? 'opencode.json'
+    : isMcpJsonTool(tool)
     ? '.mcp.json'
     : tool === 'codex'
       ? '.codex/config.toml'
@@ -292,8 +357,10 @@ function printHarnessSnippet(projectRoot: string, tool: HarnessTool): void {
   console.log(`\nHarness MCP config snippet for ${tool} (${target}):\n`);
   if (tool === 'codex') {
     console.log(createCodexTomlSnippet(projectRoot));
+  } else if (tool === 'opencode') {
+    console.log(JSON.stringify(createOpenCodeSnippet(projectRoot), null, 2));
   } else {
-    console.log(JSON.stringify(createHarnessSnippet(projectRoot), null, 2));
+    console.log(JSON.stringify(createMcpJsonSnippet(projectRoot), null, 2));
   }
 
   if (tool === 'generic') {
@@ -311,15 +378,20 @@ function main(): void {
 
   const config = ensureConfig(options.projectRoot, options.force);
   const envExample = ensureEnvExample(options.projectRoot, options.force);
-  const snippet = createHarnessSnippet(options.projectRoot);
+  const mcpSnippet = createMcpJsonSnippet(options.projectRoot);
 
   console.log('Odin runtime project bootstrap complete.');
   console.log(`- ${config.changed ? 'wrote' : 'kept'} ${config.path}`);
   console.log(`- ${envExample.changed ? 'updated' : 'kept'} ${envExample.path}`);
 
   if (options.writeMcp && isMcpJsonTool(options.tool)) {
-    const mcp = writeMcpFile(options.projectRoot, snippet, options.force);
+    const mcp = writeMcpFile(options.projectRoot, mcpSnippet, options.force);
     console.log(`- ${mcp.changed ? 'updated' : 'kept'} ${mcp.path}`);
+  }
+
+  if (options.writeMcp && options.tool === 'opencode') {
+    const openCodeConfig = writeOpenCodeConfig(options.projectRoot, options.force);
+    console.log(`- ${openCodeConfig.changed ? 'updated' : 'kept'} ${openCodeConfig.path}`);
   }
 
   if (options.writeMcp && options.tool === 'codex') {

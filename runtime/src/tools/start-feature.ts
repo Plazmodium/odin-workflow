@@ -4,13 +4,22 @@
  */
 
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import { validateHumanAuthor } from '../domain/actors.js';
 import type { StartFeatureInput } from '../schemas.js';
-import { createTextResult } from '../utils.js';
+import { createErrorResult, createTextResult } from '../utils.js';
 
 export async function handleStartFeature(
   adapter: WorkflowStateAdapter,
   input: StartFeatureInput
 ) {
+  const author_error = validateHumanAuthor(input.author);
+  if (author_error != null) {
+    return createErrorResult(author_error, {
+      feature_id: input.id,
+      author: input.author,
+    });
+  }
+
   const branch_name =
     input.dev_initials == null ? undefined : `${input.dev_initials}/feature/${input.id}`;
 

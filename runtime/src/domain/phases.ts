@@ -57,8 +57,8 @@ const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
   '6': {
     id: '6',
     name: 'Reviewer',
-    purpose: 'Run security and review checks before integration.',
-    definition_of_done: ['Review checks completed'],
+    purpose: 'Run security and unit-test quality review before integration.',
+    definition_of_done: ['Security review completed', 'Test quality evaluation completed'],
     required_artifacts: ['review'],
     allowed_next_phases: ['7'],
   },
@@ -129,8 +129,8 @@ const PHASE_AGENT_INSTRUCTIONS: Record<PhaseId, PhaseAgentInstructions> = {
   },
   '6': {
     name: 'reviewer-agent',
-    role_summary: 'Run security and review checks and summarize the result.',
-    constraints: ['High and critical findings block progression.'],
+    role_summary: 'Run security and unit-test quality checks and summarize the result.',
+    constraints: ['High and critical findings block progression.', 'Weak or missing tests send the feature back to Builder.'],
   },
   '7': {
     name: 'integrator-agent',

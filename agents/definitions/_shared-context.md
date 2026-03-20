@@ -153,6 +153,11 @@ Document project knowledge discovered during your work. The orchestrator will pr
 
 Skills are **mandatory** for all agents. The orchestrator injects domain-specific skills into your context under `## Active Skills`. If no specific tech stack skills match, the `generic-dev` fallback skill is injected.
 
+Some phases also require workflow skills:
+
+- **Builder** must receive `testing/unit-tests-sdd`
+- **Reviewer** must receive `testing/unit-tests-eval-sdd`
+
 Always follow patterns, conventions, and best practices from your injected skills.
 
 ---

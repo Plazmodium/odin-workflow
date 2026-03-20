@@ -7,6 +7,7 @@ import { getNextPhaseId } from '../../domain/phases.js';
 import type {
   AgentInvocationRecord,
   ClaimVerificationSummary,
+  FeatureCommitRecord,
   FeatureEvalSummary,
   FeatureRecord,
   LearningRecord,
@@ -26,6 +27,7 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
   private readonly results = new Map<string, PhaseResultRecord[]>();
   private readonly review_checks = new Map<string, ReviewCheckRecord[]>();
   private readonly learnings = new Map<string, LearningRecord[]>();
+  private readonly commits = new Map<string, FeatureCommitRecord[]>();
   private readonly invocations = new Map<string, AgentInvocationRecord>();
   private readonly propagation_targets: Array<{ learning_id: string; target_type: PersistedTargetType; target_path: string | null; relevance: number }> = [];
   private invocation_counter = 0;
@@ -53,7 +55,10 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
 
   async recordPhaseArtifact(artifact: PhaseArtifact): Promise<PhaseArtifact> {
     const existing = this.artifacts.get(artifact.feature_id) ?? [];
-    this.artifacts.set(artifact.feature_id, [...existing, artifact]);
+    const filtered = existing.filter(
+      (current) => !(current.phase === artifact.phase && current.output_type === artifact.output_type)
+    );
+    this.artifacts.set(artifact.feature_id, [...filtered, artifact]);
     this.touchFeature(artifact.feature_id);
     return artifact;
   }
@@ -142,6 +147,24 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
     return [...(this.learnings.get(feature_id) ?? [])];
   }
 
+  async findOpenAgentInvocation(
+    feature_id: string,
+    phase: PhaseId,
+    agent_name: string
+  ): Promise<AgentInvocationRecord | null> {
+    const matching = Array.from(this.invocations.values())
+      .filter(
+        (record) =>
+          record.feature_id === feature_id &&
+          record.phase === phase &&
+          record.agent_name === agent_name &&
+          record.ended_at == null
+      )
+      .sort((left, right) => right.started_at.localeCompare(left.started_at));
+
+    return matching[0] ?? null;
+  }
+
   async startAgentInvocation(
     feature_id: string,
     phase: PhaseId,
@@ -182,6 +205,36 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
 
     this.invocations.set(invocation_id, updated);
     return updated;
+  }
+
+  async recordCommit(commit: Omit<FeatureCommitRecord, 'committed_at'>): Promise<FeatureCommitRecord> {
+    const record: FeatureCommitRecord = {
+      ...commit,
+      committed_at: new Date().toISOString(),
+    };
+
+    const existing = this.commits.get(commit.feature_id) ?? [];
+    this.commits.set(commit.feature_id, [...existing, record]);
+    return record;
+  }
+
+  async recordPullRequest(
+    feature_id: string,
+    pr_url: string,
+    pr_number: number
+  ): Promise<{ feature_id: string; pr_url: string; pr_number: number }> {
+    return { feature_id, pr_url, pr_number };
+  }
+
+  async recordMerge(
+    feature_id: string,
+    merged_by: string
+  ): Promise<{ feature_id: string; merged_at: string; merged_by: string; pr_url?: string; pr_number?: number }> {
+    return {
+      feature_id,
+      merged_at: new Date().toISOString(),
+      merged_by,
+    };
   }
 
   async recordQualityGate(

@@ -226,6 +226,32 @@ export interface AgentInvocationRecord {
   duration_ms: number | null;
 }
 
+export interface PullRequestRecord {
+  feature_id: string;
+  pr_url: string;
+  pr_number: number;
+}
+
+export interface FeatureCommitRecord {
+  feature_id: string;
+  commit_hash: string;
+  phase: PhaseId;
+  message?: string;
+  files_changed?: number;
+  insertions?: number;
+  deletions?: number;
+  committed_at: string;
+  committed_by: string;
+}
+
+export interface MergeRecord {
+  feature_id: string;
+  merged_at: string;
+  merged_by: string;
+  pr_url?: string;
+  pr_number?: number;
+}
+
 export interface PhaseAgentInstructions {
   name: string;
   role_summary: string;
@@ -236,6 +262,12 @@ export interface PhaseContextBundle {
   feature: FeatureRecord;
   phase: PhaseContract;
   agent: PhaseAgentInstructions;
+  invocation: {
+    id: string;
+    agent_name: string;
+    started_at: string;
+    skills_used: string[];
+  } | null;
   workflow: {
     open_blockers: string[];
     open_gates: string[];

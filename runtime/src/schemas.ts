@@ -23,7 +23,29 @@ export const StartFeatureInputSchema = z.object({
   requirements_path: z.string().optional(),
   dev_initials: z.string().optional(),
   base_branch: z.string().optional(),
-  author: z.string().optional(),
+  author: z.string().min(1, 'author is required'),
+});
+
+export const RecordPullRequestInputSchema = z.object({
+  feature_id: z.string().min(1),
+  pr_url: z.string().url(),
+  pr_number: z.int().positive(),
+});
+
+export const RecordCommitInputSchema = z.object({
+  feature_id: z.string().min(1),
+  commit_hash: z.string().min(1),
+  phase: phase_id_schema,
+  message: z.string().optional(),
+  files_changed: z.int().nonnegative().optional(),
+  insertions: z.int().nonnegative().optional(),
+  deletions: z.int().nonnegative().optional(),
+  committed_by: z.string().optional(),
+});
+
+export const RecordMergeInputSchema = z.object({
+  feature_id: z.string().min(1),
+  merged_by: z.string().min(1).default('human'),
 });
 
 export const GetNextPhaseInputSchema = z.object({
@@ -114,6 +136,9 @@ export const ExploreKnowledgeInputSchema = z.object({
 
 export type VerifyDesignInput = z.infer<typeof VerifyDesignInputSchema>;
 export type StartFeatureInput = z.infer<typeof StartFeatureInputSchema>;
+export type RecordPullRequestInput = z.infer<typeof RecordPullRequestInputSchema>;
+export type RecordCommitInput = z.infer<typeof RecordCommitInputSchema>;
+export type RecordMergeInput = z.infer<typeof RecordMergeInputSchema>;
 export type GetNextPhaseInput = z.infer<typeof GetNextPhaseInputSchema>;
 export type GetFeatureStatusInput = z.infer<typeof GetFeatureStatusInputSchema>;
 export type VerifyClaimsInput = z.infer<typeof VerifyClaimsInputSchema>;

@@ -54,7 +54,6 @@ Edit `.env.local` with your Supabase credentials:
 ```env
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SECRET_KEY=your-secret-key-here
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 ```
 
 > **Where to find your keys**: Supabase Dashboard → Settings → API
@@ -157,4 +156,4 @@ Deploy to any platform that supports Next.js:
 Set these environment variables on your platform:
 - `SUPABASE_URL` (required)
 - `SUPABASE_SECRET_KEY` (required)
-- `NEXT_PUBLIC_SUPABASE_URL` (required for archives viewer — same value as `SUPABASE_URL`)
+- archived files are fetched through a server-side route; no `NEXT_PUBLIC_SUPABASE_URL` is required

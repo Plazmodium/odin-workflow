@@ -9,6 +9,7 @@ import type { RuntimeConfig } from '../../config.js';
 import type {
   AgentInvocationRecord,
   ClaimVerificationSummary,
+  FeatureCommitRecord,
   FeatureEvalSummary,
   FeatureRecord,
   LearningRecord,
@@ -525,6 +526,44 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
     }));
   }
 
+  async findOpenAgentInvocation(
+    feature_id: string,
+    phase: PhaseId,
+    agent_name: string
+  ): Promise<AgentInvocationRecord | null> {
+    const { data, error } = await this.client
+      .from('agent_invocations')
+      .select('*')
+      .eq('feature_id', feature_id)
+      .eq('phase', phase)
+      .eq('agent_name', agent_name)
+      .is('ended_at', null)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error != null) {
+      throw new Error(`Failed to find open agent invocation: ${error.message}`);
+    }
+
+    if (data == null) {
+      return null;
+    }
+
+    const row = data as JsonRecord;
+    return {
+      id: String(row.id),
+      feature_id: String(row.feature_id),
+      phase: String(row.phase) as PhaseId,
+      agent_name: String(row.agent_name),
+      operation: row.operation == null ? null : String(row.operation),
+      skills_used: Array.isArray(row.skills_used) ? row.skills_used.map((value) => String(value)) : [],
+      started_at: String(row.started_at),
+      ended_at: row.ended_at == null ? null : String(row.ended_at),
+      duration_ms: row.duration_ms == null ? null : Number(row.duration_ms),
+    };
+  }
+
   async startAgentInvocation(
     feature_id: string,
     phase: PhaseId,
@@ -578,6 +617,77 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       started_at: String(row.started_at),
       ended_at: row.ended_at == null ? null : String(row.ended_at),
       duration_ms: row.duration_ms == null ? null : Number(row.duration_ms),
+    };
+  }
+
+  async recordCommit(commit: Omit<FeatureCommitRecord, 'committed_at'>): Promise<FeatureCommitRecord> {
+    const { data, error } = await this.client.rpc('record_commit', {
+      p_feature_id: commit.feature_id,
+      p_commit_hash: commit.commit_hash,
+      p_phase: commit.phase,
+      p_message: commit.message ?? null,
+      p_files_changed: commit.files_changed ?? null,
+      p_insertions: commit.insertions ?? null,
+      p_deletions: commit.deletions ?? null,
+      p_committed_by: commit.committed_by,
+    });
+
+    if (error != null || data == null || data.length === 0) {
+      throw new Error(`Failed to record commit: ${error?.message ?? 'No result returned.'}`);
+    }
+
+    const row = data[0] as JsonRecord;
+    return {
+      feature_id: String(row.feature_id),
+      commit_hash: String(row.commit_hash),
+      phase: String(row.phase) as PhaseId,
+      message: row.message == null ? undefined : String(row.message),
+      files_changed: row.files_changed == null ? undefined : Number(row.files_changed),
+      insertions: row.insertions == null ? undefined : Number(row.insertions),
+      deletions: row.deletions == null ? undefined : Number(row.deletions),
+      committed_at: String(row.committed_at ?? row.created_at ?? new Date().toISOString()),
+      committed_by: row.committed_by == null ? commit.committed_by : String(row.committed_by),
+    };
+  }
+
+  async recordPullRequest(
+    feature_id: string,
+    pr_url: string,
+    pr_number: number
+  ): Promise<{ feature_id: string; pr_url: string; pr_number: number }> {
+    const { error } = await this.client.rpc('record_pr', {
+      p_feature_id: feature_id,
+      p_pr_url: pr_url,
+      p_pr_number: pr_number,
+    });
+
+    if (error != null) {
+      throw new Error(`Failed to record pull request: ${error.message}`);
+    }
+
+    return { feature_id, pr_url, pr_number };
+  }
+
+  async recordMerge(
+    feature_id: string,
+    merged_by: string
+  ): Promise<{ feature_id: string; merged_at: string; merged_by: string; pr_url?: string; pr_number?: number }> {
+    const { data, error } = await this.client.rpc('record_merge', {
+      p_feature_id: feature_id,
+      p_merged_by: merged_by,
+    });
+
+    if (error != null || data == null || data.length === 0) {
+      throw new Error(`Failed to record merge: ${error?.message ?? 'No result returned.'}`);
+    }
+
+    const row = data[0] as JsonRecord;
+    return {
+      feature_id,
+      merged_at: String(row.merged_at ?? new Date().toISOString()),
+      merged_by,
+      pr_url: row.pr_url == null ? undefined : String(row.pr_url),
+      pr_number: row.pr_number == null ? undefined : Number(row.pr_number),
     };
   }
 

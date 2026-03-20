@@ -52,7 +52,7 @@ cp .env.example .env
 # Edit .env with your database credentials
 ```
 
-Use the project root `.env` or `.env.local` file that lives next to your MCP config and `.odin/`. Odin does not read env files from nested app directories.
+Use the project root `.env` or `.env.local` file that lives next to `opencode.json` / `.mcp.json` / `.odin/`. Odin does not read env files from nested app directories.
 
 Odin supports two database connection methods:
 
@@ -80,6 +80,9 @@ Your AI agent now has these tools available:
 | `odin.get_next_phase` | Ask "what should happen next?" |
 | `odin.prepare_phase_context` | Get the full working bundle for a phase |
 | `odin.record_phase_artifact` | Register a phase output (PRD, spec, tasks, etc.) |
+| `odin.record_commit` | Persist git commit metadata for a feature |
+| `odin.record_pr` | Persist pull request metadata for dashboard/git tracking |
+| `odin.record_merge` | Persist that a human merged the feature PR |
 | `odin.record_phase_result` | Record phase completion, blocking, or rework |
 | `odin.run_review_checks` | Run security/review scans via Semgrep |
 | `odin.verify_design` | Run formal design verification (TLA+ model checking) on a `.machine.ts` DSL file |
