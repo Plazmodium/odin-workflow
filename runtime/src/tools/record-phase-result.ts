@@ -5,11 +5,41 @@
 
 import type { ArchiveAdapter } from '../adapters/archive/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import { resolveWorkflowActorName } from '../domain/actors.js';
 import { getNextPhaseId, getPhaseContract } from '../domain/phases.js';
+import { completeTaskArtifactContent } from '../domain/tasks.js';
 import type { RecordPhaseResultInput } from '../schemas.js';
 import type { FeatureEvalSummary } from '../types.js';
 import { createErrorResult, createId, createTextResult } from '../utils.js';
 import { autoArchiveFeature } from './archive-feature-release.js';
+
+async function completeBuilderTasks(
+  adapter: WorkflowStateAdapter,
+  feature_id: string,
+  created_by: string
+): Promise<void> {
+  const artifacts = await adapter.listPhaseArtifacts(feature_id);
+  const latest_tasks = artifacts.filter((artifact) => artifact.output_type === 'tasks').at(-1);
+
+  if (latest_tasks == null) {
+    return;
+  }
+
+  const completed = completeTaskArtifactContent(latest_tasks.content);
+  if (!completed.changed) {
+    return;
+  }
+
+  await adapter.recordPhaseArtifact({
+    id: createId('artifact'),
+    feature_id,
+    phase: latest_tasks.phase,
+    output_type: latest_tasks.output_type,
+    content: completed.content,
+    created_by,
+    created_at: new Date().toISOString(),
+  });
+}
 
 export async function handleRecordPhaseResult(
   adapter: WorkflowStateAdapter,
@@ -36,20 +66,29 @@ export async function handleRecordPhaseResult(
 
   const next_phase =
     input.outcome === 'completed' ? input.next_phase ?? getNextPhaseId(input.phase) : input.next_phase ?? null;
+  const workflow_actor = resolveWorkflowActorName(input.phase, input.created_by);
 
-  // GAP-1: Record agent invocation for duration tracking
-  let invocation_id: string | null = null;
-  try {
-    const phase_contract = getPhaseContract(input.phase);
-    const invocation = await adapter.startAgentInvocation(
-      input.feature_id,
-      input.phase,
-      input.created_by,
-      `Phase ${input.phase}: ${phase_contract.name}`
-    );
-    invocation_id = invocation.id;
-  } catch {
-    console.error(`[Odin Runtime] Failed to start agent invocation for ${input.feature_id} phase ${input.phase}`);
+  if (input.phase === '5' && input.outcome === 'completed') {
+    await completeBuilderTasks(adapter, input.feature_id, workflow_actor);
+  }
+
+  let invocation_id = (
+    await adapter.findOpenAgentInvocation(input.feature_id, input.phase, workflow_actor)
+  )?.id ?? null;
+
+  if (invocation_id == null && input.phase !== '10') {
+    try {
+      const phase_contract = getPhaseContract(input.phase);
+      const invocation = await adapter.startAgentInvocation(
+        input.feature_id,
+        input.phase,
+        workflow_actor,
+        `Phase ${input.phase}: ${phase_contract.name} (fallback)`
+      );
+      invocation_id = invocation.id;
+    } catch {
+      console.error(`[Odin Runtime] Failed to start agent invocation for ${input.feature_id} phase ${input.phase}`);
+    }
   }
 
   const updated_feature = await adapter.recordPhaseResult({
@@ -60,7 +99,7 @@ export async function handleRecordPhaseResult(
     summary: input.summary,
     next_phase,
     blockers: input.blockers,
-    created_by: input.created_by,
+    created_by: workflow_actor,
     created_at: new Date().toISOString(),
   });
 
@@ -81,7 +120,7 @@ export async function handleRecordPhaseResult(
         input.feature_id,
         `${phase_contract.name.toLowerCase()}_phase_complete`,
         'APPROVED',
-        input.created_by,
+        workflow_actor,
         input.summary
       );
     } catch {

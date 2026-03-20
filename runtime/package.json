@@ -14,7 +14,7 @@
     "init:project": "node dist/init.js",
     "start": "node dist/server.js",
     "clean": "rm -rf dist",
-    "test": "vitest run",
+    "test": "npm run build && vitest run",
     "type-check": "tsc --noEmit"
   },
   "keywords": [

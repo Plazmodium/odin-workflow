@@ -675,7 +675,7 @@ export interface PerspectiveItem {
 export interface TaskItem {
   id: string;
   title: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'done';
+  status: 'pending' | 'in_progress' | 'in-progress' | 'completed' | 'done';
 }
 
 // ============================================================

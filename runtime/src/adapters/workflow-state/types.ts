@@ -6,6 +6,7 @@
 import type {
   AgentInvocationRecord,
   ClaimVerificationSummary,
+  FeatureCommitRecord,
   FeatureEvalSummary,
   FeatureRecord,
   LearningCategory,
@@ -41,8 +42,12 @@ export interface WorkflowStateAdapter {
   listReviewChecks(feature_id: string): Promise<ReviewCheckRecord[]>;
   captureLearning(learning: LearningRecord): Promise<LearningRecord>;
   listLearnings(feature_id: string): Promise<LearningRecord[]>;
+  findOpenAgentInvocation(feature_id: string, phase: PhaseId, agent_name: string): Promise<AgentInvocationRecord | null>;
   startAgentInvocation(feature_id: string, phase: PhaseId, agent_name: string, operation?: string, skills?: string[]): Promise<AgentInvocationRecord>;
   completeAgentInvocation(invocation_id: string): Promise<AgentInvocationRecord>;
+  recordCommit(commit: Omit<FeatureCommitRecord, 'committed_at'>): Promise<FeatureCommitRecord>;
+  recordPullRequest(feature_id: string, pr_url: string, pr_number: number): Promise<{ feature_id: string; pr_url: string; pr_number: number }>;
+  recordMerge(feature_id: string, merged_by: string): Promise<{ feature_id: string; merged_at: string; merged_by: string; pr_url?: string; pr_number?: number }>;
   recordQualityGate(feature_id: string, gate_name: string, status: 'APPROVED' | 'REJECTED', approver: string, notes?: string): Promise<number>;
   computeFeatureEval(feature_id: string): Promise<FeatureEvalSummary | null>;
   recordSecurityFindings(feature_id: string, phase: PhaseId, findings: ReviewFinding[], tool: string): Promise<number>;

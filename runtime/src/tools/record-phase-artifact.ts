@@ -4,6 +4,7 @@
  */
 
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import { resolveWorkflowActorName } from '../domain/actors.js';
 import type { RecordPhaseArtifactInput } from '../schemas.js';
 import { createId, createErrorResult, createTextResult } from '../utils.js';
 
@@ -18,13 +19,15 @@ export async function handleRecordPhaseArtifact(
     });
   }
 
+  const created_by = resolveWorkflowActorName(input.phase, input.created_by);
+
   const artifact = await adapter.recordPhaseArtifact({
     id: createId('artifact'),
     feature_id: input.feature_id,
     phase: input.phase,
     output_type: input.output_type,
     content: input.content,
-    created_by: input.created_by,
+    created_by,
     created_at: new Date().toISOString(),
   });
 

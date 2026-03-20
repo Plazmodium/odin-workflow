@@ -121,6 +121,23 @@ This is the canonical step-by-step workflow the orchestrator follows for every f
 
 > **Remember**: Only the main orchestrator session can call `odin.*` tools. Task-spawned sub-agents cannot access MCP — they produce output that the orchestrator persists.
 
+### Feature Is the Unit of Execution
+
+Odin executes work at the **feature** level.
+
+- One `odin.start_feature` call represents one coherent feature moving through the workflow
+- One feature maps to one feature branch, one phase history, and one PR review boundary
+- The `tasks` artifact tracks progress **within** a feature; it does not define independent concurrent sub-feature workflows
+- Do NOT invent intra-feature swarms, isolated worktree coordination, or parallel Builder subflows unless the Odin runtime explicitly supports them
+- If work should happen in parallel, split it into multiple independent features, each with its own branch and workflow record
+
+**Implication for orchestrators and agents**:
+- Use `odin.prepare_phase_context`, `odin.record_phase_artifact`, and `odin.record_phase_result` assuming a single feature-level source of truth
+- Update task status serially through the orchestrator as progress tracking
+- Keep human review at the PR boundary for the feature as a whole
+
+In short: Odin orchestrates **features**, not concurrent sub-task swarms inside a feature.
+
 ### Task Tracking Protocol
 
 The Architect (Phase 3) records a task breakdown. The orchestrator updates task statuses during the Builder phase (Phase 5). This drives the dashboard's task progress display.
@@ -147,7 +164,7 @@ odin.record_phase_artifact({
   output_type: "tasks",
   content: [
     { id: "T1", title: "Create component", status: "completed" },
-    { id: "T2", title: "Add tests", status: "in-progress" }
+    { id: "T2", title: "Add tests", status: "in_progress" }
   ],
   created_by: "builder-agent"
 })
@@ -157,8 +174,9 @@ odin.record_phase_artifact({
 
 **Rules**:
 - Every task object MUST include `id`, `title`, and `status` fields
-- Valid statuses: `pending`, `in-progress`, `completed` (also accepts `done`)
+- Valid statuses: `pending`, `in_progress`, `completed` (also accepts `in-progress` and `done`)
 - The orchestrator MUST call this after each task completion, not just at the end of the Builder phase
+- If Builder completes and some tasks were never updated, Odin auto-completes the remaining task statuses as a safety net for dashboard correctness
 
 ---
 
@@ -453,7 +471,7 @@ Example: `jd/feature/AUTH-001`
 
 ### Developer Identity
 
-The `dev_initials` and `author` parameters in `odin.start_feature` identify the human developer. The orchestrator must **never guess** these values. To obtain them:
+The `dev_initials` and `author` parameters in `odin.start_feature` identify the human developer. The orchestrator must **never guess** these values. `author` is required and Odin rejects harness labels such as `opencode`, `codex`, or agent names. To obtain them:
 
 1. **Check git config**: `git config user.name` for author, derive initials from the name
 2. **Ask the developer** if git config is not available
@@ -464,7 +482,9 @@ The `dev_initials` and `author` parameters in `odin.start_feature` identify the 
 2. **Only after the branch exists**, call `odin.start_feature` to record the feature
 3. Transition to Phase 1 (Product) — all work happens on the feature branch
 4. Each phase: `odin.prepare_phase_context` → agent work → `odin.record_phase_artifact` → `odin.record_phase_result`
-5. Release phase creates PR via `gh pr create`
+5. `odin.prepare_phase_context` starts the phase invocation timer; `odin.record_phase_result` completes it
+6. Release phase creates PR via `gh pr create`, then records it with `odin.record_pr`
+7. After the human merges the PR, record the merge with `odin.record_merge`
 6. Human reviews and merges (NEVER the agent)
 
 > **CRITICAL**: Create the git branch BEFORE calling `odin.start_feature`. If branch creation fails (e.g., branch already exists, git error), do NOT create the feature — you would have a dead DB record with no branch. The branch is the real artifact; the DB record is tracking.
@@ -786,7 +806,7 @@ odin.start_feature({
   severity: "ROUTINE",        // ROUTINE, EXPEDITED, CRITICAL
   dev_initials: "jd",         // optional
   base_branch: "main",        // optional
-  author: "John Doe"          // optional
+  author: "John Doe"          // required: real human developer name
 })
 ```
 
@@ -809,6 +829,17 @@ odin.record_phase_artifact({
   created_by: "architect-agent"
 })
 
+odin.record_commit({
+  feature_id: "FEAT-001",
+  commit_hash: "abc123def",
+  phase: "5",
+  message: "feat(FEAT-001): implement builder task 1",
+  files_changed: 4,
+  insertions: 120,
+  deletions: 18,
+  committed_by: "builder-agent"
+})
+
 odin.record_phase_result({
   feature_id: "FEAT-001",
   phase: "3",
@@ -817,6 +848,8 @@ odin.record_phase_result({
   created_by: "architect-agent"
 })
 ```
+
+> `odin.prepare_phase_context` returns an `invocation` object. That invocation stays open while the agent works and is completed automatically when `odin.record_phase_result` is called for the same phase.
 
 ### Review & Verification
 
@@ -857,6 +890,17 @@ odin.archive_feature_release({
   feature_id: "FEAT-001",
   summary: "JWT auth implementation",
   archived_by: "release-agent"
+})
+
+odin.record_pr({
+  feature_id: "FEAT-001",
+  pr_url: "https://github.com/org/repo/pull/42",
+  pr_number: 42
+})
+
+odin.record_merge({
+  feature_id: "FEAT-001",
+  merged_by: "human"
 })
 ```
 

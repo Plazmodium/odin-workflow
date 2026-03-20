@@ -5,12 +5,13 @@
 
 import { readdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import YAML from 'yaml';
 
 import type { RuntimeConfig } from '../../config.js';
-import type { FeatureRecord, KnowledgeDomain, PhaseArtifact, ResolvedSkill } from '../../types.js';
+import type { FeatureRecord, KnowledgeDomain, PhaseArtifact, PhaseId, ResolvedSkill } from '../../types.js';
 import type { ResolveSkillsInput, ResolveSkillsResult, SkillAdapter } from './types.js';
 
 interface SkillMetadata {
@@ -56,6 +57,32 @@ const FILE_SIGNAL_MAP: Array<{ paths: string[]; skills: string[] }> = [
   { paths: ['jest.config.js', 'jest.config.ts'], skills: ['jest'] },
   { paths: ['cypress.config.ts', 'cypress.config.js'], skills: ['cypress'] },
 ];
+
+const PHASE_REQUIRED_SKILLS: Partial<Record<PhaseId, string[]>> = {
+  '5': ['unit-tests-sdd'],
+  '6': ['unit-tests-eval-sdd'],
+};
+
+function getBuiltInSkillRoots(): string[] {
+  const current_file = fileURLToPath(import.meta.url);
+  const package_root = resolve(dirname(current_file), '..', '..', '..');
+  const candidates: string[] = [];
+
+  let cursor = package_root;
+  for (let depth = 0; depth < 5; depth++) {
+    candidates.push(join(cursor, 'skills'));
+    candidates.push(join(cursor, 'agents', 'skills'));
+
+    const parent = resolve(cursor, '..');
+    if (parent === cursor) {
+      break;
+    }
+
+    cursor = parent;
+  }
+
+  return candidates.filter((path, index, values) => existsSync(path) && values.indexOf(path) === index);
+}
 
 async function collectSkillFiles(root: string): Promise<string[]> {
   if (!existsSync(root)) {
@@ -369,8 +396,13 @@ export class FilesystemSkillAdapter implements SkillAdapter {
       return this.merged_cache;
     }
 
-    const builtInRoot = join(this.projectRoot, 'agents', 'skills');
-    const builtInSkills = await loadSkillDefinitions(builtInRoot, 'built_in');
+    const builtInSkills = new Map<string, SkillDefinition>();
+    for (const root of getBuiltInSkillRoots()) {
+      const skills = await loadSkillDefinitions(root, 'built_in');
+      for (const [name, definition] of skills.entries()) {
+        builtInSkills.set(name, definition);
+      }
+    }
 
     const projectLocalRoots = (this.config.skills?.paths ?? ['.odin/skills']).map((configuredPath) =>
       join(this.projectRoot, configuredPath)
@@ -411,6 +443,10 @@ export class FilesystemSkillAdapter implements SkillAdapter {
     const mergedSkills = await this.getMergedSkillDefinitions();
 
     const requested = new Set<string>(this.config.skills?.defaults ?? []);
+
+    for (const skill of PHASE_REQUIRED_SKILLS[input.phase] ?? []) {
+      requested.add(skill);
+    }
 
     if (this.config.skills?.auto_detect !== false) {
       const repoDetected = await detectRepoSkills(this.projectRoot);

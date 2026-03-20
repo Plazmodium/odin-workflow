@@ -3,11 +3,12 @@
  * Version: 0.1.0
  */
 
-import type { FeatureRecord, KnowledgeDomain, PhaseArtifact, ResolvedSkill } from '../../types.js';
+import type { FeatureRecord, KnowledgeDomain, PhaseArtifact, PhaseId, ResolvedSkill } from '../../types.js';
 
 export interface ResolveSkillsInput {
   feature: FeatureRecord;
   artifacts: PhaseArtifact[];
+  phase: PhaseId;
 }
 
 export interface ResolveSkillsResult {

@@ -5,6 +5,7 @@
 
 import type { SkillAdapter } from '../adapters/skills/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import { resolveWorkflowActorName } from '../domain/actors.js';
 import { getPhaseAgentInstructions, getPhaseContract, isWatchedPhase } from '../domain/phases.js';
 import { computeResonance, type ResonanceInput } from '../domain/resonance.js';
 import type { PreparePhaseContextInput } from '../schemas.js';
@@ -61,20 +62,42 @@ export async function handlePreparePhaseContext(
     adapter.listOpenFindings(input.feature_id),
     adapter.listPendingClaims(input.feature_id),
   ]);
-  const resolved_skills = input.include_skills
-    ? await skill_adapter.resolveSkills({ feature, artifacts })
-    : { resolved: [], fallback_used: false };
-
   const phase = getPhaseContract(input.phase);
   const agent = getPhaseAgentInstructions(input.phase);
+  const actor_name = resolveWorkflowActorName(input.phase, input.agent_name ?? agent.name);
+  const resolved_skills = input.include_skills
+    ? await skill_adapter.resolveSkills({ feature, artifacts, phase: input.phase })
+    : { resolved: [], fallback_used: false };
+  const skill_paths = resolved_skills.resolved.map((skill) => `${skill.category}/${skill.name}`);
+  const existing_invocation = await adapter.findOpenAgentInvocation(feature.id, input.phase, actor_name);
+  const invocation =
+    existing_invocation ??
+    (input.phase === '10'
+      ? null
+      : await adapter.startAgentInvocation(
+          feature.id,
+          input.phase,
+          actor_name,
+          `Phase ${input.phase}: ${phase.name}`,
+          skill_paths.length > 0 ? skill_paths : undefined
+        ));
 
   const bundle: PhaseContextBundle = {
     feature,
     phase,
     agent: {
       ...agent,
-      name: input.agent_name ?? agent.name,
+      name: actor_name,
     },
+    invocation:
+      invocation == null
+        ? null
+        : {
+            id: invocation.id,
+            agent_name: invocation.agent_name,
+            started_at: invocation.started_at,
+            skills_used: invocation.skills_used,
+          },
     workflow: {
       open_blockers,
       open_gates,
@@ -91,7 +114,7 @@ export async function handlePreparePhaseContext(
       required_claims: isWatchedPhase(input.phase) ? ['CODE_MODIFIED'] : [],
       required_checks:
         input.phase === '6'
-          ? ['security review']
+          ? ['security review', 'unit test evaluation']
           : isWatchedPhase(input.phase)
             ? ['build', 'tests']
             : [],
