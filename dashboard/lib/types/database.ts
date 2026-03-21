@@ -648,7 +648,17 @@ export interface LearningChainItem {
 // Phase Outputs (Migration 026)
 // ============================================================
 
-export type PhaseOutputType = 'requirements' | 'perspectives' | 'tasks';
+export type PhaseOutputType =
+  | 'prd'
+  | 'requirements'
+  | 'spec'
+  | 'perspectives'
+  | 'tasks'
+  | 'review'
+  | 'documentation'
+  | 'release_notes'
+  | 'security_review_runtime'
+  | (string & {});
 
 export interface PhaseOutput {
   id: string;

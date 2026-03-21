@@ -3,14 +3,19 @@
  * Version: 0.1.0
  */
 
+import { randomUUID } from 'node:crypto';
+
 import { getNextPhaseId } from '../../domain/phases.js';
 import type {
   AgentInvocationRecord,
+  AgentClaimRecord,
   ClaimVerificationSummary,
   FeatureCommitRecord,
   FeatureEvalSummary,
   FeatureRecord,
   LearningRecord,
+  PolicyCheckResult,
+  PolicyVerdictRecord,
   PersistedTargetType,
   PhaseArtifact,
   PhaseId,
@@ -18,6 +23,9 @@ import type {
   RelatedLearningRecord,
   ReviewCheckRecord,
   ReviewFinding,
+  VerificationStatus,
+  WatcherQueueClaim,
+  WatcherReviewRecord,
 } from '../../types.js';
 import type { ListAllLearningsFilter, WorkflowStateAdapter } from './types.js';
 
@@ -28,6 +36,9 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
   private readonly review_checks = new Map<string, ReviewCheckRecord[]>();
   private readonly learnings = new Map<string, LearningRecord[]>();
   private readonly commits = new Map<string, FeatureCommitRecord[]>();
+  private readonly claims = new Map<string, AgentClaimRecord[]>();
+  private readonly policy_verdicts = new Map<string, PolicyVerdictRecord[]>();
+  private readonly watcher_reviews = new Map<string, WatcherReviewRecord[]>();
   private readonly invocations = new Map<string, AgentInvocationRecord>();
   private readonly propagation_targets: Array<{ learning_id: string; target_type: PersistedTargetType; target_path: string | null; relevance: number }> = [];
   private invocation_counter = 0;
@@ -114,11 +125,150 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
   }
 
   async listPendingClaims(_feature_id: string): Promise<string[]> {
-    return [];
+    const claims = this.claims.get(_feature_id) ?? [];
+
+    return claims
+      .map((claim) => {
+        const review = this.getLatestWatcherReview(claim.id);
+        const verdict = this.getLatestPolicyVerdict(claim.id);
+
+        if (review != null && review.verdict === 'PASS') {
+          return null;
+        }
+
+        if (review != null && review.verdict === 'FAIL') {
+          return `${claim.claim_type} by ${claim.agent_name} (watcher FAIL)`;
+        }
+
+        if (verdict == null) {
+          return `${claim.claim_type} by ${claim.agent_name} (pending policy)`;
+        }
+
+        if (verdict.verdict === 'PASS') {
+          return null;
+        }
+
+        return `${claim.claim_type} by ${claim.agent_name} (${verdict.verdict})`;
+      })
+      .filter((value): value is string => value != null);
   }
 
-  async listClaimVerificationStatus(_feature_id: string): Promise<ClaimVerificationSummary[]> {
-    return [];
+  async listClaimVerificationStatus(feature_id: string): Promise<ClaimVerificationSummary[]> {
+    const claims = this.claims.get(feature_id) ?? [];
+
+    return claims.map((claim) => {
+      const policy = this.getLatestPolicyVerdict(claim.id);
+      const watcher = this.getLatestWatcherReview(claim.id);
+      const final_status: VerificationStatus = watcher?.verdict ?? policy?.verdict ?? 'PENDING';
+
+      return {
+        claim_id: claim.id,
+        claim_type: claim.claim_type,
+        agent_name: claim.agent_name,
+        risk_level: claim.risk_level,
+        policy_verdict: policy?.verdict ?? null,
+        watcher_verdict: watcher?.verdict ?? null,
+        final_status,
+      };
+    });
+  }
+
+  async submitClaim(claim: Omit<AgentClaimRecord, 'id' | 'created_at'>): Promise<AgentClaimRecord> {
+    const record: AgentClaimRecord = {
+      ...claim,
+      id: randomUUID(),
+      created_at: new Date().toISOString(),
+    };
+
+    const existing = this.claims.get(claim.feature_id) ?? [];
+    this.claims.set(claim.feature_id, [...existing, record]);
+    this.touchFeature(claim.feature_id);
+
+    return record;
+  }
+
+  async runPolicyChecks(feature_id: string): Promise<PolicyCheckResult[]> {
+    const claims = this.claims.get(feature_id) ?? [];
+    const results: PolicyCheckResult[] = [];
+
+    for (const claim of claims) {
+      if (this.getLatestPolicyVerdict(claim.id) != null) {
+        continue;
+      }
+
+      const has_evidence = Object.keys(claim.evidence_refs).length > 0;
+      const verdict: VerificationStatus = !has_evidence || claim.risk_level === 'HIGH' ? 'NEEDS_REVIEW' : 'PASS';
+      const reason = !has_evidence
+        ? 'Missing evidence references - escalate to watcher'
+        : claim.risk_level === 'HIGH'
+          ? 'High risk claim - requires watcher review'
+          : 'Evidence references present';
+
+      this.recordPolicyVerdictInternal(claim.id, verdict, 'evidence_check', reason, claim.evidence_refs);
+      results.push({
+        claim_id: claim.id,
+        claim_type: claim.claim_type,
+        verdict,
+        needs_watcher: verdict === 'NEEDS_REVIEW',
+      });
+    }
+
+    return results;
+  }
+
+  async listClaimsNeedingReview(feature_id?: string): Promise<WatcherQueueClaim[]> {
+    const claims = feature_id == null
+      ? Array.from(this.claims.values()).flat()
+      : this.claims.get(feature_id) ?? [];
+
+    return claims
+      .filter((claim) => {
+        const policy = this.getLatestPolicyVerdict(claim.id);
+        const watcher = this.getLatestWatcherReview(claim.id);
+        return watcher == null && (claim.risk_level === 'HIGH' || policy?.verdict === 'NEEDS_REVIEW');
+      })
+      .map((claim) => {
+        const policy = this.getLatestPolicyVerdict(claim.id);
+        return {
+          claim_id: claim.id,
+          feature_id: claim.feature_id,
+          phase: claim.phase,
+          agent_name: claim.agent_name,
+          claim_type: claim.claim_type,
+          claim_description: claim.claim_description,
+          evidence_refs: claim.evidence_refs,
+          risk_level: claim.risk_level,
+          policy_verdict: policy?.verdict ?? null,
+          policy_reason: policy?.reason ?? null,
+          created_at: claim.created_at,
+        };
+      })
+      .sort((left, right) => {
+        if (left.risk_level !== right.risk_level) {
+          return left.risk_level === 'HIGH' ? -1 : 1;
+        }
+
+        return left.created_at.localeCompare(right.created_at);
+      });
+  }
+
+  async recordWatcherReview(review: Omit<WatcherReviewRecord, 'id' | 'reviewed_at'>): Promise<WatcherReviewRecord> {
+    const claim = this.findClaim(review.claim_id);
+    if (claim == null) {
+      throw new Error(`Claim not found: ${review.claim_id}`);
+    }
+
+    const record: WatcherReviewRecord = {
+      ...review,
+      id: randomUUID(),
+      reviewed_at: new Date().toISOString(),
+    };
+
+    const existing = this.watcher_reviews.get(review.claim_id) ?? [];
+    this.watcher_reviews.set(review.claim_id, [...existing, record]);
+    this.touchFeature(claim.feature_id);
+
+    return record;
   }
 
   async getLatestFeatureEval(_feature_id: string): Promise<FeatureEvalSummary | null> {
@@ -371,5 +521,49 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
       ...feature,
       updated_at: new Date().toISOString(),
     });
+  }
+
+  private findClaim(claim_id: string): AgentClaimRecord | null {
+    for (const claims of this.claims.values()) {
+      const match = claims.find((claim) => claim.id === claim_id);
+      if (match != null) {
+        return match;
+      }
+    }
+
+    return null;
+  }
+
+  private getLatestPolicyVerdict(claim_id: string): PolicyVerdictRecord | null {
+    const verdicts = this.policy_verdicts.get(claim_id) ?? [];
+    return verdicts.at(-1) ?? null;
+  }
+
+  private getLatestWatcherReview(claim_id: string): WatcherReviewRecord | null {
+    const reviews = this.watcher_reviews.get(claim_id) ?? [];
+    return reviews.at(-1) ?? null;
+  }
+
+  private recordPolicyVerdictInternal(
+    claim_id: string,
+    verdict: VerificationStatus,
+    rule_name: string,
+    reason: string | null,
+    evidence_checked: Record<string, unknown>
+  ): PolicyVerdictRecord {
+    const record: PolicyVerdictRecord = {
+      id: randomUUID(),
+      claim_id,
+      verdict,
+      rule_name,
+      reason,
+      evidence_checked,
+      created_at: new Date().toISOString(),
+    };
+
+    const existing = this.policy_verdicts.get(claim_id) ?? [];
+    this.policy_verdicts.set(claim_id, [...existing, record]);
+
+    return record;
   }
 }

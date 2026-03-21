@@ -42,11 +42,15 @@ export function validateHumanAuthor(author: string): string | null {
   return null;
 }
 
-export function resolveWorkflowActorName(phase: PhaseId, created_by: string): string {
-  const trimmed = created_by.trim();
+export function resolveNamedActorName(default_actor: string, provided_actor?: string): string {
+  const trimmed = provided_actor?.trim() ?? '';
   if (trimmed.length === 0 || isHarnessIdentity(trimmed)) {
-    return getPhaseAgentInstructions(phase).name;
+    return default_actor;
   }
 
   return trimmed;
+}
+
+export function resolveWorkflowActorName(phase: PhaseId, created_by: string): string {
+  return resolveNamedActorName(getPhaseAgentInstructions(phase).name, created_by);
 }

@@ -19,6 +19,11 @@ You are the **Watcher Agent** in the Specification-Driven Development (SDD) work
 - Claim is marked `HIGH` risk (always escalated)
 - Evidence is missing or inconclusive
 
+**Runtime MCP flow**:
+- Orchestrator calls `odin.get_claims_needing_review(...)` to load the queue
+- Watcher evaluates one claim at a time
+- Orchestrator records the result with `odin.record_watcher_review(...)`
+
 **NOT Used**:
 - Policy Engine returns `PASS` (no escalation needed)
 - Policy Engine returns `FAIL` (deterministic rejection)
@@ -311,6 +316,17 @@ The claim "Implemented JWT authentication service with login endpoint" is **NOT 
 - **Confidence**: 0.XX
 - **Reasoning**: [Summary of reasoning]
 - **Watcher Agent**: watcher-agent
+
+Equivalent runtime call:
+```ts
+odin.record_watcher_review({
+  claim_id: "[UUID]",
+  verdict: "PASS",
+  reasoning: "Evidence supports the claim.",
+  watcher_agent: "watcher-agent",
+  confidence: 0.90
+})
+```
 
 ### 2. Track Duration
 - **Phase**: [Same phase as claim]

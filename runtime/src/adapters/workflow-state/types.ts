@@ -5,12 +5,14 @@
 
 import type {
   AgentInvocationRecord,
+  AgentClaimRecord,
   ClaimVerificationSummary,
   FeatureCommitRecord,
   FeatureEvalSummary,
   FeatureRecord,
   LearningCategory,
   LearningRecord,
+  PolicyCheckResult,
   PersistedTargetType,
   PhaseArtifact,
   PhaseId,
@@ -18,6 +20,8 @@ import type {
   RelatedLearningRecord,
   ReviewCheckRecord,
   ReviewFinding,
+  WatcherQueueClaim,
+  WatcherReviewRecord,
 } from '../../types.js';
 
 export interface ListAllLearningsFilter {
@@ -37,6 +41,10 @@ export interface WorkflowStateAdapter {
   listOpenFindings(feature_id: string): Promise<string[]>;
   listPendingClaims(feature_id: string): Promise<string[]>;
   listClaimVerificationStatus(feature_id: string): Promise<ClaimVerificationSummary[]>;
+  submitClaim(claim: Omit<AgentClaimRecord, 'id' | 'created_at'>): Promise<AgentClaimRecord>;
+  runPolicyChecks(feature_id: string): Promise<PolicyCheckResult[]>;
+  listClaimsNeedingReview(feature_id?: string): Promise<WatcherQueueClaim[]>;
+  recordWatcherReview(review: Omit<WatcherReviewRecord, 'id' | 'reviewed_at'>): Promise<WatcherReviewRecord>;
   getLatestFeatureEval(feature_id: string): Promise<FeatureEvalSummary | null>;
   recordReviewCheck(check: ReviewCheckRecord): Promise<ReviewCheckRecord>;
   listReviewChecks(feature_id: string): Promise<ReviewCheckRecord[]>;

@@ -8,18 +8,25 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { RuntimeConfig } from '../../config.js';
 import type {
   AgentInvocationRecord,
+  AgentClaimRecord,
   ClaimVerificationSummary,
+  ClaimType,
   FeatureCommitRecord,
   FeatureEvalSummary,
   FeatureRecord,
   LearningRecord,
+  PolicyCheckResult,
   PersistedTargetType,
   PhaseArtifact,
   PhaseId,
   PhaseResultRecord,
+  RiskLevel,
   RelatedLearningRecord,
   ReviewCheckRecord,
   ReviewFinding,
+  VerificationStatus,
+  WatcherQueueClaim,
+  WatcherReviewRecord,
 } from '../../types.js';
 import type { ListAllLearningsFilter, WorkflowStateAdapter } from './types.js';
 
@@ -377,13 +384,121 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
 
     return (data as JsonRecord[]).map((row) => ({
       claim_id: String(row.claim_id),
-      claim_type: String(row.claim_type),
+      claim_type: String(row.claim_type) as ClaimType,
       agent_name: String(row.agent_name),
-      risk_level: String(row.risk_level),
-      policy_verdict: row.policy_verdict == null ? null : String(row.policy_verdict),
-      watcher_verdict: row.watcher_verdict == null ? null : String(row.watcher_verdict),
-      final_status: String(row.final_status),
+      risk_level: String(row.risk_level) as RiskLevel,
+      policy_verdict: row.policy_verdict == null ? null : (String(row.policy_verdict) as VerificationStatus),
+      watcher_verdict: row.watcher_verdict == null ? null : (String(row.watcher_verdict) as VerificationStatus),
+      final_status: String(row.final_status) as VerificationStatus,
     }));
+  }
+
+  async submitClaim(claim: Omit<AgentClaimRecord, 'id' | 'created_at'>): Promise<AgentClaimRecord> {
+    const { data, error } = await this.client.rpc('submit_claim', {
+      p_feature_id: claim.feature_id,
+      p_phase: claim.phase,
+      p_agent_name: claim.agent_name,
+      p_claim_type: claim.claim_type,
+      p_description: claim.claim_description,
+      p_evidence_refs: claim.evidence_refs,
+      p_risk_level: claim.risk_level,
+      p_invocation_id: claim.invocation_id,
+    });
+
+    if (error != null || data == null || data.length === 0) {
+      throw new Error(`Failed to submit claim: ${error?.message ?? 'No result returned.'}`);
+    }
+
+    const row = data[0] as JsonRecord;
+    return {
+      id: String(row.claim_id),
+      feature_id: String(row.feature_id),
+      phase: String(row.phase) as PhaseId,
+      agent_name: claim.agent_name,
+      invocation_id: claim.invocation_id,
+      claim_type: String(row.claim_type) as ClaimType,
+      claim_description: claim.claim_description,
+      evidence_refs: claim.evidence_refs,
+      risk_level: String(row.risk_level) as RiskLevel,
+      created_at: String(row.created_at),
+    };
+  }
+
+  async runPolicyChecks(feature_id: string): Promise<PolicyCheckResult[]> {
+    const { data, error } = await this.client.rpc('run_policy_checks', {
+      p_feature_id: feature_id,
+    });
+
+    if (error != null) {
+      throw new Error(`Failed to run policy checks: ${error.message}`);
+    }
+
+    if (data == null) {
+      return [];
+    }
+
+    return (data as JsonRecord[]).map((row) => ({
+      claim_id: String(row.claim_id),
+      claim_type: String(row.claim_type) as ClaimType,
+      verdict: String(row.verdict) as VerificationStatus,
+      needs_watcher: Boolean(row.needs_watcher),
+    }));
+  }
+
+  async listClaimsNeedingReview(feature_id?: string): Promise<WatcherQueueClaim[]> {
+    const { data, error } = await this.client.rpc('get_claims_needing_review', {
+      p_feature_id: feature_id ?? null,
+    });
+
+    if (error != null) {
+      throw new Error(`Failed to list claims needing watcher review: ${error.message}`);
+    }
+
+    if (data == null) {
+      return [];
+    }
+
+    return (data as JsonRecord[]).map((row) => ({
+      claim_id: String(row.claim_id),
+      feature_id: String(row.feature_id),
+      phase: String(row.phase) as PhaseId,
+      agent_name: String(row.agent_name),
+      claim_type: String(row.claim_type) as ClaimType,
+      claim_description: String(row.claim_description),
+      evidence_refs:
+        row.evidence_refs != null && typeof row.evidence_refs === 'object' && !Array.isArray(row.evidence_refs)
+          ? (row.evidence_refs as Record<string, unknown>)
+          : {},
+      risk_level: String(row.risk_level) as RiskLevel,
+      policy_verdict: row.policy_verdict == null ? null : (String(row.policy_verdict) as VerificationStatus),
+      policy_reason: row.policy_reason == null ? null : String(row.policy_reason),
+      created_at: String(row.created_at),
+    }));
+  }
+
+  async recordWatcherReview(review: Omit<WatcherReviewRecord, 'id' | 'reviewed_at'>): Promise<WatcherReviewRecord> {
+    const { data, error } = await this.client.rpc('record_watcher_review', {
+      p_claim_id: review.claim_id,
+      p_verdict: review.verdict,
+      p_reasoning: review.reasoning,
+      p_watcher_agent: review.watcher_agent,
+      p_confidence: review.confidence,
+    });
+
+    if (error != null || data == null || data.length === 0) {
+      throw new Error(`Failed to record watcher review: ${error?.message ?? 'No result returned.'}`);
+    }
+
+    const row = data[0] as JsonRecord;
+    return {
+      id: String(row.review_id),
+      claim_id: String(row.claim_id),
+      verdict: String(row.verdict) as WatcherReviewRecord['verdict'],
+      confidence: Number(row.confidence),
+      reasoning: review.reasoning,
+      watcher_agent: review.watcher_agent,
+      reviewed_at: new Date().toISOString(),
+    };
   }
 
   async getLatestFeatureEval(feature_id: string): Promise<FeatureEvalSummary | null> {
