@@ -184,3 +184,55 @@ describe('InMemoryWorkflowStateAdapter.listRelatedLearnings', () => {
     expect(related).toHaveLength(3);
   });
 });
+
+describe('InMemoryWorkflowStateAdapter watcher lifecycle', () => {
+  it('supports claim submission through watcher review', async () => {
+    const adapter = new InMemoryWorkflowStateAdapter();
+    await adapter.startFeature({
+      id: 'FEAT-WATCHER',
+      name: 'Watcher Feature',
+      complexity_level: 1,
+      severity: 'ROUTINE',
+      author: 'Jane Doe',
+    });
+
+    const claim = await adapter.submitClaim({
+      feature_id: 'FEAT-WATCHER',
+      phase: '5',
+      agent_name: 'builder-agent',
+      invocation_id: null,
+      claim_type: 'CODE_MODIFIED',
+      claim_description: 'Updated payment authorization flow',
+      evidence_refs: { commit_sha: 'abc123' },
+      risk_level: 'HIGH',
+    });
+
+    const policy = await adapter.runPolicyChecks('FEAT-WATCHER');
+    expect(policy).toHaveLength(1);
+    expect(policy[0]?.verdict).toBe('NEEDS_REVIEW');
+
+    const queue = await adapter.listClaimsNeedingReview('FEAT-WATCHER');
+    expect(queue).toHaveLength(1);
+    expect(queue[0]?.claim_id).toBe(claim.id);
+
+    await adapter.recordWatcherReview({
+      claim_id: claim.id,
+      verdict: 'PASS',
+      confidence: 0.88,
+      reasoning: 'The high-risk change matches the supplied diff and tests.',
+      watcher_agent: 'watcher-agent',
+    });
+
+    const verification = await adapter.listClaimVerificationStatus('FEAT-WATCHER');
+    expect(verification).toHaveLength(1);
+    expect(verification[0]).toMatchObject({
+      claim_id: claim.id,
+      policy_verdict: 'NEEDS_REVIEW',
+      watcher_verdict: 'PASS',
+      final_status: 'PASS',
+    });
+
+    const pending = await adapter.listPendingClaims('FEAT-WATCHER');
+    expect(pending).toHaveLength(0);
+  });
+});

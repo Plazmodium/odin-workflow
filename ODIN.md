@@ -354,9 +354,41 @@ Builder/Integrator/Release emit claims
         LLM Watcher (semantic)
 ```
 
-Claims are submitted automatically by the runtime when agents record phase results. The orchestrator verifies claims using:
+The watcher flow runs through Odin's MCP runtime surface:
 
 ```
+odin.submit_claim({ ... })
+odin.run_policy_checks({ feature_id: "FEAT-001" })
+odin.get_claims_needing_review({ feature_id: "FEAT-001" })
+odin.record_watcher_review({ ... })
+odin.verify_claims({ feature_id: "FEAT-001" })
+```
+
+Example:
+
+```ts
+odin.submit_claim({
+  feature_id: "FEAT-001",
+  phase: "5",
+  agent_name: "builder-agent",
+  claim_type: "TEST_PASSED",
+  description: "Acceptance criteria tests pass",
+  evidence_refs: { test_output_hash: "sha256:abc123" },
+  risk_level: "LOW"
+})
+
+odin.run_policy_checks({ feature_id: "FEAT-001" })
+
+odin.get_claims_needing_review({ feature_id: "FEAT-001" })
+
+odin.record_watcher_review({
+  claim_id: "550e8400-e29b-41d4-a716-446655440000",
+  verdict: "PASS",
+  reasoning: "Evidence supports the claim.",
+  watcher_agent: "watcher-agent",
+  confidence: 0.91
+})
+
 odin.verify_claims({ feature_id: "FEAT-001" })
 ```
 
@@ -394,7 +426,6 @@ The LLM Watcher is called when ANY of these are true:
 |---------|---------|--------|
 | `PASS` | Evidence supports claim | Continue workflow |
 | `FAIL` | Evidence contradicts claim | Create blocker |
-| `NEEDS_REVIEW` | Still inconclusive | Escalate to human |
 
 The Watcher is **advisory** — it informs but does not auto-block. The orchestrator decides how to act on verdicts.
 

@@ -13,6 +13,28 @@ export const REVIEW_TOOLS = ['semgrep'] as const;
 
 export const REVIEW_CHECK_STATUSES = ['queued', 'passed', 'failed'] as const;
 
+export const CLAIM_TYPES = [
+  'CODE_ADDED',
+  'CODE_MODIFIED',
+  'CODE_DELETED',
+  'TEST_ADDED',
+  'TEST_PASSED',
+  'TEST_FAILED',
+  'BUILD_SUCCEEDED',
+  'BUILD_FAILED',
+  'SECURITY_CHECKED',
+  'SECURITY_FINDING_RESOLVED',
+  'INTEGRATION_VERIFIED',
+  'ARCHIVE_CREATED',
+  'PR_CREATED',
+] as const;
+
+export const VERIFICATION_STATUSES = ['PENDING', 'PASS', 'FAIL', 'NEEDS_REVIEW'] as const;
+
+export const WATCHER_REVIEW_VERDICTS = ['PASS', 'FAIL'] as const;
+
+export const RISK_LEVELS = ['LOW', 'MEDIUM', 'HIGH'] as const;
+
 export const LEARNING_CATEGORIES = [
   'DECISION',
   'PATTERN',
@@ -40,6 +62,10 @@ export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
 export type PhaseOutcome = (typeof PHASE_OUTCOMES)[number];
 export type ReviewTool = (typeof REVIEW_TOOLS)[number];
 export type ReviewCheckStatus = (typeof REVIEW_CHECK_STATUSES)[number];
+export type ClaimType = (typeof CLAIM_TYPES)[number];
+export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
+export type WatcherReviewVerdict = (typeof WATCHER_REVIEW_VERDICTS)[number];
+export type RiskLevel = (typeof RISK_LEVELS)[number];
 export type LearningCategory = (typeof LEARNING_CATEGORIES)[number];
 export type ArtifactOutputType = (typeof ARTIFACT_OUTPUT_TYPES)[number];
 
@@ -108,12 +134,66 @@ export interface FeatureEvalSummary {
 
 export interface ClaimVerificationSummary {
   claim_id: string;
-  claim_type: string;
+  claim_type: ClaimType;
   agent_name: string;
-  risk_level: string;
-  policy_verdict: string | null;
-  watcher_verdict: string | null;
-  final_status: string;
+  risk_level: RiskLevel;
+  policy_verdict: VerificationStatus | null;
+  watcher_verdict: VerificationStatus | null;
+  final_status: VerificationStatus;
+}
+
+export interface AgentClaimRecord {
+  id: string;
+  feature_id: string;
+  phase: PhaseId;
+  agent_name: string;
+  invocation_id: string | null;
+  claim_type: ClaimType;
+  claim_description: string;
+  evidence_refs: Record<string, unknown>;
+  risk_level: RiskLevel;
+  created_at: string;
+}
+
+export interface PolicyVerdictRecord {
+  id: string;
+  claim_id: string;
+  verdict: VerificationStatus;
+  rule_name: string;
+  reason: string | null;
+  evidence_checked: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface WatcherReviewRecord {
+  id: string;
+  claim_id: string;
+  verdict: WatcherReviewVerdict;
+  confidence: number;
+  reasoning: string;
+  watcher_agent: string;
+  reviewed_at: string;
+}
+
+export interface PolicyCheckResult {
+  claim_id: string;
+  claim_type: ClaimType;
+  verdict: VerificationStatus;
+  needs_watcher: boolean;
+}
+
+export interface WatcherQueueClaim {
+  claim_id: string;
+  feature_id: string;
+  phase: PhaseId;
+  agent_name: string;
+  claim_type: ClaimType;
+  claim_description: string;
+  evidence_refs: Record<string, unknown>;
+  risk_level: RiskLevel;
+  policy_verdict: VerificationStatus | null;
+  policy_reason: string | null;
+  created_at: string;
 }
 
 export interface PhaseContract {

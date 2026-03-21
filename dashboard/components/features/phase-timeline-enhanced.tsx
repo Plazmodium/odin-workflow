@@ -8,7 +8,7 @@
  */
 
 import { useState } from 'react';
-import { ChevronDown, Clock, CheckCircle, XCircle, AlertTriangle, BookOpen, ListChecks, Eye, ClipboardList } from 'lucide-react';
+import { ChevronDown, Clock, CheckCircle, XCircle, AlertTriangle, BookOpen, ListChecks, Eye, ClipboardList, Shield } from 'lucide-react';
 import { cn, formatMinutes, formatDuration, phaseName } from '@/lib/utils';
 import { getPhaseOutputArray } from '@/lib/phase-output-content';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +35,46 @@ interface PhaseTimelineEnhancedProps {
   blockers: Blocker[];
   transitions: PhaseTransition[];
   phaseOutputs?: PhaseOutput[];
+}
+
+function summarizeOutputValue(value: unknown, depth = 0): string[] {
+  if (value == null) return ['No content recorded'];
+  if (typeof value === 'string') {
+    return value
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .slice(0, 4);
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return [String(value)];
+  }
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((item) => summarizeOutputValue(item, depth + 1))
+      .slice(0, depth === 0 ? 4 : 2);
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .slice(0, 4)
+      .flatMap(([key, nested]) => {
+        if (nested != null && typeof nested === 'object') {
+          const nestedSummary = summarizeOutputValue(nested, depth + 1).join(' | ');
+          return `${key}: ${nestedSummary}`;
+        }
+        return `${key}: ${nested == null ? 'null' : String(nested)}`;
+      });
+  }
+
+  return ['Unsupported output format'];
+}
+
+function titleizeOutputType(outputType: string): string {
+  return outputType
+    .replace(/_/g, ' ')
+    .split(' ')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -357,6 +397,57 @@ export function PhaseTimelineEnhanced({
                   </div>
                 );
               })()}
+
+              {output.output_type === 'prd' && (
+                <div>
+                  <h5 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <ClipboardList className="h-3 w-3" />
+                    Product Brief
+                  </h5>
+                  <div className="space-y-1 text-xs">
+                    <p className="text-muted-foreground/70">Created by {output.created_by}</p>
+                    {summarizeOutputValue(output.content).map((line, index) => (
+                      <p key={`${output.id}-prd-${index}`} className="leading-relaxed">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {output.output_type === 'security_review_runtime' && (
+                <div>
+                  <h5 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <Shield className="h-3 w-3" />
+                    Reviewer Summary
+                  </h5>
+                  <div className="space-y-1 text-xs">
+                    <p className="text-muted-foreground/70">Initiated by {output.created_by}</p>
+                    {summarizeOutputValue(output.content).map((line, index) => (
+                      <p key={`${output.id}-review-${index}`} className="leading-relaxed">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!['requirements', 'perspectives', 'tasks', 'prd', 'security_review_runtime'].includes(output.output_type) && (
+                <div>
+                  <h5 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                    <BookOpen className="h-3 w-3" />
+                    {titleizeOutputType(output.output_type)}
+                  </h5>
+                  <div className="space-y-1 text-xs">
+                    <p className="text-muted-foreground/70">Created by {output.created_by}</p>
+                    {summarizeOutputValue(output.content).map((line, index) => (
+                      <p key={`${output.id}-generic-${index}`} className="leading-relaxed">
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
 

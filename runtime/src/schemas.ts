@@ -7,10 +7,13 @@ import * as z from 'zod/v4';
 
 import {
   ARTIFACT_OUTPUT_TYPES,
+  CLAIM_TYPES,
   LEARNING_CATEGORIES,
   PHASE_IDS,
   PHASE_OUTCOMES,
+  RISK_LEVELS,
   REVIEW_TOOLS,
+  WATCHER_REVIEW_VERDICTS,
 } from './types.js';
 
 const phase_id_schema = z.enum(PHASE_IDS);
@@ -58,6 +61,33 @@ export const GetFeatureStatusInputSchema = z.object({
 
 export const VerifyClaimsInputSchema = z.object({
   feature_id: z.string().min(1),
+});
+
+export const SubmitClaimInputSchema = z.object({
+  feature_id: z.string().min(1),
+  phase: phase_id_schema,
+  agent_name: z.string().optional(),
+  claim_type: z.enum(CLAIM_TYPES),
+  description: z.string().min(1),
+  evidence_refs: z.record(z.string(), z.unknown()).default({}),
+  risk_level: z.enum(RISK_LEVELS).default('LOW'),
+  invocation_id: z.string().optional(),
+});
+
+export const RunPolicyChecksInputSchema = z.object({
+  feature_id: z.string().min(1),
+});
+
+export const GetClaimsNeedingReviewInputSchema = z.object({
+  feature_id: z.string().min(1).optional(),
+});
+
+export const RecordWatcherReviewInputSchema = z.object({
+  claim_id: z.string().uuid(),
+  verdict: z.enum(WATCHER_REVIEW_VERDICTS),
+  reasoning: z.string().min(1),
+  watcher_agent: z.string().optional(),
+  confidence: z.number().min(0).max(1).default(0.8),
 });
 
 export const ArchiveFeatureReleaseInputSchema = z.object({
@@ -142,6 +172,10 @@ export type RecordMergeInput = z.infer<typeof RecordMergeInputSchema>;
 export type GetNextPhaseInput = z.infer<typeof GetNextPhaseInputSchema>;
 export type GetFeatureStatusInput = z.infer<typeof GetFeatureStatusInputSchema>;
 export type VerifyClaimsInput = z.infer<typeof VerifyClaimsInputSchema>;
+export type SubmitClaimInput = z.infer<typeof SubmitClaimInputSchema>;
+export type RunPolicyChecksInput = z.infer<typeof RunPolicyChecksInputSchema>;
+export type GetClaimsNeedingReviewInput = z.infer<typeof GetClaimsNeedingReviewInputSchema>;
+export type RecordWatcherReviewInput = z.infer<typeof RecordWatcherReviewInputSchema>;
 export type ArchiveFeatureReleaseInput = z.infer<typeof ArchiveFeatureReleaseInputSchema>;
 export type PreparePhaseContextInput = z.infer<typeof PreparePhaseContextInputSchema>;
 export type RecordPhaseArtifactInput = z.infer<typeof RecordPhaseArtifactInputSchema>;

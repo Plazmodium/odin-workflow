@@ -25,6 +25,7 @@ import {
   ArchiveFeatureReleaseInputSchema,
   CaptureLearningInputSchema,
   ExploreKnowledgeInputSchema,
+  GetClaimsNeedingReviewInputSchema,
   GetFeatureStatusInputSchema,
   GetNextPhaseInputSchema,
   PreparePhaseContextInputSchema,
@@ -33,8 +34,11 @@ import {
   RecordPhaseArtifactInputSchema,
   RecordPullRequestInputSchema,
   RecordPhaseResultInputSchema,
+  RecordWatcherReviewInputSchema,
   RunReviewChecksInputSchema,
+  RunPolicyChecksInputSchema,
   StartFeatureInputSchema,
+  SubmitClaimInputSchema,
   VerifyClaimsInputSchema,
   VerifyDesignInputSchema,
 } from './schemas.js';
@@ -42,6 +46,7 @@ import { handleApplyMigrations } from './tools/apply-migrations.js';
 import { handleArchiveFeatureRelease } from './tools/archive-feature-release.js';
 import { handleCaptureLearning } from './tools/capture-learning.js';
 import { handleExploreKnowledge } from './tools/explore-knowledge.js';
+import { handleGetClaimsNeedingReview } from './tools/get-claims-needing-review.js';
 import { handleGetFeatureStatus } from './tools/get-feature-status.js';
 import { handleGetNextPhase } from './tools/get-next-phase.js';
 import { handlePreparePhaseContext } from './tools/prepare-phase-context.js';
@@ -50,8 +55,11 @@ import { handleRecordMerge } from './tools/record-merge.js';
 import { handleRecordPhaseArtifact } from './tools/record-phase-artifact.js';
 import { handleRecordPullRequest } from './tools/record-pull-request.js';
 import { handleRecordPhaseResult } from './tools/record-phase-result.js';
+import { handleRecordWatcherReview } from './tools/record-watcher-review.js';
 import { handleRunReviewChecks } from './tools/run-review-checks.js';
+import { handleRunPolicyChecks } from './tools/run-policy-checks.js';
 import { handleStartFeature } from './tools/start-feature.js';
+import { handleSubmitClaim } from './tools/submit-claim.js';
 import { handleVerifyClaims } from './tools/verify-claims.js';
 import { handleVerifyDesign } from './tools/verify-design.js';
 import { safeToolHandler } from './utils.js';
@@ -201,6 +209,16 @@ server.registerTool(
 );
 
 server.registerTool(
+  'odin.submit_claim',
+  {
+    title: 'Submit Claim',
+    description: 'Submit a watched agent claim for policy and watcher verification.',
+    inputSchema: SubmitClaimInputSchema,
+  },
+  safeToolHandler(async (input) => handleSubmitClaim(workflow_state, input))
+);
+
+server.registerTool(
   'odin.record_commit',
   {
     title: 'Record Commit',
@@ -251,6 +269,16 @@ server.registerTool(
 );
 
 server.registerTool(
+  'odin.run_policy_checks',
+  {
+    title: 'Run Policy Checks',
+    description: 'Run deterministic policy checks for submitted claims on a feature.',
+    inputSchema: RunPolicyChecksInputSchema,
+  },
+  safeToolHandler(async (input) => handleRunPolicyChecks(workflow_state, input))
+);
+
+server.registerTool(
   'odin.capture_learning',
   {
     title: 'Capture Learning',
@@ -278,6 +306,26 @@ server.registerTool(
     inputSchema: VerifyClaimsInputSchema,
   },
   safeToolHandler(async (input) => handleVerifyClaims(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.get_claims_needing_review',
+  {
+    title: 'Get Claims Needing Review',
+    description: 'List claims currently waiting for watcher review.',
+    inputSchema: GetClaimsNeedingReviewInputSchema,
+  },
+  safeToolHandler(async (input) => handleGetClaimsNeedingReview(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.record_watcher_review',
+  {
+    title: 'Record Watcher Review',
+    description: 'Record the watcher verdict for an escalated claim.',
+    inputSchema: RecordWatcherReviewInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordWatcherReview(workflow_state, input))
 );
 
 server.registerTool(
