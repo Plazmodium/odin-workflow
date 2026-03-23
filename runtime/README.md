@@ -70,11 +70,15 @@ Your AI agent now has these tools available:
 | `odin.start_feature` | Create a feature in the workflow |
 | `odin.get_next_phase` | Ask "what should happen next?" |
 | `odin.prepare_phase_context` | Get the full working bundle for a phase |
+| `odin.get_development_eval_status` | Inspect focused development-eval state for a feature |
 | `odin.record_phase_artifact` | Register a phase output (PRD, spec, tasks, etc.) |
 | `odin.submit_claim` | Submit a watched-agent claim for policy and watcher verification |
 | `odin.record_commit` | Persist git commit metadata for a feature |
 | `odin.record_pr` | Persist pull request metadata for dashboard/git tracking |
 | `odin.record_merge` | Persist that a human merged the feature PR |
+| `odin.record_quality_gate` | Persist an explicit workflow quality gate decision |
+| `odin.record_eval_plan` | Persist a structured Architect `eval_plan` artifact |
+| `odin.record_eval_run` | Persist a structured Reviewer/Integrator `eval_run` artifact |
 | `odin.record_phase_result` | Record phase completion, blocking, or rework |
 | `odin.run_review_checks` | Run security/review scans via Semgrep |
 | `odin.run_policy_checks` | Run deterministic policy checks for submitted claims |
@@ -170,6 +174,60 @@ Typical usage:
 3. Review the result in Architect/Guardian before implementation
 
 If Java or `tla-precheck` is missing, Odin returns an `UNAVAILABLE` / `NOT_CONFIGURED` result for design verification instead of enabling it silently.
+
+## Development Evals
+
+Odin also supports a lightweight **Development Evals** workflow track:
+
+- Architect records `eval_plan` via `odin.record_eval_plan` (or `odin.record_phase_artifact`)
+- Guardian records `eval_readiness` via `odin.record_quality_gate`
+- Reviewer records `eval_run` via `odin.record_eval_run` (or `odin.record_phase_artifact`)
+- Integrator may append a later `eval_run` via `odin.record_eval_run` when runtime verification materially changes the result
+
+These artifacts are surfaced in `odin.prepare_phase_context` and `odin.get_feature_status`.
+
+When Development Evals are relevant, `odin.prepare_phase_context` returns a richer `development_evals` block with:
+
+- `expected_artifacts` — which eval artifact(s) this phase is expected to produce now
+- `expected_gate` — which eval gate this phase is expected to decide now
+- `status_summary` — current eval state the harness should keep visible
+- `harness_prompt_block` — phase-specific prompt lines the harness should append verbatim to the active agent prompt
+
+Recommended harness behavior:
+
+```text
+1. Call odin.prepare_phase_context(...)
+2. Build the agent prompt from:
+   - context.agent.role_summary
+   - context.agent.constraints
+   - context.development_evals.harness_prompt_block
+3. Keep context.development_evals.status_summary visible to the operator
+4. Do not treat eval instructions as a replacement for formal verification, Semgrep, tests, runtime checks, or watcher checks
+```
+
+Canonical eval-aware orchestration snippet:
+
+```text
+When orchestrating Odin phases:
+1. Call odin.prepare_phase_context({ feature_id, phase, agent_name }).
+2. Build the active agent prompt from:
+   - context.agent.role_summary
+   - context.agent.constraints
+   - context.development_evals.harness_prompt_block
+3. Use odin.get_development_eval_status({ feature_id }) when you need focused eval state.
+4. Record eval artifacts/gates with odin.record_eval_plan, odin.record_eval_run, and odin.record_quality_gate.
+5. Never let Development Evals override odin.verify_design, odin.run_review_checks, tests, runtime verification, or watcher checks.
+```
+
+If the harness wants a focused eval-only read path instead of parsing `odin.get_feature_status`, call:
+
+```text
+odin.get_development_eval_status({ feature_id: "FEAT-001" })
+```
+
+This returns the current Development Eval mode, latest `eval_plan`, latest `eval_run`, open `eval_readiness` gate (if any), and recent eval artifact history.
+
+**Important**: Development Evals are additive. They do **not** replace `odin.verify_design`, `odin.run_review_checks`, Builder/Integrator test verification, or watched-claim verification.
 
 ## Project-Local Skills
 

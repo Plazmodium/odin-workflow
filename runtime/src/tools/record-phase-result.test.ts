@@ -96,7 +96,8 @@ describe('handleRecordPhaseResult', () => {
       'builder_phase_complete',
       'APPROVED',
       'builder-agent',
-      'Builder finished implementation'
+      'Builder finished implementation',
+      '5'
     );
   });
 });

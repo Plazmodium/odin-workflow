@@ -50,6 +50,7 @@ Every step must be executed or explicitly marked N/A with justification. No sile
 | A2 | Perform Complexity Assessment (3 dimensions) | ⬜ |
 | A3 | Draft Specification (spec.md) | ⬜ |
 | A3a | Identify State Flows for Formal Verification (opt-in, L2/L3) | ⬜ |
+| A3b | Draft Development Eval Plan (`eval_plan`) when required | ⬜ |
 | A4 | Self-Score Against Quality Rubric | ⬜ |
 | A5 | Document State Changes (for orchestrator) | ⬜ |
 
@@ -80,6 +81,8 @@ Input: requirements/[ID]/requirements.md (approved)
 [2] Perform complexity assessment (3 dimensions)
    ↓
 [3] Draft specification following SDD template
+   ↓
+[3b] Draft development eval plan when required
    ↓
 [4] Self-score against quality rubric
    ↓
@@ -336,6 +339,24 @@ If the feature contains critical state flows, write a `.machine.ts` DSL file usi
 
 ---
 
+### Step 3b: Draft Development Eval Plan
+
+When Development Evals are required, create an `eval_plan` artifact alongside the spec.
+
+Minimum contents:
+- scope and intended behavior
+- capability cases
+- regression cases
+- grading approach
+- pass criteria
+- transcript review notes
+
+Do NOT use this as a replacement for formal verification, tests, security review, or runtime verification.
+
+For L1 work, if a full `eval_plan` is overkill, still document the minimum required acceptance/regression case in the spec notes or state changes.
+
+---
+
 ### Step 4: Self-Score Against Rubric
 
 Score each of the 5 criteria (Clarity, Completeness, Testability, Technical Feasibility, Complexity Accuracy) from 0.0-2.0. Scale: 0.0-0.9 insufficient, 1.0-1.4 needs improvement, 1.5-1.9 good, 2.0 excellent.
@@ -350,13 +371,16 @@ At the end of your spec-draft-v1.md, include a **State Changes Required** sectio
 
 1. **Register Feature** — feature_id, name, complexity level, severity, requirements path
 2. **Track Duration** — phase 2, agent Architect, operation description
-3. **Transition Phase** — from phase 1 to phase 2, with self-score summary
+3. **Record Development Eval Artifact** — `eval_plan` when required
+4. **Transition Phase** — from phase 1 to phase 2, with self-score summary
 
 ---
 
 ### Step A Output
 
 **Files Created**: `specs/[ID]/spec-draft-v1.md` with "State Changes Required" section
+
+**Additional Artifact**: `eval_plan` phase artifact when required
 
 **State Changes Documented**: Feature registration, spec draft created
 

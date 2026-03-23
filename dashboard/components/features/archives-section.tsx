@@ -31,9 +31,6 @@ export function ArchivesSection({
   const isCompleted = featureStatus === 'COMPLETED';
   const hasFiles = archive && archive.files_archived.length > 0;
 
-  // Handle trailing slash in storage_path
-  const storagePath = archive?.storage_path?.replace(/\/$/, '') ?? '';
-
   return (
     <Card>
       <CardHeader>
@@ -95,7 +92,6 @@ export function ArchivesSection({
       <ArchiveFileModal
         featureId={featureId}
         fileName={selectedFile}
-        storagePath={storagePath}
         isOpen={selectedFile !== null}
         onClose={() => setSelectedFile(null)}
       />

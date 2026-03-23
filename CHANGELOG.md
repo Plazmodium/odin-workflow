@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.1-beta] - 2026-03-23
+
+### Added
+- Development Evals workflow support across Odin docs, runtime tools, and dashboard rendering.
+- Runtime helpers for `eval_plan`, `eval_run`, `eval_readiness`, and focused development-eval status inspection.
+- Canonical eval-aware orchestration guidance in runtime bootstrap output and shipped docs.
+
+### Fixed
+- Dashboard archive viewing now resolves files through archive metadata instead of assuming public storage URLs.
+- Dashboard phase timeline and agent profiler now normalize workflow agent labels, aggregate duration data correctly, and show current task progress more reliably.
+
+### Changed
+- Root README release badge updated to `0.3.1-beta`.
+- Root `package.json`, runtime `package.json`, runtime lockfile, and runtime MCP server version updated to `0.3.1-beta`.
+
 ## [0.3.0] - 2026-03-18
 
 ### Added

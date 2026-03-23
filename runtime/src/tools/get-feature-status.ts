@@ -4,7 +4,9 @@
  */
 
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import { buildDevelopmentEvalContext } from '../domain/development-evals.js';
 import { getNextPhaseId, getPhaseContract } from '../domain/phases.js';
+import { formatOpenGateSummary } from '../domain/quality-gates.js';
 import type { GetFeatureStatusInput } from '../schemas.js';
 import { createErrorResult, createTextResult } from '../utils.js';
 
@@ -24,7 +26,7 @@ export async function handleGetFeatureStatus(
     review_checks,
     learnings,
     open_blockers,
-    open_gates,
+    open_gate_records,
     open_findings,
     pending_claims,
     claim_verification,
@@ -35,7 +37,7 @@ export async function handleGetFeatureStatus(
       adapter.listReviewChecks(input.feature_id),
       adapter.listLearnings(input.feature_id),
       adapter.listOpenBlockers(input.feature_id),
-      adapter.listOpenGates(input.feature_id),
+      adapter.listOpenGateRecords(input.feature_id),
       adapter.listOpenFindings(input.feature_id),
       adapter.listPendingClaims(input.feature_id),
       adapter.listClaimVerificationStatus(input.feature_id),
@@ -46,6 +48,8 @@ export async function handleGetFeatureStatus(
   const next_phase_id = getNextPhaseId(feature.current_phase);
   const next_phase = next_phase_id == null ? null : getPhaseContract(next_phase_id);
   const latest_review_check = review_checks.at(-1) ?? null;
+  const open_gates = open_gate_records.map(formatOpenGateSummary);
+  const development_evals = buildDevelopmentEvalContext(feature, feature.current_phase, artifacts, open_gate_records);
 
   return createTextResult(
     `Feature ${feature.id} is ${feature.status} in ${current_phase.name}.`,
@@ -65,6 +69,7 @@ export async function handleGetFeatureStatus(
       workflow: {
         open_blockers,
         open_gates,
+        open_gate_records,
         open_findings,
         pending_claims,
         claim_verification_summary: {
@@ -75,6 +80,7 @@ export async function handleGetFeatureStatus(
           pending: claim_verification.filter((claim) => claim.final_status === 'PENDING').length,
         },
       },
+      development_evals,
       latest_feature_eval,
       latest_review_check,
       claim_verification,

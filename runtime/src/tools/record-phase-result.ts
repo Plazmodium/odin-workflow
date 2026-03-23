@@ -121,7 +121,8 @@ export async function handleRecordPhaseResult(
         `${phase_contract.name.toLowerCase()}_phase_complete`,
         'APPROVED',
         workflow_actor,
-        input.summary
+        input.summary,
+        input.phase
       );
     } catch {
       console.error(`[Odin Runtime] Failed to record quality gate for ${input.feature_id} phase ${input.phase}`);

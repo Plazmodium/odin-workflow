@@ -366,6 +366,20 @@ function printHarnessSnippet(projectRoot: string, tool: HarnessTool): void {
   if (tool === 'generic') {
     console.log('\nGeneric note: add the `odin` server block to whatever MCP config mechanism your tool supports.');
   }
+
+  console.log('\nEval-aware orchestration tip:');
+  console.log(
+    '- Prefer `odin.get_development_eval_status({ feature_id })` when the harness needs focused eval state (latest eval_plan, eval_run, and eval_readiness) instead of parsing the broader `odin.get_feature_status` payload.'
+  );
+
+  console.log('\nCanonical eval-aware orchestration snippet:');
+  console.log([
+    '1. Call `odin.prepare_phase_context({ feature_id, phase, agent_name })`.',
+    '2. Build the agent prompt from `context.agent.role_summary`, `context.agent.constraints`, and `context.development_evals.harness_prompt_block`.',
+    '3. Use `odin.get_development_eval_status({ feature_id })` when you need focused eval state instead of parsing broad status payloads.',
+    '4. Record structured eval artifacts with `odin.record_eval_plan`, `odin.record_eval_run`, and `odin.record_quality_gate`.',
+    '5. Never treat Development Evals as a replacement for `odin.verify_design`, `odin.run_review_checks`, tests, runtime verification, or watcher checks.',
+  ].join('\n'));
 }
 
 function main(): void {

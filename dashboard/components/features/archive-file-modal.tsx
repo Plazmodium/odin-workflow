@@ -22,20 +22,18 @@ import { cn } from '@/lib/utils';
 interface ArchiveFileModalProps {
   featureId: string;
   fileName: string | null;
-  storagePath: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
-function getArchiveFileUrl(storagePath: string, fileName: string): string {
-  const params = new URLSearchParams({ storagePath, fileName });
+function getArchiveFileUrl(featureId: string, fileName: string): string {
+  const params = new URLSearchParams({ featureId, fileName });
   return `/api/archives?${params.toString()}`;
 }
 
 export function ArchiveFileModal({
-  featureId: _featureId,
+  featureId,
   fileName,
-  storagePath,
   isOpen,
   onClose,
 }: ArchiveFileModalProps) {
@@ -44,7 +42,7 @@ export function ArchiveFileModal({
   const [error, setError] = useState<string | null>(null);
 
   const fetchFile = useCallback(async () => {
-    if (!fileName || !storagePath) {
+    if (!fileName || !featureId) {
       return;
     }
 
@@ -56,7 +54,7 @@ export function ArchiveFileModal({
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
     try {
-      const url = getArchiveFileUrl(storagePath, fileName);
+      const url = getArchiveFileUrl(featureId, fileName);
       const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
 
       clearTimeout(timeoutId);
@@ -83,7 +81,7 @@ export function ArchiveFileModal({
     } finally {
       setLoading(false);
     }
-  }, [fileName, storagePath]);
+  }, [featureId, fileName]);
 
   useEffect(() => {
     if (isOpen && fileName) {

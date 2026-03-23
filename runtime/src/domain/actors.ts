@@ -19,13 +19,28 @@ const HARNESS_IDENTITIES = new Set([
   'developer',
 ]);
 
+const MODEL_IDENTITY_PATTERNS: RegExp[] = [
+  /(^|\/)gpt-[a-z0-9._-]+$/,
+  /(^|\/)claude-[a-z0-9._-]+$/,
+  /(^|\/)gemini-[a-z0-9._-]+$/,
+  /(^|\/)o[1-9][a-z0-9._-]*$/,
+  /(^|\/)deepseek-[a-z0-9._-]+$/,
+  /(^|\/)llama-[a-z0-9._-]+$/,
+  /(^|\/)mistral-[a-z0-9._-]+$/,
+  /(^|\/)qwen-[a-z0-9._-]+$/,
+];
+
 function normalizeActor(value: string): string {
   return value.trim().toLowerCase().replace(/[_\s]+/g, '-');
 }
 
 export function isHarnessIdentity(value: string): boolean {
   const normalized = normalizeActor(value);
-  return HARNESS_IDENTITIES.has(normalized) || HARNESS_IDENTITIES.has(normalized.replace(/-/g, ' '));
+  return (
+    HARNESS_IDENTITIES.has(normalized) ||
+    HARNESS_IDENTITIES.has(normalized.replace(/-/g, ' ')) ||
+    MODEL_IDENTITY_PATTERNS.some((pattern) => pattern.test(normalized))
+  );
 }
 
 export function validateHumanAuthor(author: string): string | null {
@@ -45,6 +60,10 @@ export function validateHumanAuthor(author: string): string | null {
 export function resolveNamedActorName(default_actor: string, provided_actor?: string): string {
   const trimmed = provided_actor?.trim() ?? '';
   if (trimmed.length === 0 || isHarnessIdentity(trimmed)) {
+    return default_actor;
+  }
+
+  if (normalizeActor(trimmed) === normalizeActor(default_actor.replace(/-agent$/, ''))) {
     return default_actor;
   }
 

@@ -42,10 +42,49 @@ function createWorkflowAdapter(feature: FeatureRecord | null): WorkflowStateAdap
         created_by: 'architect-agent',
         created_at: '2026-03-13T00:00:00.000Z',
       },
+      {
+        id: 'artifact_2',
+        feature_id: 'FEAT-002',
+        phase: '3',
+        output_type: 'eval_plan',
+        content: { cases: ['cap-1'] },
+        created_by: 'architect-agent',
+        created_at: '2026-03-13T00:30:00.000Z',
+      },
+      {
+        id: 'artifact_3',
+        feature_id: 'FEAT-002',
+        phase: '6',
+        output_type: 'eval_run',
+        content: { status: 'passed' },
+        created_by: 'reviewer-agent',
+        created_at: '2026-03-13T02:30:00.000Z',
+      },
     ] as PhaseArtifact[]),
     recordPhaseResult: vi.fn(async () => feature),
     listOpenBlockers: vi.fn(async () => ['Needs approval']),
-    listOpenGates: vi.fn(async () => ['guardian_approval [phase 4] (PENDING)']),
+    listOpenGateRecords: vi.fn(async () => [
+      {
+        id: 1,
+        feature_id: 'FEAT-002',
+        gate_name: 'guardian_approval',
+        phase: '4',
+        status: 'PENDING',
+        approver: 'guardian-agent',
+        approved_at: '2026-03-13T01:00:00.000Z',
+        approval_notes: null,
+      },
+      {
+        id: 2,
+        feature_id: 'FEAT-002',
+        gate_name: 'eval_readiness',
+        phase: '4',
+        status: 'REJECTED',
+        approver: 'guardian-agent',
+        approved_at: '2026-03-13T01:10:00.000Z',
+        approval_notes: 'Regression case is still missing.',
+      },
+    ]),
     listOpenFindings: vi.fn(async () => ['HIGH: Finding (file.ts)']),
     listPendingClaims: vi.fn(async () => ['CODE_MODIFIED by builder-agent (NEEDS_REVIEW)']),
     listClaimVerificationStatus: vi.fn(async () => [
@@ -121,31 +160,55 @@ describe('handleGetFeatureStatus', () => {
     const result = await handleGetFeatureStatus(createWorkflowAdapter(createFeature()), {
       feature_id: 'FEAT-002',
     });
+    const status = result.structuredContent as {
+      counts: Record<string, number>;
+      current_phase: { name: string };
+      next_phase: { name: string };
+      latest_review_check: { summary: string };
+      latest_feature_eval: { overall_score: number };
+      workflow: { claim_verification_summary: Record<string, number> };
+      development_evals: unknown;
+      claim_verification: unknown[];
+      recent_artifacts: unknown[];
+      recent_learnings: unknown[];
+    };
 
     expect(result.isError).toBeUndefined();
     expect(result.content[0]?.text).toContain('Feature FEAT-002 is IN_PROGRESS in Builder.');
-    expect(result.structuredContent?.counts).toEqual({
-      artifacts: 1,
+    expect(status.counts).toEqual({
+      artifacts: 3,
       review_checks: 1,
       learnings: 1,
       open_blockers: 1,
-      open_gates: 1,
+      open_gates: 2,
       open_findings: 1,
       pending_claims: 1,
     });
-    expect(result.structuredContent?.current_phase?.name).toBe('Builder');
-    expect(result.structuredContent?.next_phase?.name).toBe('Reviewer');
-    expect(result.structuredContent?.latest_review_check?.summary).toBe('0 findings');
-    expect(result.structuredContent?.latest_feature_eval?.overall_score).toBe(98);
-    expect(result.structuredContent?.workflow?.claim_verification_summary).toEqual({
+    expect(status.current_phase.name).toBe('Builder');
+    expect(status.next_phase.name).toBe('Reviewer');
+    expect(status.latest_review_check.summary).toBe('0 findings');
+    expect(status.latest_feature_eval.overall_score).toBe(98);
+    expect(status.workflow.claim_verification_summary).toEqual({
       total: 2,
       passed: 1,
       failed: 0,
       needs_review: 1,
       pending: 0,
     });
-    expect(result.structuredContent?.claim_verification).toHaveLength(2);
-    expect(result.structuredContent?.recent_artifacts).toHaveLength(1);
-    expect(result.structuredContent?.recent_learnings).toHaveLength(1);
+    expect(status.development_evals).toMatchObject({
+      mode: 'plan_required',
+      latest_plan: {
+        output_type: 'eval_plan',
+      },
+      latest_run: {
+        output_type: 'eval_run',
+      },
+      open_readiness_gate: {
+        status: 'REJECTED',
+      },
+    });
+    expect(status.claim_verification).toHaveLength(2);
+    expect(status.recent_artifacts).toHaveLength(3);
+    expect(status.recent_learnings).toHaveLength(1);
   });
 });

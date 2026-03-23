@@ -7,10 +7,11 @@ This document demonstrates a complete feature implementation using the three-age
 ## Table of Contents
 
 1. [Feature Request](#feature-request)
-2. [Usage Guide: Agent-Based Workflow](#usage-guide-agent-based-workflow)
-3. [Usage Guide: Cursor](#usage-guide-cursor)
-4. [Complete Workflow Example](#complete-workflow-example)
-5. [Artifacts Produced](#artifacts-produced)
+2. [Odin Runtime Example: Development Evals](#odin-runtime-example-development-evals)
+3. [Usage Guide: Agent-Based Workflow](#usage-guide-agent-based-workflow)
+4. [Usage Guide: Cursor](#usage-guide-cursor)
+5. [Complete Workflow Example](#complete-workflow-example)
+6. [Artifacts Produced](#artifacts-produced)
 
 ---
 
@@ -30,6 +31,101 @@ This document demonstrates a complete feature implementation using the three-age
 - Changes should be validated (name required, bio max 500 chars)
 - Only authenticated users can update their own profile
 - API should return updated profile on success
+
+---
+
+## Odin Runtime Example: Development Evals
+
+This is the minimal end-to-end shape for using Development Evals without adding a new phase.
+
+### 1. Architect records `eval_plan`
+
+After Product and Discovery define success criteria and scenarios, the orchestrator records the Architect output:
+
+```typescript
+odin.record_eval_plan({
+  feature_id: 'USER-004',
+  created_by: 'architect-agent',
+  scope: 'Users can update their own profile name and bio safely.',
+  capability_evals: [
+    {
+      id: 'CAP-1',
+      expected_outcome: 'Authenticated user updates name and bio and receives the saved profile.',
+      grader_type: 'tests',
+      pass_rule: 'profile update endpoint returns persisted values',
+    },
+  ],
+  regression_evals: [
+    {
+      id: 'REG-1',
+      prior_failure: 'Unauthenticated request could mutate profile data.',
+      expected_outcome: 'Unauthenticated request is rejected and no data changes.',
+      grader_type: 'tests',
+      pass_rule: '401 returned and DB row unchanged',
+    },
+  ],
+  transcript_review_plan: ['Review failed cases and sample one passing case.'],
+});
+```
+
+### 2. Guardian records `eval_readiness`
+
+Guardian approves or rejects the eval design. This does **not** replace Guardian review, TLA+, or other existing gates.
+
+```typescript
+odin.record_quality_gate({
+  feature_id: 'USER-004',
+  gate_name: 'eval_readiness',
+  status: 'APPROVED',
+  approver: 'guardian-agent',
+  phase: '4',
+  notes: 'Eval plan is outcome-based, includes a negative case, and does not waive security or runtime verification.',
+});
+```
+
+### 3. Reviewer records `eval_run`
+
+Reviewer still runs `odin.run_review_checks(...)` for Semgrep. Development Evals are additive.
+
+```typescript
+odin.record_eval_run({
+  feature_id: 'USER-004',
+  phase: '6',
+  created_by: 'reviewer-agent',
+  status: 'partial',
+  cases_run: ['CAP-1', 'REG-1'],
+  important_failures: [],
+  manual_review_notes: ['Behavioral checks pass; runtime rendering still needs Integrator verification.'],
+  follow_up: ['Integrator verifies rendered profile reflects persisted DB value.'],
+});
+```
+
+### 4. Integrator resolves any `partial` status
+
+If Reviewer leaves an eval run as `partial`, Integrator closes the loop with runtime evidence.
+
+```typescript
+odin.record_eval_run({
+  feature_id: 'USER-004',
+  phase: '7',
+  created_by: 'integrator-agent',
+  status: 'passed',
+  cases_run: ['CAP-1', 'REG-1'],
+  manual_review_notes: ['Confirmed database row and rendered UI both show updated profile values.'],
+  follow_up: ['Ready for Documenter and Release.'],
+});
+```
+
+### 5. Non-interference rule
+
+Even when Development Evals pass:
+
+- `odin.verify_design` still applies when formal verification is relevant
+- `odin.run_review_checks` still applies in Reviewer
+- Builder and Integrator still run tests/build/runtime validation
+- Watcher claim verification still applies to watched phases
+
+Passing Development Evals never overrides a failing existing review step.
 
 ---
 

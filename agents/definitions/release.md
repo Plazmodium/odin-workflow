@@ -334,7 +334,7 @@ After stable release, archive feature files:
 Before calling `complete_feature(...)`, run final coverage validation for phases 1-7 (including `release-agent`).
 If it fails, stop and remediate telemetry coverage first.
 
-**Archive** (to `workflow-archives/[ID]/`): requirements.md, spec-approved.md, tasks.md, context.md, review.md, implementation-notes.md
+**Archive** (to `workflow-archives/[ID]/`): requirements.md, spec-approved.md, tasks.md, context.md, review.md, eval_run.md (if present), implementation-notes.md
 
 **Delete** (drafts): spec-draft-v*.md, iteration-report.md, context-references.md
 

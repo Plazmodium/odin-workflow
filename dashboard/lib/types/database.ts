@@ -657,6 +657,8 @@ export type PhaseOutputType =
   | 'review'
   | 'documentation'
   | 'release_notes'
+  | 'eval_plan'
+  | 'eval_run'
   | 'security_review_runtime'
   | (string & {});
 
@@ -686,6 +688,37 @@ export interface TaskItem {
   id: string;
   title: string;
   status: 'pending' | 'in_progress' | 'in-progress' | 'completed' | 'done';
+}
+
+export interface DevelopmentEvalCase {
+  id?: string;
+  title?: string;
+  prompt?: string;
+  expected_outcome?: string;
+  grader_type?: string;
+  pass_rule?: string;
+  prior_failure?: string;
+}
+
+export interface EvalPlanContent {
+  scope?: string;
+  success_criteria?: string[];
+  non_goals?: string[];
+  capability_evals?: DevelopmentEvalCase[];
+  regression_evals?: DevelopmentEvalCase[];
+  transcript_review_plan?: string[];
+  solvability_note?: string;
+}
+
+export type EvalRunStatus = 'passed' | 'failed' | 'partial' | 'blocked';
+
+export interface EvalRunContent {
+  status?: EvalRunStatus;
+  cases_run?: string[];
+  important_failures?: string[];
+  manual_review_notes?: string[];
+  transcript_review_observations?: string[];
+  follow_up?: string[];
 }
 
 // ============================================================

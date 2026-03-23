@@ -6,6 +6,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import type { RuntimeConfig } from '../../config.js';
+import { formatOpenGateSummary } from '../../domain/quality-gates.js';
 import type {
   AgentInvocationRecord,
   AgentClaimRecord,
@@ -20,6 +21,7 @@ import type {
   PhaseArtifact,
   PhaseId,
   PhaseResultRecord,
+  QualityGateRecord,
   RiskLevel,
   RelatedLearningRecord,
   ReviewCheckRecord,
@@ -61,6 +63,19 @@ function requireSupabaseConfig(config: RuntimeConfig): { url: string; secret_key
   }
 
   return { url, secret_key };
+}
+
+function toQualityGateRecord(row: JsonRecord): QualityGateRecord {
+  return {
+    id: Number(row.id),
+    feature_id: String(row.feature_id),
+    gate_name: String(row.gate_name),
+    phase: String(row.phase) as PhaseId,
+    status: String(row.status) as QualityGateRecord['status'],
+    approver: String(row.approver),
+    approved_at: String(row.approved_at),
+    approval_notes: typeof row.approval_notes === 'string' ? row.approval_notes : null,
+  };
 }
 
 export function shouldTransitionPhaseResult(result: PhaseResultRecord): boolean {
@@ -242,24 +257,28 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
   }
 
   async listOpenGates(feature_id: string): Promise<string[]> {
+    const gates = await this.listOpenGateRecords(feature_id);
+    return gates.map(formatOpenGateSummary);
+  }
+
+  async listOpenGateRecords(feature_id: string): Promise<QualityGateRecord[]> {
     const { data, error } = await this.client
       .from('quality_gates')
-      .select('gate_name, status, phase')
+      .select('id, feature_id, gate_name, status, phase, approver, approved_at, approval_notes')
       .eq('feature_id', feature_id)
       .in('status', ['PENDING', 'REJECTED'])
-      .order('phase', { ascending: true });
+      .order('phase', { ascending: true })
+      .order('approved_at', { ascending: true });
 
     if (error != null) {
-      throw new Error(`Failed to list quality gates from Supabase: ${error.message}`);
+      throw new Error(`Failed to list quality gate records from Supabase: ${error.message}`);
     }
 
     if (data == null) {
       return [];
     }
 
-    return (data as JsonRecord[]).map(
-      (row) => `${row.gate_name} [phase ${row.phase}] (${row.status})`
-    );
+    return (data as JsonRecord[]).map(toQualityGateRecord);
   }
 
   async listOpenFindings(feature_id: string): Promise<string[]> {
@@ -811,21 +830,66 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
     gate_name: string,
     status: 'APPROVED' | 'REJECTED',
     approver: string,
-    notes?: string
+    notes?: string,
+    phase?: PhaseId
   ): Promise<number> {
-    const { data, error } = await this.client.rpc('approve_gate', {
-      p_feature_id: feature_id,
-      p_gate_name: gate_name,
-      p_status: status,
-      p_approver: approver,
-      p_approval_notes: notes ?? null,
-    });
+    const effective_phase =
+      phase ??
+      (await (async (): Promise<PhaseId> => {
+        const { data, error } = await this.client
+          .from('features')
+          .select('current_phase')
+          .eq('id', feature_id)
+          .single();
+
+        if (error != null) {
+          throw new Error(`Failed to resolve gate phase from feature: ${error.message}`);
+        }
+
+        return String(data.current_phase) as PhaseId;
+      })());
+
+    const { data, error } = await this.client
+      .from('quality_gates')
+      .upsert(
+        {
+          feature_id,
+          gate_name,
+          phase: effective_phase,
+          status,
+          approver,
+          approved_at: new Date().toISOString(),
+          approval_notes: notes ?? null,
+        },
+        {
+          onConflict: 'feature_id,gate_name,phase',
+        }
+      )
+      .select('id')
+      .single();
 
     if (error != null) {
       throw new Error(`Failed to record quality gate: ${error.message}`);
     }
 
-    return Number(data);
+    const gate_id = Number(data.id);
+    const { error: audit_error } = await this.client.from('audit_log').insert({
+      feature_id,
+      operation: `GATE_${status}`,
+      agent_name: approver,
+      details: {
+        gate_id,
+        gate_name,
+        status,
+        phase: effective_phase,
+      },
+    });
+
+    if (audit_error != null) {
+      console.error(`[Odin Runtime] Failed to record audit log for quality gate ${gate_name}: ${audit_error.message}`);
+    }
+
+    return gate_id;
   }
 
   async computeFeatureEval(feature_id: string): Promise<FeatureEvalSummary | null> {

@@ -1,6 +1,6 @@
 {
   "name": "odin-workflow",
-  "version": "0.2.0",
+  "version": "0.3.1-beta",
   "description": "Specification-Driven Development framework for AI-assisted coding",
   "keywords": [
     "sdd",

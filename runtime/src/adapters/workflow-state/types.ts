@@ -17,6 +17,7 @@ import type {
   PhaseArtifact,
   PhaseId,
   PhaseResultRecord,
+  QualityGateRecord,
   RelatedLearningRecord,
   ReviewCheckRecord,
   ReviewFinding,
@@ -38,6 +39,7 @@ export interface WorkflowStateAdapter {
   recordPhaseResult(result: PhaseResultRecord): Promise<FeatureRecord | null>;
   listOpenBlockers(feature_id: string): Promise<string[]>;
   listOpenGates(feature_id: string): Promise<string[]>;
+  listOpenGateRecords(feature_id: string): Promise<QualityGateRecord[]>;
   listOpenFindings(feature_id: string): Promise<string[]>;
   listPendingClaims(feature_id: string): Promise<string[]>;
   listClaimVerificationStatus(feature_id: string): Promise<ClaimVerificationSummary[]>;
@@ -56,7 +58,14 @@ export interface WorkflowStateAdapter {
   recordCommit(commit: Omit<FeatureCommitRecord, 'committed_at'>): Promise<FeatureCommitRecord>;
   recordPullRequest(feature_id: string, pr_url: string, pr_number: number): Promise<{ feature_id: string; pr_url: string; pr_number: number }>;
   recordMerge(feature_id: string, merged_by: string): Promise<{ feature_id: string; merged_at: string; merged_by: string; pr_url?: string; pr_number?: number }>;
-  recordQualityGate(feature_id: string, gate_name: string, status: 'APPROVED' | 'REJECTED', approver: string, notes?: string): Promise<number>;
+  recordQualityGate(
+    feature_id: string,
+    gate_name: string,
+    status: 'APPROVED' | 'REJECTED',
+    approver: string,
+    notes?: string,
+    phase?: PhaseId
+  ): Promise<number>;
   computeFeatureEval(feature_id: string): Promise<FeatureEvalSummary | null>;
   recordSecurityFindings(feature_id: string, phase: PhaseId, findings: ReviewFinding[], tool: string): Promise<number>;
   declarePropagationTarget(learning_id: string, target_type: PersistedTargetType, target_path: string | null, relevance: number): Promise<void>;

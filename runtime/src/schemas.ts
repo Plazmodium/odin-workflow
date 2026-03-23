@@ -51,11 +51,64 @@ export const RecordMergeInputSchema = z.object({
   merged_by: z.string().min(1).default('human'),
 });
 
+export const RecordQualityGateInputSchema = z.object({
+  feature_id: z.string().min(1),
+  gate_name: z.string().min(1),
+  status: z.union([z.literal('APPROVED'), z.literal('REJECTED')]),
+  approver: z.string().min(1),
+  notes: z.string().optional(),
+  phase: phase_id_schema.optional(),
+});
+
+const DevelopmentEvalCaseInputSchema = z.object({
+  id: z.string().min(1).optional(),
+  title: z.string().min(1).optional(),
+  prompt: z.string().min(1).optional(),
+  expected_outcome: z.string().min(1).optional(),
+  grader_type: z.string().min(1).optional(),
+  pass_rule: z.string().min(1).optional(),
+  prior_failure: z.string().min(1).optional(),
+});
+
+export const RecordEvalPlanInputSchema = z
+  .object({
+    feature_id: z.string().min(1),
+    created_by: z.string().min(1),
+    scope: z.string().min(1),
+    success_criteria: z.array(z.string().min(1)).default([]),
+    non_goals: z.array(z.string().min(1)).default([]),
+    capability_evals: z.array(DevelopmentEvalCaseInputSchema).default([]),
+    regression_evals: z.array(DevelopmentEvalCaseInputSchema).default([]),
+    transcript_review_plan: z.array(z.string().min(1)).default([]),
+    solvability_note: z.string().optional(),
+  })
+  .refine(
+    (value) => value.capability_evals.length > 0 || value.regression_evals.length > 0,
+    'At least one capability or regression eval is required.'
+  );
+
+export const RecordEvalRunInputSchema = z.object({
+  feature_id: z.string().min(1),
+  phase: z.union([z.literal('6'), z.literal('7')]).default('6'),
+  created_by: z.string().min(1),
+  status: z.union([z.literal('passed'), z.literal('failed'), z.literal('partial'), z.literal('blocked')]),
+  cases_run: z.array(z.string().min(1)).default([]),
+  important_failures: z.array(z.string().min(1)).default([]),
+  manual_review_notes: z.array(z.string().min(1)).default([]),
+  transcript_review_observations: z.array(z.string().min(1)).default([]),
+  follow_up: z.array(z.string().min(1)).default([]),
+  environment_summary: z.array(z.string().min(1)).default([]),
+});
+
 export const GetNextPhaseInputSchema = z.object({
   feature_id: z.string().min(1),
 });
 
 export const GetFeatureStatusInputSchema = z.object({
+  feature_id: z.string().min(1),
+});
+
+export const GetDevelopmentEvalStatusInputSchema = z.object({
   feature_id: z.string().min(1),
 });
 
@@ -102,6 +155,7 @@ export const ArchiveFeatureReleaseInputSchema = z.object({
     'spec',
     'tasks',
     'review',
+    'eval_run',
     'documentation',
     'release_notes',
   ]),
@@ -169,8 +223,12 @@ export type StartFeatureInput = z.infer<typeof StartFeatureInputSchema>;
 export type RecordPullRequestInput = z.infer<typeof RecordPullRequestInputSchema>;
 export type RecordCommitInput = z.infer<typeof RecordCommitInputSchema>;
 export type RecordMergeInput = z.infer<typeof RecordMergeInputSchema>;
+export type RecordQualityGateInput = z.infer<typeof RecordQualityGateInputSchema>;
+export type RecordEvalPlanInput = z.infer<typeof RecordEvalPlanInputSchema>;
+export type RecordEvalRunInput = z.infer<typeof RecordEvalRunInputSchema>;
 export type GetNextPhaseInput = z.infer<typeof GetNextPhaseInputSchema>;
 export type GetFeatureStatusInput = z.infer<typeof GetFeatureStatusInputSchema>;
+export type GetDevelopmentEvalStatusInput = z.infer<typeof GetDevelopmentEvalStatusInputSchema>;
 export type VerifyClaimsInput = z.infer<typeof VerifyClaimsInputSchema>;
 export type SubmitClaimInput = z.infer<typeof SubmitClaimInputSchema>;
 export type RunPolicyChecksInput = z.infer<typeof RunPolicyChecksInputSchema>;
