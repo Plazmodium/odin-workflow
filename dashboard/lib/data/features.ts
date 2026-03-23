@@ -267,7 +267,8 @@ export async function getPhaseOutputs(
     .from('phase_outputs')
     .select('*')
     .eq('feature_id', featureId)
-    .order('phase', { ascending: true });
+    .order('phase', { ascending: true })
+    .order('created_at', { ascending: true });
   if (error || !data) return [];
   return data as PhaseOutput[];
 }

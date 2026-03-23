@@ -9,6 +9,7 @@
 
 import { useState } from 'react';
 import { ChevronDown, Clock, CheckCircle, XCircle, AlertTriangle, BookOpen, ListChecks, Eye, ClipboardList, Shield } from 'lucide-react';
+import { normalizeWorkflowAgentLabel } from '@/lib/agent-names';
 import { cn, formatMinutes, formatDuration, phaseName } from '@/lib/utils';
 import { getPhaseOutputArray } from '@/lib/phase-output-content';
 import { Badge } from '@/components/ui/badge';
@@ -154,6 +155,7 @@ export function PhaseTimelineEnhanced({
   // Compute latest task progress for the phase bar indicator
   // The latest (highest phase) task output represents the most up-to-date statuses
   let latestTasks: TaskItem[] = [];
+  let latestTasksPhase: Phase | null = null;
   for (const output of phaseOutputs) {
     if (output.output_type === 'tasks') {
       // Always overwrite — we iterate in phase order (ascending), so last wins
@@ -161,6 +163,7 @@ export function PhaseTimelineEnhanced({
         ...t,
         status: normalizeTaskStatus(t.status),
       }));
+      latestTasksPhase = output.phase;
     }
   }
   const tasksDone = latestTasks.filter((t) => normalizeTaskStatus(t.status) === 'completed').length;
@@ -178,6 +181,13 @@ export function PhaseTimelineEnhanced({
   const togglePhase = (phase: Phase) => {
     setExpandedPhase((prev) => (prev === phase ? null : phase));
   };
+
+  const shouldShowLatestTasksInPhase =
+    expandedPhase != null &&
+    hasTaskProgress &&
+    latestTasksPhase != null &&
+    Number(expandedPhase) >= 5 &&
+    Number(expandedPhase) >= Number(latestTasksPhase);
 
   return (
     <div className="space-y-2">
@@ -281,11 +291,17 @@ export function PhaseTimelineEnhanced({
               <p className="text-xs text-muted-foreground/60">No invocations in this phase</p>
             ) : (
               <div className="space-y-2">
-                {invocationsByPhase.get(expandedPhase)!.map((inv) => (
+                {invocationsByPhase.get(expandedPhase)!.map((inv) => {
+                  const displayAgentName = normalizeWorkflowAgentLabel(inv.agent_name, inv.phase, inv.operation);
+
+                  return (
                   <div key={inv.id} className="space-y-1">
                     <div className="flex items-center gap-2 text-xs">
                       <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
-                      <span className="font-medium">{inv.agent_name}</span>
+                      <span className="font-medium">{displayAgentName}</span>
+                      {displayAgentName !== inv.agent_name && (
+                        <span className="text-muted-foreground/60">({inv.agent_name})</span>
+                      )}
                       {inv.operation && (
                         <span className="text-muted-foreground truncate">
                           {inv.operation}
@@ -310,7 +326,8 @@ export function PhaseTimelineEnhanced({
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -450,6 +467,37 @@ export function PhaseTimelineEnhanced({
               )}
             </div>
           ))}
+
+          {shouldShowLatestTasksInPhase && (
+            <div>
+              <h5 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+                <ListChecks className="h-3 w-3" />
+                Current Task Progress ({tasksDone}/{tasksTotal})
+              </h5>
+              <div className="space-y-1">
+                {latestTasks.map((task) => (
+                  <div key={`latest-${task.id}`} className="flex items-center gap-2 text-xs">
+                    {task.status === 'completed' ? (
+                      <CheckCircle className={`h-3 w-3 shrink-0 ${TASK_STATUS_COLORS.completed}`} />
+                    ) : task.status === 'in_progress' ? (
+                      <Clock className={`h-3 w-3 shrink-0 ${TASK_STATUS_COLORS.in_progress}`} />
+                    ) : (
+                      <div className="h-3 w-3 shrink-0 rounded-full border border-muted-foreground/40" />
+                    )}
+                    <span className="font-mono text-muted-foreground/60 shrink-0 w-16">{task.id}</span>
+                    <span
+                      className={cn(
+                        'flex-1 truncate',
+                        task.status === 'completed' && 'line-through text-muted-foreground/60'
+                      )}
+                    >
+                      {task.title}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Quality Gates */}
           <div>

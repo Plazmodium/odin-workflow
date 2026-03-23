@@ -35,6 +35,9 @@ describe('odin-runtime-init', () => {
     expect(existsSync(join(tmpDir, '.odin', 'skills', '.gitkeep'))).toBe(true);
     expect(existsSync(join(tmpDir, '.env.example'))).toBe(true);
     expect(output).toContain('Odin runtime project bootstrap complete');
+    expect(output).toContain('odin.get_development_eval_status');
+    expect(output).toContain('Canonical eval-aware orchestration snippet');
+    expect(output).toContain('odin.record_eval_plan');
   });
 
   it('does not overwrite existing config without --force', () => {

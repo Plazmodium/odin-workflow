@@ -26,12 +26,16 @@ import {
   CaptureLearningInputSchema,
   ExploreKnowledgeInputSchema,
   GetClaimsNeedingReviewInputSchema,
+  GetDevelopmentEvalStatusInputSchema,
   GetFeatureStatusInputSchema,
   GetNextPhaseInputSchema,
   PreparePhaseContextInputSchema,
   RecordCommitInputSchema,
+  RecordEvalPlanInputSchema,
+  RecordEvalRunInputSchema,
   RecordMergeInputSchema,
   RecordPhaseArtifactInputSchema,
+  RecordQualityGateInputSchema,
   RecordPullRequestInputSchema,
   RecordPhaseResultInputSchema,
   RecordWatcherReviewInputSchema,
@@ -47,13 +51,17 @@ import { handleArchiveFeatureRelease } from './tools/archive-feature-release.js'
 import { handleCaptureLearning } from './tools/capture-learning.js';
 import { handleExploreKnowledge } from './tools/explore-knowledge.js';
 import { handleGetClaimsNeedingReview } from './tools/get-claims-needing-review.js';
+import { handleGetDevelopmentEvalStatus } from './tools/get-development-eval-status.js';
 import { handleGetFeatureStatus } from './tools/get-feature-status.js';
 import { handleGetNextPhase } from './tools/get-next-phase.js';
 import { handlePreparePhaseContext } from './tools/prepare-phase-context.js';
 import { handleRecordCommit } from './tools/record-commit.js';
+import { handleRecordEvalPlan } from './tools/record-eval-plan.js';
+import { handleRecordEvalRun } from './tools/record-eval-run.js';
 import { handleRecordMerge } from './tools/record-merge.js';
 import { handleRecordPhaseArtifact } from './tools/record-phase-artifact.js';
 import { handleRecordPullRequest } from './tools/record-pull-request.js';
+import { handleRecordQualityGate } from './tools/record-quality-gate.js';
 import { handleRecordPhaseResult } from './tools/record-phase-result.js';
 import { handleRecordWatcherReview } from './tools/record-watcher-review.js';
 import { handleRunReviewChecks } from './tools/run-review-checks.js';
@@ -139,7 +147,7 @@ const formal_verification_adapter = createFormalVerificationAdapter(project_root
 const server = new McpServer(
   {
     name: 'odin',
-    version: '0.1.0',
+    version: '0.3.1-beta',
   },
   {
     capabilities: {
@@ -176,6 +184,16 @@ server.registerTool(
     inputSchema: GetFeatureStatusInputSchema,
   },
   safeToolHandler(async (input) => handleGetFeatureStatus(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.get_development_eval_status',
+  {
+    title: 'Get Development Eval Status',
+    description: 'Inspect focused development eval state, latest artifacts, and recent history for a feature.',
+    inputSchema: GetDevelopmentEvalStatusInputSchema,
+  },
+  safeToolHandler(async (input) => handleGetDevelopmentEvalStatus(workflow_state, input))
 );
 
 server.registerTool(
@@ -246,6 +264,36 @@ server.registerTool(
     inputSchema: RecordMergeInputSchema,
   },
   safeToolHandler(async (input) => handleRecordMerge(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.record_quality_gate',
+  {
+    title: 'Record Quality Gate',
+    description: 'Record a workflow quality gate decision for a feature.',
+    inputSchema: RecordQualityGateInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordQualityGate(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.record_eval_plan',
+  {
+    title: 'Record Eval Plan',
+    description: 'Record a structured development eval plan for the Architect phase.',
+    inputSchema: RecordEvalPlanInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordEvalPlan(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.record_eval_run',
+  {
+    title: 'Record Eval Run',
+    description: 'Record a structured development eval run for Reviewer or Integrator.',
+    inputSchema: RecordEvalRunInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordEvalRun(workflow_state, input))
 );
 
 server.registerTool(

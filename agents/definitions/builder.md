@@ -207,6 +207,9 @@ const context = await read_file("specs/AUTH-001-jwt-login/context.md");
 if (!context) {
   throw new Error("Context bundle missing. Guardian must create it first.");
 }
+
+// If development evals are required, confirm eval_readiness is approved
+// and load the eval_plan before implementation begins.
 ```
 
 #### 1b. Verify Feature Branch
@@ -277,6 +280,7 @@ Read in this order:
 1. **`spec.md`** - Understand WHAT you're building
 2. **`context.md`** - Study HOW to build it (patterns)
 3. **`review.md`** - Understand Guardian's validation notes
+4. **`eval_plan`** (if present) - Understand the behavior that must be proven without replacing real tests
 
 ---
 
@@ -534,6 +538,7 @@ npm run build     # ✅ Build passes with zero errors
 - Build passes with zero errors
 - No hardcoded secrets or security vulnerabilities
 - All tasks marked complete
+- Any newly discovered bug or edge-case behavior has corresponding regression/acceptance coverage updated
 
 #### 5c. Create Implementation Summary
 

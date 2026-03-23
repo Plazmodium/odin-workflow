@@ -59,6 +59,7 @@ When developers use AI coding assistants without proper specifications:
 
 - **Adaptive complexity** (L1/L2/L3) - specs scale to match task size
 - **Learnings system** with confidence scoring and multi-target propagation
+- **Development Evals** for pre/post-build behavior verification
 - **EVALS** for health monitoring and performance diagnostics
 - **11-phase workflow** with 12 specialized agents
 - **Watcher verification** - Policy Engine + LLM escalation for critical phases
@@ -108,12 +109,15 @@ This is the canonical step-by-step workflow the orchestrator follows for every f
    d. Invoke agent (Task tool or inline)             # Agent produces output
    e. odin.record_phase_artifact({ ... })            # Persist artifacts
    f. Phase-specific actions:
+      - Phase 3 (Architect): record eval_plan when required
       - Phase 4 (Guardian): verify spec quality rubric scores 2/2
+                            record eval_readiness via odin.record_quality_gate({ ... })
       - Phase 5 (Builder): update task statuses after each task
-      - Phase 6 (Reviewer): odin.run_review_checks({ ... })
+      - Phase 6 (Reviewer): odin.run_review_checks({ ... }), record eval_run when required
+      - Phase 7 (Integrator): resolve any partial eval_run with runtime evidence
       - Phase 9 (Release): odin.verify_claims({ ... }), check coverage,
-                            odin.archive_feature_release({ ... }),
-                            gh pr create
+                             odin.archive_feature_release({ ... }),
+                             gh pr create
    g. odin.record_phase_result({ ..., outcome: "completed" })
                                                      # Advance to next phase
 4. STOP after PR creation — wait for human to merge
@@ -177,6 +181,82 @@ odin.record_phase_artifact({
 - Valid statuses: `pending`, `in_progress`, `completed` (also accepts `in-progress` and `done`)
 - The orchestrator MUST call this after each task completion, not just at the end of the Builder phase
 - If Builder completes and some tasks were never updated, Odin auto-completes the remaining task statuses as a safety net for dashboard correctness
+
+---
+
+## Development Evals
+
+Development Evals are a workflow track for defining and verifying behavior before and after implementation. They are distinct from the post-hoc **EVALS** health system.
+
+### Core Objects
+
+| Object | Owner | Purpose |
+|--------|-------|---------|
+| `eval_plan` | Architect | Pre-build definition of capability/regression coverage |
+| `eval_readiness` | Guardian | Hard gate before Builder when development evals are required |
+| `eval_run` | Reviewer (Integrator may append) | Post-build proof artifact summarizing eval execution |
+
+### Complexity Rules
+
+- **L1 bug fix**: at least one reproducing regression case must exist before Builder completes
+- **L1 net-new change**: at least one acceptance/capability case must exist before Builder completes
+- **L2/L3**: `eval_plan` is required before Builder starts
+
+### Recording Convention
+
+Architect records `eval_plan` with the dedicated helper:
+```ts
+odin.record_eval_plan({
+  feature_id: "FEAT-001",
+  scope: "Export feature metrics safely",
+  capability_evals: [{ id: "CAP-1", expected_outcome: "CSV export succeeds" }],
+  regression_evals: [{ id: "REG-1", expected_outcome: "Existing dashboard view still renders" }],
+  created_by: "architect-agent"
+})
+```
+
+Guardian records `eval_readiness` through a quality gate:
+```ts
+odin.record_quality_gate({
+  feature_id: "FEAT-001",
+  gate_name: "eval_readiness",
+  status: "APPROVED",
+  approver: "guardian-agent",
+  notes: "Eval plan is concrete, outcome-based, and does not waive other review steps."
+})
+```
+
+Reviewer records `eval_run` after executing development evals:
+```ts
+odin.record_eval_run({
+  feature_id: "FEAT-001",
+  phase: "6",
+  status: "passed",
+  cases_run: ["CAP-1", "REG-1"],
+  important_failures: [],
+  manual_review_notes: ["Sampled one passing case for grader sanity."],
+  created_by: "reviewer-agent"
+})
+```
+
+### Non-Interference Rules
+
+Development Evals are additive. They MUST NOT replace or weaken:
+
+- formal verification via `odin.verify_design` when applicable
+- Builder and Integrator build/test verification
+- Reviewer security review via `odin.run_review_checks`
+- Integrator runtime spot-checks and end-state validation
+- watched-claim verification via Policy Engine and Watcher
+
+If Development Evals pass but any of the existing review steps fail, the feature remains blocked.
+
+### Failure Semantics
+
+- Failing `eval_readiness` blocks progression from Guardian to Builder
+- Reviewer records `eval_run`; `failed` or `blocked` returns the feature to Builder
+- Integrator must resolve any `partial` eval state before Release
+- Build, security, runtime, and claim-verification failures remain independently blocking even if Development Evals passed earlier
 
 ---
 
@@ -311,6 +391,8 @@ Relevance threshold for propagation: >= 0.60
 ## EVALS System
 
 EVALS monitors feature and system health.
+
+> **Terminology**: This section describes **operational EVALS** (health scoring after work completes). It is separate from **Development Evals**, which are workflow artifacts/gates used before and during implementation.
 
 ### Feature Health
 
@@ -534,6 +616,7 @@ When a feature completes, the Release phase archives spec files to Supabase Stor
 | `spec.md` | Approved specification |
 | `tasks.md` | Task breakdown |
 | `review.md` | Guardian review |
+| `eval_run.md` | Reviewer/Integrator development eval summary (when present) |
 | `implementation-notes.md` | Builder notes |
 
 ### Archive Format
@@ -881,6 +964,12 @@ odin.record_phase_result({
 ```
 
 > `odin.prepare_phase_context` returns an `invocation` object. That invocation stays open while the agent works and is completed automatically when `odin.record_phase_result` is called for the same phase.
+
+> When Development Evals are relevant, `odin.prepare_phase_context` also returns `development_evals.expected_artifacts`, `development_evals.expected_gate`, `development_evals.status_summary`, and `development_evals.harness_prompt_block`. Harnesses should append the `harness_prompt_block` lines to the active agent prompt instead of relying on implicit eval behavior.
+
+> If the harness wants a focused eval-only read path, use `odin.get_development_eval_status({ feature_id })` instead of parsing the broader `odin.get_feature_status` payload.
+
+> Canonical eval-aware harness flow: `odin.prepare_phase_context` -> build prompt from `role_summary`, `constraints`, and `harness_prompt_block` -> `odin.get_development_eval_status` when focused eval state is needed -> `odin.record_eval_plan` / `odin.record_eval_run` / `odin.record_quality_gate` as work completes.
 
 ### Review & Verification
 

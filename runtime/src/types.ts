@@ -34,6 +34,7 @@ export const VERIFICATION_STATUSES = ['PENDING', 'PASS', 'FAIL', 'NEEDS_REVIEW']
 export const WATCHER_REVIEW_VERDICTS = ['PASS', 'FAIL'] as const;
 
 export const RISK_LEVELS = ['LOW', 'MEDIUM', 'HIGH'] as const;
+export const QUALITY_GATE_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'] as const;
 
 export const LEARNING_CATEGORIES = [
   'DECISION',
@@ -55,7 +56,11 @@ export const ARTIFACT_OUTPUT_TYPES = [
   'documentation',
   'release_notes',
   'design_verification',
+  'eval_plan',
+  'eval_run',
 ] as const;
+
+export const DEVELOPMENT_EVAL_MODES = ['l1_minimal', 'plan_required'] as const;
 
 export type PhaseId = (typeof PHASE_IDS)[number];
 export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
@@ -66,8 +71,10 @@ export type ClaimType = (typeof CLAIM_TYPES)[number];
 export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
 export type WatcherReviewVerdict = (typeof WATCHER_REVIEW_VERDICTS)[number];
 export type RiskLevel = (typeof RISK_LEVELS)[number];
+export type QualityGateStatus = (typeof QUALITY_GATE_STATUSES)[number];
 export type LearningCategory = (typeof LEARNING_CATEGORIES)[number];
 export type ArtifactOutputType = (typeof ARTIFACT_OUTPUT_TYPES)[number];
+export type DevelopmentEvalMode = (typeof DEVELOPMENT_EVAL_MODES)[number];
 
 export type PersistedTargetType = 'skill' | 'agent_definition' | 'agents_md';
 
@@ -130,6 +137,17 @@ export interface FeatureEvalSummary {
   quality_score: number | null;
   overall_score: number | null;
   health_status: string;
+}
+
+export interface QualityGateRecord {
+  id: number;
+  feature_id: string;
+  gate_name: string;
+  phase: PhaseId;
+  status: QualityGateStatus;
+  approver: string;
+  approved_at: string;
+  approval_notes: string | null;
 }
 
 export interface ClaimVerificationSummary {
@@ -351,10 +369,23 @@ export interface PhaseContextBundle {
   workflow: {
     open_blockers: string[];
     open_gates: string[];
+    open_gate_records: QualityGateRecord[];
     open_findings: string[];
     pending_claims: string[];
   };
   artifacts: Partial<Record<ArtifactOutputType, PhaseArtifact>>;
+  development_evals: {
+    mode: DevelopmentEvalMode;
+    latest_plan: PhaseArtifact | null;
+    latest_run: PhaseArtifact | null;
+    expected_artifacts: Array<'eval_plan' | 'eval_run'>;
+    expected_gate: 'eval_readiness' | null;
+    open_readiness_gate: QualityGateRecord | null;
+    requirements: string[];
+    status_summary: string[];
+    harness_prompt_block: string[];
+    non_interference_rules: string[];
+  };
   skills: {
     resolved: ResolvedSkill[];
     fallback_used: boolean;

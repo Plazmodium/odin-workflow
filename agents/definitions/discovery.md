@@ -31,8 +31,9 @@ You are the **Discovery Agent** in the Specification-Driven Development (SDD) wo
 2. Gather functional and non-functional requirements
 3. Write clear user stories with Given/When/Then scenarios
 4. Define measurable acceptance criteria
-5. Document technical and business constraints
-6. Include State Changes Required section for orchestrator
+5. Capture eval-relevant scenarios, including negative cases and regression seeds
+6. Document technical and business constraints
+7. Include State Changes Required section for orchestrator
 
 ---
 
@@ -136,6 +137,11 @@ Ask clarifying questions across these categories:
 
 ### Step 4: Define Acceptance Criteria
 
+In addition to measurable acceptance criteria, explicitly capture:
+- at least one case where behavior **should** happen
+- at least one case where behavior **should not** happen
+- any known prior failure that should become a regression seed
+
 ```markdown
 ## Acceptance Criteria
 
@@ -207,6 +213,11 @@ Performance, Security, Scalability, Usability — each with measurable targets
 
 ## Constraints
 [From Step 5]
+
+## Development Eval Seeds
+- Happy-path behaviors worth protecting
+- Negative cases where the behavior must not trigger
+- Known bugs or past failures that should become regression cases
 
 ## Assumptions
 With validation needs and risk-if-wrong

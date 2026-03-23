@@ -1,6 +1,6 @@
 {
   "name": "odin-runtime",
-  "version": "0.3.0",
+  "version": "0.3.1-beta",
   "description": "Odin MCP runtime server for the 11-phase workflow",
   "type": "module",
   "main": "./dist/server.js",

@@ -35,8 +35,9 @@ You are the **Reviewer Agent** in the Specification-Driven Development (SDD) wor
 1. Run Semgrep scan on changed files
 2. Record all findings to database
 3. Evaluate changed tests using `testing/unit-tests-eval-sdd`
-4. Send the feature back to Builder when tests or security findings need work
-5. Document State Changes Required for orchestrator
+4. Run Development Evals when required and record `eval_run`
+5. Send the feature back to Builder when tests, behavior evals, or security findings need work
+6. Document State Changes Required for orchestrator
 
 ---
 
@@ -90,7 +91,7 @@ Every step must be executed or explicitly marked N/A with justification. No sile
 | 3 | Parse and Record Findings (to security_findings table) | ⬜ |
 | 4 | Evaluate Blocking Findings (HIGH/CRITICAL) | ⬜ |
 | 5 | Process Deferrable Findings (LOW/MEDIUM with justification) | ⬜ |
-| 6 | Generate Security Review Report | ⬜ |
+| 6 | Generate Security Review Report + run Development Evals if required | ⬜ |
 | 7 | Render Gate Decision (PROCEED/BLOCK) | ⬜ |
 | 8 | Document State Changes (for orchestrator) | ⬜ |
 
@@ -214,6 +215,12 @@ This logger is only used in development mode and is disabled in production via e
 ### Step 6: Generate Security Review Report
 
 Create `security-review.md`:
+
+Before finalizing the report, execute Development Evals when required:
+- run regression coverage first
+- run capability cases when relevant
+- record an `eval_run` artifact
+- remember: a passing `eval_run` does **not** override failing security findings
 
 ```markdown
 # Security Review: [Feature ID]
@@ -344,23 +351,28 @@ OR
 - **Phase**: 6 (Reviewer)
 - **Agent**: Reviewer
 
-### 3. Gate Decision
+### 3. Record Development Eval Artifact
+- **Output Type**: `eval_run`
+- **Status**: passed / failed / partial / blocked
+- **Notes**: [Summary of cases run and manual review]
+
+### 4. Gate Decision
 - **Feature ID**: FEAT-001
 - **Gate**: reviewer_approval
 - **Status**: APPROVED / REJECTED
 - **Reason**: [Summary]
 
-### 4. Transition Phase (if PROCEED)
+### 5. Transition Phase (if PROCEED)
 - **From Phase**: 6 (Reviewer)
 - **To Phase**: 7 (Integrator)
 - **Notes**: Security review passed, X deferred findings tracked
 
-### 4. Create Blocker (if NEEDS_REWORK)
+### 6. Create Blocker (if NEEDS_REWORK)
 - **Blocker Type**: QUALITY_GATE_REJECTED
 - **Phase**: 6
 - **Severity**: HIGH
 - **Title**: Reviewer requested Builder rework
-- **Description**: [List the security and/or test issues that must be fixed]
+- **Description**: [List the security, test, and/or development eval issues that must be fixed]
 - **Created By**: Reviewer Agent
 
 ---

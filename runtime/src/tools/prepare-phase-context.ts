@@ -6,7 +6,9 @@
 import type { SkillAdapter } from '../adapters/skills/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
 import { resolveWorkflowActorName } from '../domain/actors.js';
+import { appendDevelopmentEvalChecks, buildDevelopmentEvalContext } from '../domain/development-evals.js';
 import { getPhaseAgentInstructions, getPhaseContract, isWatchedPhase } from '../domain/phases.js';
+import { formatOpenGateSummary } from '../domain/quality-gates.js';
 import { computeResonance, type ResonanceInput } from '../domain/resonance.js';
 import type { PreparePhaseContextInput } from '../schemas.js';
 import type { ArtifactOutputType, LearningCategory, PhaseArtifact, PhaseContextBundle } from '../types.js';
@@ -21,6 +23,8 @@ const ARTIFACT_KEYS: ArtifactOutputType[] = [
   'documentation',
   'release_notes',
   'design_verification',
+  'eval_plan',
+  'eval_run',
 ];
 
 function buildArtifactLineage(artifacts: PhaseArtifact[]): PhaseContextBundle['artifacts'] {
@@ -49,24 +53,27 @@ export async function handlePreparePhaseContext(
     });
   }
 
-  const artifacts = input.include_artifacts ? await adapter.listPhaseArtifacts(input.feature_id) : [];
+  const all_artifacts = await adapter.listPhaseArtifacts(input.feature_id);
+  const artifacts = input.include_artifacts ? all_artifacts : [];
   const [feature_learnings, related_learnings] = input.include_learnings
     ? await Promise.all([
         adapter.listLearnings(input.feature_id),
         adapter.listRelatedLearnings(input.feature_id, 5),
       ])
     : [[], []];
-  const [open_blockers, open_gates, open_findings, pending_claims] = await Promise.all([
+  const [open_blockers, open_gate_records, open_findings, pending_claims] = await Promise.all([
     adapter.listOpenBlockers(input.feature_id),
-    adapter.listOpenGates(input.feature_id),
+    adapter.listOpenGateRecords(input.feature_id),
     adapter.listOpenFindings(input.feature_id),
     adapter.listPendingClaims(input.feature_id),
   ]);
+  const open_gates = open_gate_records.map(formatOpenGateSummary);
   const phase = getPhaseContract(input.phase);
   const agent = getPhaseAgentInstructions(input.phase);
   const actor_name = resolveWorkflowActorName(input.phase, input.agent_name ?? agent.name);
+  const development_evals = buildDevelopmentEvalContext(feature, input.phase, all_artifacts, open_gate_records);
   const resolved_skills = input.include_skills
-    ? await skill_adapter.resolveSkills({ feature, artifacts, phase: input.phase })
+    ? await skill_adapter.resolveSkills({ feature, artifacts: all_artifacts, phase: input.phase })
     : { resolved: [], fallback_used: false };
   const skill_paths = resolved_skills.resolved.map((skill) => `${skill.category}/${skill.name}`);
   const existing_invocation = await adapter.findOpenAgentInvocation(feature.id, input.phase, actor_name);
@@ -88,6 +95,7 @@ export async function handlePreparePhaseContext(
     agent: {
       ...agent,
       name: actor_name,
+      constraints: [...new Set([...agent.constraints, ...development_evals.harness_prompt_block])],
     },
     invocation:
       invocation == null
@@ -101,10 +109,12 @@ export async function handlePreparePhaseContext(
     workflow: {
       open_blockers,
       open_gates,
+      open_gate_records,
       open_findings,
       pending_claims,
     },
     artifacts: buildArtifactLineage(artifacts),
+    development_evals,
     skills: {
       resolved: resolved_skills.resolved,
       fallback_used: resolved_skills.fallback_used,
@@ -112,12 +122,14 @@ export async function handlePreparePhaseContext(
     verification: {
       watched_phase: isWatchedPhase(input.phase),
       required_claims: isWatchedPhase(input.phase) ? ['CODE_MODIFIED'] : [],
-      required_checks:
+      required_checks: appendDevelopmentEvalChecks(
         input.phase === '6'
           ? ['security review', 'unit test evaluation']
           : isWatchedPhase(input.phase)
             ? ['build', 'tests']
             : [],
+        input.phase
+      ),
       review_mode: input.phase === '6' ? 'security' : isWatchedPhase(input.phase) ? 'watched_phase' : 'none',
     },
     learnings: [

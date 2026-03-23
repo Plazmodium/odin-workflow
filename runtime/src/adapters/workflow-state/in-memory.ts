@@ -6,6 +6,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { getNextPhaseId } from '../../domain/phases.js';
+import { formatOpenGateSummary } from '../../domain/quality-gates.js';
 import type {
   AgentInvocationRecord,
   AgentClaimRecord,
@@ -20,6 +21,7 @@ import type {
   PhaseArtifact,
   PhaseId,
   PhaseResultRecord,
+  QualityGateRecord,
   RelatedLearningRecord,
   ReviewCheckRecord,
   ReviewFinding,
@@ -36,6 +38,7 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
   private readonly review_checks = new Map<string, ReviewCheckRecord[]>();
   private readonly learnings = new Map<string, LearningRecord[]>();
   private readonly commits = new Map<string, FeatureCommitRecord[]>();
+  private readonly quality_gates = new Map<string, QualityGateRecord[]>();
   private readonly claims = new Map<string, AgentClaimRecord[]>();
   private readonly policy_verdicts = new Map<string, PolicyVerdictRecord[]>();
   private readonly watcher_reviews = new Map<string, WatcherReviewRecord[]>();
@@ -117,7 +120,14 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
   }
 
   async listOpenGates(_feature_id: string): Promise<string[]> {
-    return [];
+    const gates = await this.listOpenGateRecords(_feature_id);
+    return gates.map(formatOpenGateSummary);
+  }
+
+  async listOpenGateRecords(feature_id: string): Promise<QualityGateRecord[]> {
+    return [...(this.quality_gates.get(feature_id) ?? [])].filter(
+      (gate) => gate.status === 'PENDING' || gate.status === 'REJECTED'
+    );
   }
 
   async listOpenFindings(_feature_id: string): Promise<string[]> {
@@ -388,13 +398,39 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
   }
 
   async recordQualityGate(
-    _feature_id: string,
-    _gate_name: string,
-    _status: 'APPROVED' | 'REJECTED',
-    _approver: string,
-    _notes?: string
+    feature_id: string,
+    gate_name: string,
+    status: 'APPROVED' | 'REJECTED',
+    approver: string,
+    notes?: string,
+    phase?: PhaseId
   ): Promise<number> {
-    return 0;
+    const feature = this.features.get(feature_id);
+    if (feature == null) {
+      throw new Error(`Feature ${feature_id} not found`);
+    }
+
+    const effective_phase = phase ?? feature.current_phase;
+    const existing = this.quality_gates.get(feature_id) ?? [];
+    const duplicate = existing.find(
+      (gate) => gate.gate_name === gate_name && gate.phase === effective_phase
+    );
+    const gate_id = duplicate?.id ?? existing.length + 1;
+    const next_gate: QualityGateRecord = {
+      id: gate_id,
+      feature_id,
+      gate_name,
+      phase: effective_phase,
+      status,
+      approver,
+      approved_at: new Date().toISOString(),
+      approval_notes: notes ?? null,
+    };
+
+    const filtered = existing.filter((gate) => !(gate.gate_name === gate_name && gate.phase === effective_phase));
+    this.quality_gates.set(feature_id, [...filtered, next_gate]);
+    this.touchFeature(feature_id);
+    return gate_id;
   }
 
   async computeFeatureEval(_feature_id: string): Promise<FeatureEvalSummary | null> {

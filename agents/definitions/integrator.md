@@ -118,7 +118,7 @@ Every step must be executed or explicitly marked N/A with justification. No sile
 | 4 | Handle Merge Conflicts (if any) | ⬜ |
 | 5 | Run Integration Tests (full suite) | ⬜ |
 | 6 | CI/CD & Verification (pipeline check) | ⬜ |
-| 6b | Runtime Verification (spot-check DB vs UI) | ⬜ |
+| 6b | Runtime Verification (spot-check DB vs UI + resolve partial evals) | ⬜ |
 | 7 | Document State Changes (for orchestrator) | ⬜ |
 | 8 | Cleanup (optional, remove stale branches) | ⬜ |
 
@@ -217,6 +217,8 @@ Wait for pipeline (lint, type-check, tests, build, security). Verify feature wor
 
 4. **Integration points**: If the feature interacts with external services (Supabase, APIs), verify those connections work at runtime, not just at build time.
 
+5. **Development Eval resolution**: If Reviewer recorded `eval_run.status = partial`, resolve it here with runtime or end-state evidence. Record an updated `eval_run` if runtime verification materially changes the result.
+
 **If runtime verification fails**: Create a blocker documenting the discrepancy. Do NOT mark integration as successful if the application shows incorrect data, even if the build passes.
 
 ---
@@ -242,7 +244,12 @@ End your `integration-report.md` with:
 - **Phase**: 7 (Integrator)
 - **Agent**: Integrator
 
-### 3. Transition Phase
+### 3. Record Development Eval Artifact (if runtime materially updates Reviewer result)
+- **Output Type**: `eval_run`
+- **Status**: passed / failed / partial / blocked
+- **Notes**: [Runtime evidence or end-state mismatch]
+
+### 4. Transition Phase
 - **From Phase**: 7 (Integrator)
 - **To Phase**: 8 (Documenter)
 

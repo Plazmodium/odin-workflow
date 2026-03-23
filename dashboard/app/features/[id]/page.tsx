@@ -32,6 +32,7 @@ import { AuditTimeline } from '@/components/features/audit-timeline';
 import { ArchivesSection } from '@/components/features/archives-section';
 import { WatcherVerificationPanel } from '@/components/features/watcher-verification-panel';
 import { SecurityFindingsPanel } from '@/components/features/security-findings-panel';
+import { DevelopmentEvalsPanel } from '@/components/features/development-evals-panel';
 import { RefreshEvalsButton } from '@/components/shared/refresh-evals-button';
 import { PollingSubscription } from '@/components/realtime/realtime-page';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -133,14 +134,25 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
       </div>
 
       {/* Quality Gates */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Quality Gates</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <QualityGatesTable gates={gates} featureStatus={feature.status} />
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Development Evals</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DevelopmentEvalsPanel phaseOutputs={phaseOutputs} gates={gates} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Quality Gates</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <QualityGatesTable gates={gates} featureStatus={feature.status} />
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Blockers */}
       <Card>

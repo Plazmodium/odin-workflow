@@ -1,7 +1,8 @@
 'use client';
 
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Shield } from 'lucide-react';
+import { normalizeWorkflowAgentLabel } from '@/lib/agent-names';
 import { phaseName } from '@/lib/utils';
 import { AGENT_CHART_COLORS, WATCHED_PHASES } from '@/lib/constants';
 import type { AgentDuration } from '@/lib/types/database';
@@ -30,9 +31,47 @@ export function AgentProfiler({ durations, error = null, claimsSummary = null }:
     );
   }
 
+  const normalizedBuckets = new Map<string, AgentDuration>();
+  for (const duration of durations) {
+    const normalizedAgentName = normalizeWorkflowAgentLabel(duration.agent_name, duration.phase);
+    const key = `${duration.phase}::${normalizedAgentName}`;
+    const existing = normalizedBuckets.get(key);
+
+    if (existing == null) {
+      normalizedBuckets.set(key, {
+        ...duration,
+        agent_name: normalizedAgentName,
+      });
+      continue;
+    }
+
+    const combinedInvocationCount = existing.invocation_count + duration.invocation_count;
+    const combinedTotalDuration = existing.total_duration_ms + duration.total_duration_ms;
+    normalizedBuckets.set(key, {
+      ...existing,
+      invocation_count: combinedInvocationCount,
+      total_duration_ms: combinedTotalDuration,
+      avg_duration_ms: Math.round(combinedTotalDuration / combinedInvocationCount),
+      min_duration_ms:
+        existing.min_duration_ms == null
+          ? duration.min_duration_ms
+          : duration.min_duration_ms == null
+            ? existing.min_duration_ms
+            : Math.min(existing.min_duration_ms, duration.min_duration_ms),
+      max_duration_ms:
+        existing.max_duration_ms == null
+          ? duration.max_duration_ms
+          : duration.max_duration_ms == null
+            ? existing.max_duration_ms
+            : Math.max(existing.max_duration_ms, duration.max_duration_ms),
+    });
+  }
+
+  const normalizedDurations = Array.from(normalizedBuckets.values());
+
   // Get unique agents and phases
-  const agents = [...new Set(durations.map((d) => d.agent_name))];
-  const phases = [...new Set(durations.map((d) => d.phase))].sort();
+  const agents = [...new Set(normalizedDurations.map((d) => d.agent_name))];
+  const phases = [...new Set(normalizedDurations.map((d) => d.phase))].sort((left, right) => Number(left) - Number(right));
 
   // Build chart data: one entry per phase, with agent durations as fields
   const chartData = phases.map((phase) => {
@@ -42,7 +81,7 @@ export function AgentProfiler({ durations, error = null, claimsSummary = null }:
       isWatched: WATCHED_PHASES.includes(phase as typeof WATCHED_PHASES[number]),
     };
     agents.forEach((agent) => {
-      const match = durations.find((d) => d.phase === phase && d.agent_name === agent);
+      const match = normalizedDurations.find((d) => d.phase === phase && d.agent_name === agent);
       const rawDuration = match ? Number(match.total_duration_ms) : 0;
       entry[agent] = Number.isFinite(rawDuration) ? Math.round(rawDuration / 1000) : 0;
     });

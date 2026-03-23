@@ -83,6 +83,7 @@ Every step must be executed or explicitly marked N/A with justification. No sile
 | A1 | Initialize Feature Review (load PRD + spec + iteration history) | ⬜ |
 | A2 | PRD-Spec Alignment Check (verify spec addresses PRD requirements) | ⬜ |
 | A3 | Multi-Perspective Review (User Value, Technical Soundness, Quality & Testability) | ⬜ |
+| A3a | Review Development Eval Plan / minimal eval obligation (when required) | ⬜ |
 | A4 | Score Each Perspective (Good / Needs Work / Blocking) | ⬜ |
 | A5 | Convergence Detection (compare with prior iterations) | ⬜ |
 | A6 | Early Thrashing Detection (iteration 3+) | ⬜ |
@@ -272,6 +273,9 @@ Covers: testable acceptance criteria, test coverage, edge case tests, test data,
 - [ ] Are edge cases covered by tests?
 - [ ] Is test data/fixtures specified?
 - [ ] Are metrics concrete and measurable?
+- [ ] Is the development eval plan concrete, outcome-based, and fair?
+- [ ] Does the plan distinguish capability vs regression cases when required?
+- [ ] For bug fixes, is there at least one reproducing regression case?
 
 **Common Issues**:
 - ❌ Vague acceptance criteria that can't be tested
@@ -289,6 +293,12 @@ Covers: testable acceptance criteria, test coverage, edge case tests, test data,
 
 **Fix**: Add specific metrics to Section 3 (Acceptance Criteria).
 ```
+
+**Development Eval Gate**:
+- When development evals are required, record `eval_readiness` as part of your state changes.
+- `APPROVED` Guardian outcome should record `eval_readiness = APPROVED`.
+- Iteration/blocking outcomes should record `eval_readiness = REJECTED` with notes describing whether the issue is "needs work" or "blocked".
+- `eval_readiness` is additive only; it does not override Guardian review, Technical Soundness findings, or applicable formal verification results.
 
 ---
 

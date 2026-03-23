@@ -52,13 +52,26 @@ Every agent artifact must end with this section:
 - **Agent**: [Your agent name]
 - **Operation**: [Brief description]
 
-### 3. Transition Phase (if applicable)
+### 3. Record Development Eval Artifact (if applicable)
+- **Feature ID**: [ID]
+- **Phase**: [N]
+- **Output Type**: `eval_plan` | `eval_run`
+- **Created By**: [Agent name]
+
+### 4. Record Quality Gate (if applicable)
+- **Feature ID**: [ID]
+- **Gate Name**: `eval_readiness` | [other gate]
+- **Status**: `APPROVED` | `REJECTED`
+- **Approver**: [Agent name]
+- **Notes**: [Why]
+
+### 5. Transition Phase (if applicable)
 - **Feature ID**: [ID]
 - **From Phase**: [N]
 - **To Phase**: [N+1]
 - **Transitioned By**: [Agent name]
 
-### 4. Create Blocker (if applicable)
+### 6. Create Blocker (if applicable)
 - **Blocker Type**: [SPEC_AMBIGUITY | MISSING_CONTEXT | TECHNICAL_IMPOSSIBILITY | EXTERNAL_DEPENDENCY | INTEGRATION_CONFLICT | DURATION_EXCEEDED | ITERATION_LIMIT_EXCEEDED | QUALITY_GATE_REJECTED | OTHER]
 - **Phase**: [N]
 - **Severity**: [LOW | MEDIUM | HIGH | CRITICAL]
@@ -159,6 +172,48 @@ Some phases also require workflow skills:
 - **Reviewer** must receive `testing/unit-tests-eval-sdd`
 
 Always follow patterns, conventions, and best practices from your injected skills.
+
+---
+
+## Development Evals — Additive Verification
+
+Development Evals are a workflow track for defining and checking behavior before and after implementation. They are **not** the same as Odin's operational **EVALS** health scoring.
+
+### Core Objects
+
+- **`eval_plan`** — Architect-owned pre-build artifact describing capability/regression cases and grading strategy
+- **`eval_readiness`** — Guardian gate before Builder begins
+- **`eval_run`** — Reviewer-owned post-build proof artifact, optionally extended by Integrator for runtime validation
+
+### Phase Responsibilities
+
+- **Product**: define success, non-goals, and failure shape
+- **Discovery**: collect happy-path, edge, failure, and should-not-trigger scenarios
+- **Architect**: record `eval_plan` when required
+- **Guardian**: decide `eval_readiness`
+- **Builder**: keep regression/acceptance coverage in sync with the work
+- **Reviewer**: run development evals and record `eval_run`
+- **Integrator**: resolve any `partial` eval state with runtime/end-state verification
+
+### Non-Interference Rule
+
+Development Evals are additive. They MUST NOT replace, bypass, or weaken:
+
+- formal verification (`odin.verify_design`) when applicable
+- Builder/Integrator test and build verification
+- Reviewer security review via `odin.run_review_checks`
+- runtime spot-checks and integration validation
+- watched-claim Policy Engine / Watcher verification
+
+If Development Evals pass but one of the existing review steps fails, the feature is still blocked.
+
+### Runtime Recording Convention
+
+Only the main orchestrator session can call Odin MCP tools. Agents should document these state changes when relevant:
+
+- `odin.record_phase_artifact({ output_type: "eval_plan", ... })`
+- `odin.record_quality_gate({ gate_name: "eval_readiness", ... })`
+- `odin.record_phase_artifact({ output_type: "eval_run", ... })`
 
 ---
 
