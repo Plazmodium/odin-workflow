@@ -255,6 +255,15 @@ Point your AI tool at [ODIN.md](ODIN.md) and use it as the framework guide for r
 
 Every feature goes through all 11 phases. Complexity level changes the depth of each phase, not whether the phase runs.
 
+### Development Evals Summary
+
+- **Product** defines success, non-goals, and failure shape
+- **Discovery** captures happy-path, negative, and regression-seed scenarios
+- **Architect** records `eval_plan` for L2/L3 work; L1 still needs minimal acceptance or regression coverage
+- **Guardian** decides `eval_readiness` before Builder starts when required
+- **Reviewer** records `eval_run`; **Integrator** resolves any `partial` eval state with runtime evidence
+- Development Evals are additive only - they do not replace `odin.verify_design`, `odin.run_review_checks`, tests, runtime verification, or Watcher checks
+
 See [ODIN.md](ODIN.md) for the full protocol.
 
 ## Adaptive Complexity
