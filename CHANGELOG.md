@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Dashboard: make Discovery requirements render robustly in the phase timeline even when `requirements` phase output items use fallback fields (for example `description`, `text`, or plain strings) instead of only `id` / `title` / `priority`.
+
 ## [0.3.1-beta] - 2026-03-23
 
 ### Added
