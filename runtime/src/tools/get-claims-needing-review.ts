@@ -23,7 +23,7 @@ export async function handleGetClaimsNeedingReview(
   const claims = await adapter.listClaimsNeedingReview(input.feature_id);
 
   return createTextResult(
-    `Found ${claims.length} claim(s) needing watcher review${input.feature_id == null ? '' : ` for feature ${input.feature_id}`}.`,
+    `Found ${claims.length} claim(s) needing watcher review${input.feature_id == null ? '' : ` for feature ${input.feature_id}`}. The watcher-agent should review each claim and record verdicts with odin.record_watcher_review.`,
     {
       feature_id: input.feature_id ?? null,
       claims,

@@ -19,6 +19,7 @@ export async function handleVerifyClaims(
   }
 
   const claims = await adapter.listClaimVerificationStatus(input.feature_id);
+  const claims_needing_review = await adapter.listClaimsNeedingReview(input.feature_id);
   const counts = {
     total: claims.length,
     passed: claims.filter((claim) => claim.final_status === 'PASS').length,
@@ -26,13 +27,25 @@ export async function handleVerifyClaims(
     needs_review: claims.filter((claim) => claim.final_status === 'NEEDS_REVIEW').length,
     pending: claims.filter((claim) => claim.final_status === 'PENDING').length,
   };
+  const next_actions =
+    claims_needing_review.length === 0
+      ? []
+      : [
+          'Claims are still awaiting LLM watcher review.',
+          'Call odin.get_claims_needing_review to fetch the queue for the watcher-agent.',
+          'Record each watcher decision with odin.record_watcher_review, then run odin.verify_claims again.',
+        ];
 
   return createTextResult(
-    `Verified ${counts.total} claim(s) for feature ${feature.id}.`,
+    claims_needing_review.length === 0
+      ? `Verified ${counts.total} claim(s) for feature ${feature.id}.`
+      : `Verified ${counts.total} claim(s) for feature ${feature.id}; ${claims_needing_review.length} claim(s) still await watcher review.`,
     {
       feature_id: feature.id,
       counts,
       claims,
+      claims_needing_review,
+      next_actions,
     }
   );
 }

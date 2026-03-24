@@ -66,6 +66,21 @@ describe('handlePreparePhaseContext', () => {
       ]),
       listOpenFindings: vi.fn(async () => []),
       listPendingClaims: vi.fn(async () => []),
+      listClaimsNeedingReview: vi.fn(async () => [
+        {
+          claim_id: 'claim_1',
+          feature_id: 'FEAT-CTX',
+          phase: '5',
+          agent_name: 'builder-agent',
+          claim_type: 'CODE_MODIFIED',
+          claim_description: 'Changed endpoint handlers',
+          evidence_refs: {},
+          risk_level: 'LOW',
+          policy_verdict: 'NEEDS_REVIEW',
+          policy_reason: 'Missing evidence references - escalate to watcher',
+          created_at: '2026-03-20T00:58:00.000Z',
+        },
+      ]),
       findOpenAgentInvocation: vi.fn(async () => null),
       startAgentInvocation: vi.fn(async () => ({
         id: 'inv_1',
@@ -112,6 +127,7 @@ describe('handlePreparePhaseContext', () => {
         context?: {
           agent: { constraints: string[] };
           verification: { required_checks: string[] };
+          workflow: { claims_needing_review_count: number };
           development_evals: {
             expected_artifacts: string[];
             open_readiness_gate: { status: string } | null;
@@ -142,7 +158,10 @@ describe('handlePreparePhaseContext', () => {
         agent_name: 'builder-agent',
       },
       verification: {
-        required_checks: ['build', 'tests'],
+        required_checks: ['build', 'tests', 'policy checks', 'watcher review resolution'],
+      },
+      workflow: {
+        claims_needing_review_count: 1,
       },
     });
     expect(context?.development_evals.requirements).toContain(
@@ -155,6 +174,9 @@ describe('handlePreparePhaseContext', () => {
     );
     expect(context?.agent.constraints).toContain(
       'Development Evals are required: the open `eval_readiness` gate is REJECTED. Respect that gate and escalate instead of bypassing it.'
+    );
+    expect(context?.agent.constraints).toContain(
+      'Outstanding claims need watcher review: call odin.get_claims_needing_review, have watcher-agent review each claim, record results with odin.record_watcher_review, then re-run odin.verify_claims before closing the watched phase.'
     );
   });
 
@@ -170,6 +192,7 @@ describe('handlePreparePhaseContext', () => {
       listOpenGateRecords: vi.fn(async () => []),
       listOpenFindings: vi.fn(async () => []),
       listPendingClaims: vi.fn(async () => []),
+      listClaimsNeedingReview: vi.fn(async () => []),
       findOpenAgentInvocation: vi.fn(async () => null),
       startAgentInvocation: vi.fn(async () => ({
         id: 'inv_2',

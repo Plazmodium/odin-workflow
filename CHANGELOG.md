@@ -4,8 +4,16 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.2-beta] - 2026-03-24
+
 ### Fixed
-- Dashboard: make Discovery requirements render robustly in the phase timeline even when `requirements` phase output items use fallback fields (for example `description`, `text`, or plain strings) instead of only `id` / `title` / `priority`.
+- Runtime: handle object-shaped Supabase RPC responses when recording commits so `odin.record_commit` no longer crashes on installs that return a single row object.
+- Runtime: harden watched-claim flow so claims can only be submitted from the active watched phase, and expose clearer watcher next actions through `run_policy_checks`, `get_claims_needing_review`, `verify_claims`, and `prepare_phase_context`.
+- Runtime: narrow skill auto-detection so generic words like `api`, `architecture`, and `testing` do not load entire skill categories for every agent; non-technical phases now fall back more cleanly to `generic-dev`.
+- Dashboard: keep Discovery requirements visible in the phase timeline even when requirements items use fallback fields such as `description`, `text`, or plain strings instead of only `id` / `title` / `priority`.
+
+### Changed
+- Version references updated to `0.3.2-beta` in the root package, runtime package, runtime lockfile, runtime MCP server version, and README badge.
 
 ## [0.3.1-beta] - 2026-03-23
 

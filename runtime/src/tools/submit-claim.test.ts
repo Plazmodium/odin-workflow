@@ -6,7 +6,7 @@ import { handleSubmitClaim } from './submit-claim.js';
 describe('handleSubmitClaim', () => {
   it('normalizes harness labels and reuses the open invocation for the phase agent', async () => {
     const adapter: WorkflowStateAdapter = {
-      getFeature: vi.fn(async () => ({ id: 'FEAT-CLAIM' })),
+      getFeature: vi.fn(async () => ({ id: 'FEAT-CLAIM', current_phase: '5' })),
       findOpenAgentInvocation: vi.fn(async () => ({
         id: 'inv_5',
         feature_id: 'FEAT-CLAIM',
@@ -46,5 +46,45 @@ describe('handleSubmitClaim', () => {
       evidence_refs: { test_output_hash: 'sha256:abc' },
       risk_level: 'LOW',
     });
+  });
+
+  it('rejects claims from non-watched phases', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => ({ id: 'FEAT-CLAIM', current_phase: '4' })),
+      submitClaim: vi.fn(),
+    } as unknown as WorkflowStateAdapter;
+
+    const result = await handleSubmitClaim(adapter, {
+      feature_id: 'FEAT-CLAIM',
+      phase: '4',
+      claim_type: 'CODE_MODIFIED',
+      description: 'Spec was updated',
+      evidence_refs: {},
+      risk_level: 'LOW',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('watched phases');
+    expect(adapter.submitClaim).not.toHaveBeenCalled();
+  });
+
+  it('rejects claims when the provided phase does not match the feature current phase', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => ({ id: 'FEAT-CLAIM', current_phase: '5' })),
+      submitClaim: vi.fn(),
+    } as unknown as WorkflowStateAdapter;
+
+    const result = await handleSubmitClaim(adapter, {
+      feature_id: 'FEAT-CLAIM',
+      phase: '7',
+      claim_type: 'CODE_MODIFIED',
+      description: 'Integration completed',
+      evidence_refs: {},
+      risk_level: 'LOW',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('currently in phase 5, not 7');
+    expect(adapter.submitClaim).not.toHaveBeenCalled();
   });
 });
