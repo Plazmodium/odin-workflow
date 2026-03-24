@@ -61,17 +61,24 @@ export async function handlePreparePhaseContext(
         adapter.listRelatedLearnings(input.feature_id, 5),
       ])
     : [[], []];
-  const [open_blockers, open_gate_records, open_findings, pending_claims] = await Promise.all([
+  const [open_blockers, open_gate_records, open_findings, pending_claims, claims_needing_review] = await Promise.all([
     adapter.listOpenBlockers(input.feature_id),
     adapter.listOpenGateRecords(input.feature_id),
     adapter.listOpenFindings(input.feature_id),
     adapter.listPendingClaims(input.feature_id),
+    adapter.listClaimsNeedingReview(input.feature_id),
   ]);
   const open_gates = open_gate_records.map(formatOpenGateSummary);
   const phase = getPhaseContract(input.phase);
   const agent = getPhaseAgentInstructions(input.phase);
   const actor_name = resolveWorkflowActorName(input.phase, input.agent_name ?? agent.name);
   const development_evals = buildDevelopmentEvalContext(feature, input.phase, all_artifacts, open_gate_records);
+  const watcher_constraints =
+    isWatchedPhase(input.phase) && claims_needing_review.length > 0
+      ? [
+          'Outstanding claims need watcher review: call odin.get_claims_needing_review, have watcher-agent review each claim, record results with odin.record_watcher_review, then re-run odin.verify_claims before closing the watched phase.',
+        ]
+      : [];
   const resolved_skills = input.include_skills
     ? await skill_adapter.resolveSkills({ feature, artifacts: all_artifacts, phase: input.phase })
     : { resolved: [], fallback_used: false };
@@ -95,7 +102,7 @@ export async function handlePreparePhaseContext(
     agent: {
       ...agent,
       name: actor_name,
-      constraints: [...new Set([...agent.constraints, ...development_evals.harness_prompt_block])],
+      constraints: [...new Set([...agent.constraints, ...development_evals.harness_prompt_block, ...watcher_constraints])],
     },
     invocation:
       invocation == null
@@ -112,6 +119,7 @@ export async function handlePreparePhaseContext(
       open_gate_records,
       open_findings,
       pending_claims,
+      claims_needing_review_count: claims_needing_review.length,
     },
     artifacts: buildArtifactLineage(artifacts),
     development_evals,
@@ -126,7 +134,7 @@ export async function handlePreparePhaseContext(
         input.phase === '6'
           ? ['security review', 'unit test evaluation']
           : isWatchedPhase(input.phase)
-            ? ['build', 'tests']
+            ? ['build', 'tests', 'policy checks', ...(claims_needing_review.length > 0 ? ['watcher review resolution'] : [])]
             : [],
         input.phase
       ),

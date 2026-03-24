@@ -63,6 +63,8 @@ const PHASE_REQUIRED_SKILLS: Partial<Record<PhaseId, string[]>> = {
   '6': ['unit-tests-eval-sdd'],
 };
 
+const TECH_AWARE_PHASES = new Set<PhaseId>(['2', '3', '4', '5', '6', '7']);
+
 function getBuiltInSkillRoots(): string[] {
   const current_file = fileURLToPath(import.meta.url);
   const package_root = resolve(dirname(current_file), '..', '..', '..');
@@ -220,7 +222,8 @@ function collectMentionedSkills(text: string, available: Map<string, SkillDefini
   const mentioned = new Set<string>();
 
   for (const [name, skill] of available.entries()) {
-    const candidates = [name, skill.metadata.category, ...(skill.metadata.compatible_with ?? [])]
+    const candidates = [name, ...(skill.metadata.compatible_with ?? [])]
+      .flatMap((value) => extractNameAliases(value))
       .map((value) => value.toLowerCase())
       .filter((value, index, values) => value.length > 1 && values.indexOf(value) === index);
 
@@ -356,6 +359,10 @@ function extractNameAliases(name: string): string[] {
   if (dotted !== name) {
     aliases.push(dotted);
   }
+  const spaced = name.replace(/-/g, ' ');
+  if (spaced !== name) {
+    aliases.push(spaced);
+  }
   return aliases;
 }
 
@@ -448,7 +455,7 @@ export class FilesystemSkillAdapter implements SkillAdapter {
       requested.add(skill);
     }
 
-    if (this.config.skills?.auto_detect !== false) {
+    if (this.config.skills?.auto_detect !== false && TECH_AWARE_PHASES.has(input.phase)) {
       const repoDetected = await detectRepoSkills(this.projectRoot);
       for (const skill of repoDetected) {
         requested.add(skill);

@@ -372,6 +372,7 @@ export interface PhaseContextBundle {
     open_gate_records: QualityGateRecord[];
     open_findings: string[];
     pending_claims: string[];
+    claims_needing_review_count: number;
   };
   artifacts: Partial<Record<ArtifactOutputType, PhaseArtifact>>;
   development_evals: {

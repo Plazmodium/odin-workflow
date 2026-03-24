@@ -34,6 +34,23 @@ import type { ListAllLearningsFilter, WorkflowStateAdapter } from './types.js';
 
 type JsonRecord = { [key: string]: unknown };
 
+function getSingleRpcRow(data: unknown, operation: string): JsonRecord {
+  if (Array.isArray(data)) {
+    const row = data[0];
+    if (row != null && typeof row === 'object' && !Array.isArray(row)) {
+      return row as JsonRecord;
+    }
+
+    throw new Error(`Failed to ${operation}: No row returned.`);
+  }
+
+  if (data != null && typeof data === 'object') {
+    return data as JsonRecord;
+  }
+
+  throw new Error(`Failed to ${operation}: RPC returned an unexpected shape.`);
+}
+
 function toFeatureRecord(row: JsonRecord): FeatureRecord {
   return {
     id: String(row.feature_id ?? row.id),
@@ -111,11 +128,11 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       p_author: feature.author ?? null,
     });
 
-    if (error != null || data == null || data.length === 0) {
+    if (error != null || data == null) {
       throw new Error(`Failed to create feature in Supabase: ${error?.message ?? 'No result returned.'}`);
     }
 
-    const created = data[0] as JsonRecord;
+    const created = getSingleRpcRow(data, 'create feature in Supabase');
     return {
       id: String(created.feature_id),
       name: String(created.feature_name),
@@ -142,11 +159,11 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       throw new Error(`Failed to fetch feature status from Supabase: ${error.message}`);
     }
 
-    if (data == null || data.length === 0) {
+    if (data == null) {
       return null;
     }
 
-    return toFeatureRecord(data[0] as JsonRecord);
+    return toFeatureRecord(getSingleRpcRow(data, 'fetch feature status from Supabase'));
   }
 
   async recordPhaseArtifact(artifact: PhaseArtifact): Promise<PhaseArtifact> {
@@ -424,11 +441,11 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       p_invocation_id: claim.invocation_id,
     });
 
-    if (error != null || data == null || data.length === 0) {
+    if (error != null || data == null) {
       throw new Error(`Failed to submit claim: ${error?.message ?? 'No result returned.'}`);
     }
 
-    const row = data[0] as JsonRecord;
+    const row = getSingleRpcRow(data, 'submit claim');
     return {
       id: String(row.claim_id),
       feature_id: String(row.feature_id),
@@ -504,11 +521,11 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       p_confidence: review.confidence,
     });
 
-    if (error != null || data == null || data.length === 0) {
+    if (error != null || data == null) {
       throw new Error(`Failed to record watcher review: ${error?.message ?? 'No result returned.'}`);
     }
 
-    const row = data[0] as JsonRecord;
+    const row = getSingleRpcRow(data, 'record watcher review');
     return {
       id: String(row.review_id),
       claim_id: String(row.claim_id),
@@ -717,7 +734,7 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       throw new Error(`Failed to start agent invocation: ${error?.message ?? 'No result returned.'}`);
     }
 
-    const row = (Array.isArray(data) ? data[0] : data) as JsonRecord;
+    const row = getSingleRpcRow(data, 'start agent invocation');
     return {
       id: String(row.id),
       feature_id: String(row.feature_id),
@@ -740,7 +757,7 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       throw new Error(`Failed to complete agent invocation: ${error?.message ?? 'No result returned.'}`);
     }
 
-    const row = (Array.isArray(data) ? data[0] : data) as JsonRecord;
+    const row = getSingleRpcRow(data, 'complete agent invocation');
     return {
       id: String(row.id),
       feature_id: String(row.feature_id),
@@ -766,11 +783,11 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       p_committed_by: commit.committed_by,
     });
 
-    if (error != null || data == null || data.length === 0) {
+    if (error != null || data == null) {
       throw new Error(`Failed to record commit: ${error?.message ?? 'No result returned.'}`);
     }
 
-    const row = data[0] as JsonRecord;
+    const row = getSingleRpcRow(data, 'record commit');
     return {
       feature_id: String(row.feature_id),
       commit_hash: String(row.commit_hash),
@@ -811,11 +828,11 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       p_merged_by: merged_by,
     });
 
-    if (error != null || data == null || data.length === 0) {
+    if (error != null || data == null) {
       throw new Error(`Failed to record merge: ${error?.message ?? 'No result returned.'}`);
     }
 
-    const row = data[0] as JsonRecord;
+    const row = getSingleRpcRow(data, 'record merge');
     return {
       feature_id,
       merged_at: String(row.merged_at ?? new Date().toISOString()),
