@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { ChevronDown, Clock, CheckCircle, XCircle, AlertTriangle, BookOpen, ListChecks, Eye, ClipboardList, Shield } from 'lucide-react';
 import { normalizeWorkflowAgentLabel } from '@/lib/agent-names';
 import { cn, formatMinutes, formatDuration, phaseName } from '@/lib/utils';
-import { getPhaseOutputArray } from '@/lib/phase-output-content';
+import { getPhaseOutputArray, getRequirementItems } from '@/lib/phase-output-content';
 import { Badge } from '@/components/ui/badge';
 import { GATE_COLORS, BLOCKER_SEVERITY_COLORS } from '@/lib/constants';
 import type {
@@ -22,7 +22,6 @@ import type {
   Blocker,
   PhaseTransition,
   PhaseOutput,
-  RequirementItem,
   PerspectiveItem,
   TaskItem,
 } from '@/lib/types/database';
@@ -339,14 +338,14 @@ export function PhaseTimelineEnhanced({
                 <div>
                   <h5 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
                     <ClipboardList className="h-3 w-3" />
-                    Requirements ({getPhaseOutputArray<RequirementItem>(output.content, ['functional_requirements', 'requirements']).length})
+                    Requirements ({getRequirementItems(output.content).length})
                   </h5>
                   <div className="space-y-1">
-                    {getPhaseOutputArray<RequirementItem>(output.content, ['functional_requirements', 'requirements']).map((req) => (
+                    {getRequirementItems(output.content).map((req) => (
                       <div key={req.id} className="flex items-center gap-2 text-xs">
                         <span className="font-mono text-muted-foreground/60 shrink-0 w-12">{req.id}</span>
-                        <span className="flex-1 truncate">{req.title}</span>
-                        <Badge variant="outline" className={`text-[9px] ${PRIORITY_COLORS[req.priority] ?? ''}`}>
+                        <span className="flex-1 min-w-0 truncate">{req.title}</span>
+                        <Badge variant="outline" className={`text-[9px] shrink-0 ${PRIORITY_COLORS[req.priority] ?? ''}`}>
                           {req.priority}
                         </Badge>
                       </div>
