@@ -1,17 +1,35 @@
 {
-  "name": "odin-runtime",
-  "version": "0.3.2-beta",
+  "name": "@plazmodium/odin",
+  "version": "0.3.3-beta",
   "description": "Odin MCP runtime server for the 11-phase workflow",
+  "homepage": "https://github.com/Plazmodium/odin-workflow/tree/dev/runtime",
+  "bugs": {
+    "url": "https://github.com/Plazmodium/odin-workflow/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Plazmodium/odin-workflow.git",
+    "directory": "runtime"
+  },
   "type": "module",
   "main": "./dist/server.js",
+  "files": [
+    "dist",
+    "migrations",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
+    "odin": "./dist/cli.js",
     "odin-runtime": "./dist/server.js",
     "odin-runtime-init": "./dist/init.js"
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "init:project": "node dist/init.js",
+    "init:project": "node dist/cli.js init",
     "start": "node dist/server.js",
     "clean": "rm -rf dist",
     "test": "npm run build && vitest run",
@@ -24,7 +42,7 @@
     "workflow",
     "runtime"
   ],
-  "author": "Odin Framework Contributors",
+  "author": "Gabor Racz",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.0",

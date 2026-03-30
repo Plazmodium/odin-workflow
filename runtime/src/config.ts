@@ -34,9 +34,12 @@ export interface RuntimeConfig {
     timeout_seconds?: number;
   };
   archive?: {
-    provider?: 'supabase';
+    provider?: 'supabase' | 'none';
   };
 }
+
+export const CONFIG_RESTART_NOTE =
+  'Changes to .env, .env.local, or .odin/config.yaml are only picked up when the Odin MCP server starts. Restart the MCP server after changing runtime config.';
 
 const DEFAULT_CONFIG: RuntimeConfig = {
   runtime: {
@@ -55,9 +58,18 @@ const DEFAULT_CONFIG: RuntimeConfig = {
     timeout_seconds: 120,
   },
   archive: {
-    provider: 'supabase',
+    provider: 'none',
   },
 };
+
+export interface RuntimeConfigSummary {
+  project_root: string;
+  runtime_mode: RuntimeConfig['runtime']['mode'];
+  workflow_state_backend: 'supabase' | 'in_memory';
+  archive_backend: 'supabase' | 'none';
+  review_provider: string;
+  skills_auto_detect: boolean;
+}
 
 function loadEnvFiles(project_root: string): void {
   const env_paths = [join(project_root, '.env.local'), join(project_root, '.env')];
@@ -146,4 +158,18 @@ export function loadRuntimeConfig(project_root: string): RuntimeConfig {
   const interpolated = interpolateEnv(parsed ?? {}) as Partial<RuntimeConfig>;
 
   return mergeConfig(mergeConfig(DEFAULT_CONFIG, env_defaults), interpolated);
+}
+
+export function summarizeRuntimeConfig(
+  project_root: string,
+  config: RuntimeConfig,
+): RuntimeConfigSummary {
+  return {
+    project_root,
+    runtime_mode: config.runtime.mode,
+    workflow_state_backend: config.runtime.mode === 'supabase' ? 'supabase' : 'in_memory',
+    archive_backend: config.archive?.provider ?? 'none',
+    review_provider: config.review?.provider ?? 'semgrep',
+    skills_auto_detect: config.skills?.auto_detect ?? true,
+  };
 }

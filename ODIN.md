@@ -767,9 +767,12 @@ Check the returned status for invocation coverage across phases 1-8 (before PR) 
 
 Odin state is managed through the **Odin MCP Runtime** (`odin` server) — a single-install TypeScript MCP server that provides all workflow tools (`odin.start_feature`, `odin.prepare_phase_context`, `odin.record_phase_artifact`, etc.).
 
-The runtime supports any PostgreSQL provider as its backend:
-- **Direct PostgreSQL** via `DATABASE_URL` (Neon, Railway, self-hosted, etc.)
-- **Supabase Management API** via `SUPABASE_URL` + `SUPABASE_ACCESS_TOKEN`
+Current runtime contract:
+- **Persistent workflow state** uses the Supabase workflow-state adapter when `runtime.mode: supabase`
+- **Smoke-test mode** uses `runtime.mode: in_memory` with no external services
+- **Database schema application** happens through `odin.apply_migrations`, which supports either:
+  - `DATABASE_URL` for direct PostgreSQL migrations
+  - `SUPABASE_URL` + `SUPABASE_ACCESS_TOKEN` for Supabase Management API migrations
 
 Database schema is applied via `odin.apply_migrations`, which auto-detects existing schemas and tracks applied migrations. See [runtime/README.md](runtime/README.md) for full configuration.
 
@@ -828,7 +831,7 @@ Keep only Context & Goals and Acceptance Criteria.
 | `filesystem` | Direct file access | Recommended |
 | `github` | Pull issues, PRs, tickets | Optional |
 
-The `odin` server is the Odin MCP Runtime. It provides all `odin.*` tools and manages workflow state via PostgreSQL (any provider). See [runtime/README.md](runtime/README.md) for setup.
+The `odin` server is the Odin MCP Runtime. It provides all `odin.*` tools, manages persistent workflow state through Supabase in `runtime.mode: supabase`, and supports migration-only direct PostgreSQL access through `odin.apply_migrations`. See [runtime/README.md](runtime/README.md) for setup.
 
 **Docker Gateway Toolkit:**
 
@@ -908,7 +911,7 @@ All workflow operations use `odin.*` tools provided by the Odin MCP Runtime.
 ```
 odin.apply_migrations({ dry_run: false })
 ```
-Applies pending database migrations. Auto-detects existing schemas on first run. Supports `DATABASE_URL` (any PostgreSQL provider) or Supabase Management API.
+Applies pending database migrations. Auto-detects existing schemas on first run. Supports `DATABASE_URL` (direct PostgreSQL) or Supabase Management API.
 
 ### Create a Feature
 

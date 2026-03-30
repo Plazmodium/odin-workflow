@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 
@@ -13,7 +15,8 @@ function createTmpDir(): string {
 }
 
 function runInit(args: string): string {
-  const initScript = join(__dirname, '..', 'dist', 'init.js');
+  const testDir = dirname(fileURLToPath(import.meta.url));
+  const initScript = join(testDir, '..', 'dist', 'init.js');
   return execSync(`node ${initScript} ${args}`, { encoding: 'utf8', timeout: 10000 });
 }
 
@@ -35,9 +38,14 @@ describe('odin-runtime-init', () => {
     expect(existsSync(join(tmpDir, '.odin', 'skills', '.gitkeep'))).toBe(true);
     expect(existsSync(join(tmpDir, '.env.example'))).toBe(true);
     expect(output).toContain('Odin runtime project bootstrap complete');
+    expect(output).toContain('runtime quick-start mode: in_memory');
     expect(output).toContain('odin.get_development_eval_status');
     expect(output).toContain('Canonical eval-aware orchestration snippet');
     expect(output).toContain('odin.record_eval_plan');
+
+    const config = readFileSync(join(tmpDir, '.odin', 'config.yaml'), 'utf8');
+    expect(config).toContain('mode: in_memory');
+    expect(config).toContain('provider: none');
   });
 
   it('does not overwrite existing config without --force', () => {
@@ -70,6 +78,7 @@ describe('odin-runtime-init', () => {
 
     const content = readFileSync(join(tmpDir, '.env.example'), 'utf8');
     expect(content).toContain('MY_VAR=hello');
+    expect(content).toContain('DATABASE_URL=');
     expect(content).toContain('SUPABASE_URL=');
     expect(content).toContain('SUPABASE_SECRET_KEY=');
   });
@@ -80,7 +89,8 @@ describe('odin-runtime-init', () => {
     expect(existsSync(join(tmpDir, '.mcp.json'))).toBe(true);
     const mcp = JSON.parse(readFileSync(join(tmpDir, '.mcp.json'), 'utf8'));
     expect(mcp.mcpServers.odin).toBeDefined();
-    expect(mcp.mcpServers.odin.command).toBe('node');
+    expect(mcp.mcpServers.odin.command).toBe('npx');
+    expect(mcp.mcpServers.odin.args).toEqual(['-y', '@plazmodium/odin', 'mcp']);
   });
 
   it('writes opencode.json with --tool opencode --write-mcp', () => {
@@ -91,8 +101,17 @@ describe('odin-runtime-init', () => {
     expect(config.$schema).toBe('https://opencode.ai/config.json');
     expect(config.mcp.odin).toBeDefined();
     expect(config.mcp.odin.type).toBe('local');
-    expect(config.mcp.odin.command[0]).toBe('node');
+    expect(config.mcp.odin.command[0]).toBe('npx');
+    expect(config.mcp.odin.command.slice(1)).toEqual(['-y', '@plazmodium/odin', 'mcp']);
     expect(config.mcp.odin.environment.ODIN_PROJECT_ROOT).toBe(tmpDir);
+  });
+
+  it('can emit source-checkout snippets for local development', () => {
+    runInit(`--project-root ${tmpDir} --tool amp --distribution source --write-mcp`);
+
+    const mcp = JSON.parse(readFileSync(join(tmpDir, '.mcp.json'), 'utf8'));
+    expect(mcp.mcpServers.odin.command).toBe('node');
+    expect(mcp.mcpServers.odin.args[0]).toContain('dist/server.js');
   });
 
   it('writes .codex/config.toml with --tool codex --write-mcp', () => {
@@ -105,9 +124,10 @@ describe('odin-runtime-init', () => {
 
   it('prints help with --help', () => {
     const output = runInit('--help');
-    expect(output).toContain('Usage: odin-runtime-init');
+    expect(output).toContain('Usage: odin init');
     expect(output).toContain('--project-root');
     expect(output).toContain('--tool');
+    expect(output).toContain('--distribution');
   });
 
   it('merges into existing .mcp.json without clobbering other servers', () => {

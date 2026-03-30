@@ -14,7 +14,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { RuntimeConfig } from '../config.js';
+import { CONFIG_RESTART_NOTE, type RuntimeConfig } from '../config.js';
 import type { ApplyMigrationsInput } from '../schemas.js';
 import type { SqlExecutor } from '../adapters/sql-executor/types.js';
 import { SupabaseManagementApiExecutor } from '../adapters/sql-executor/supabase-management-api.js';
@@ -31,7 +31,35 @@ interface MigrationResult {
 // Executor factory
 // ====================================================================
 
-function createSqlExecutor(config: RuntimeConfig): { executor?: SqlExecutor; error?: string } {
+function appendRestartNote(message: string): string {
+  return `${message}\n\n${CONFIG_RESTART_NOTE}`;
+}
+
+export function describeSupabaseManagementApiUrlIssue(supabase_url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(supabase_url);
+  } catch {
+    return `SUPABASE_URL is not a valid URL: ${supabase_url}. Use your project base URL (for example https://<ref>.supabase.co) or use DATABASE_URL for direct PostgreSQL migrations.`;
+  }
+
+  if (parsed.pathname.startsWith('/storage/')) {
+    return `SUPABASE_URL points to a Storage endpoint (${supabase_url}), not a project base URL. Use the project base URL instead (for example https://<ref>.supabase.co). If you are working against local Supabase or another local PostgreSQL instance, prefer DATABASE_URL for odin.apply_migrations.`;
+  }
+
+  if (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost') {
+    return `SUPABASE_URL points to a local Supabase endpoint (${supabase_url}). Odin does not use local Supabase URLs with the Supabase Management API path here. Use DATABASE_URL for direct PostgreSQL migrations instead.`;
+  }
+
+  const project_ref = SupabaseManagementApiExecutor.extractProjectRef(supabase_url);
+  if (project_ref == null) {
+    return `Cannot extract a Supabase project ref from SUPABASE_URL: ${supabase_url}. Expected a base project URL like https://<ref>.supabase.co. If you are not using hosted Supabase Management API access, use DATABASE_URL instead.`;
+  }
+
+  return null;
+}
+
+export function createSqlExecutor(config: RuntimeConfig): { executor?: SqlExecutor; error?: string } {
   const database_url = config.database?.url;
   if (database_url != null && database_url.length > 0) {
     return { executor: new DirectPostgresExecutor(database_url) };
@@ -41,21 +69,31 @@ function createSqlExecutor(config: RuntimeConfig): { executor?: SqlExecutor; err
   const access_token = config.supabase?.access_token;
 
   if (supabase_url != null && supabase_url.length > 0 && access_token != null && access_token.length > 0) {
+    const url_issue = describeSupabaseManagementApiUrlIssue(supabase_url);
+    if (url_issue != null) {
+      return {
+        error: appendRestartNote(url_issue),
+      };
+    }
+
     const project_ref = SupabaseManagementApiExecutor.extractProjectRef(supabase_url);
     if (project_ref == null) {
       return {
-        error: `Cannot extract project ref from SUPABASE_URL: ${supabase_url}. Expected format: https://<ref>.supabase.co`,
+        error: appendRestartNote(
+          `Cannot extract project ref from SUPABASE_URL: ${supabase_url}. Expected format: https://<ref>.supabase.co`,
+        ),
       };
     }
     return { executor: new SupabaseManagementApiExecutor(project_ref, access_token) };
   }
 
   return {
-    error:
+    error: appendRestartNote(
       'No database connection configured. Set one of:\n' +
-      '  • DATABASE_URL — direct PostgreSQL connection string (works with any provider)\n' +
+      '  • DATABASE_URL — direct PostgreSQL connection string (recommended for local PostgreSQL or local Supabase)\n' +
       '  • SUPABASE_URL + SUPABASE_ACCESS_TOKEN — Supabase Management API\n' +
       'Set in .env or .odin/config.yaml.',
+    ),
   };
 }
 
@@ -64,24 +102,17 @@ function createSqlExecutor(config: RuntimeConfig): { executor?: SqlExecutor; err
 // ====================================================================
 
 function findMigrationsDir(): string | null {
-  const project_root = process.env.ODIN_PROJECT_ROOT;
-  if (project_root != null) {
-    const project_migrations = join(project_root, 'migrations');
-    if (existsSync(project_migrations)) {
-      return project_migrations;
-    }
-  }
-
   const current_file = fileURLToPath(import.meta.url);
   const package_root = resolve(dirname(current_file), '..', '..');
-  const sibling_migrations = resolve(package_root, '..', 'migrations');
-  if (existsSync(sibling_migrations)) {
-    return sibling_migrations;
-  }
 
   const bundled_migrations = join(package_root, 'migrations');
   if (existsSync(bundled_migrations)) {
     return bundled_migrations;
+  }
+
+  const sibling_migrations = resolve(package_root, '..', 'migrations');
+  if (existsSync(sibling_migrations)) {
+    return sibling_migrations;
   }
 
   return null;
@@ -127,7 +158,8 @@ async function fetchAppliedNames(executor: SqlExecutor): Promise<{ names: Set<st
  * tracking table with migration names so they are not re-applied.
  *
  * Detection heuristic: if the `features` table exists, the core schema is
- * already in place. If `agent_claims` exists, the v2 schema is also present.
+ * already in place. If `agent_claims` exists, the current bundled v2 baseline
+ * (`005`-`008`) is also present.
  */
 async function bootstrapExistingSchema(
   executor: SqlExecutor,
@@ -149,7 +181,7 @@ async function bootstrapExistingSchema(
   const has_v2 = existing_tables.has('agent_claims');
 
   // Determine which migrations are already represented in the live schema.
-  // Core migrations: 001-004. V2 migrations: 005-008.
+  // Core migrations: 001-004. Current bundled v2 baseline: 005-008.
   const bootstrapped: string[] = [];
   for (const file of migration_files) {
     const prefix = parseInt(file.name.split('_')[0] ?? '', 10);
@@ -157,7 +189,7 @@ async function bootstrapExistingSchema(
 
     if (has_core && prefix <= 4) {
       bootstrapped.push(file.name);
-    } else if (has_v2 && prefix >= 5) {
+    } else if (has_v2 && prefix >= 5 && prefix <= 8) {
       bootstrapped.push(file.name);
     }
   }
@@ -197,7 +229,7 @@ export async function handleApplyMigrations(
   if (migrations_dir == null) {
     return createErrorResult(
       'No migrations directory found. Looked for: ' +
-        '${ODIN_PROJECT_ROOT}/migrations/, sibling migrations/ to runtime package, bundled migrations/.'
+        'bundled migrations/ in the Odin package, sibling migrations/ next to the runtime package.'
     );
   }
 

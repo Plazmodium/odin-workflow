@@ -1,6 +1,6 @@
 # Odin Schema Migrations
 
-These SQL migration files define the Odin database schema for Supabase. They are applied sequentially by the `odin.apply_migrations` tool using the Supabase Management API.
+These SQL migration files define the Odin database schema. They are applied sequentially by the `odin.apply_migrations` tool using either direct PostgreSQL (`DATABASE_URL`) or the Supabase Management API (`SUPABASE_URL` + `SUPABASE_ACCESS_TOKEN`).
 
 ## Usage
 
@@ -12,8 +12,11 @@ The `odin.apply_migrations` tool will:
 
 ## Requirements
 
-- `SUPABASE_URL` — Your Supabase project URL
-- `SUPABASE_ACCESS_TOKEN` — A Supabase Management API personal access token (from https://supabase.com/dashboard/account/tokens)
+Choose one connection path:
+
+- `DATABASE_URL` — direct PostgreSQL connection string; recommended for local PostgreSQL or local Supabase Postgres
+- `SUPABASE_URL` — your hosted Supabase project base URL (`https://<ref>.supabase.co`)
+- `SUPABASE_ACCESS_TOKEN` — Supabase Management API personal access token (from https://supabase.com/dashboard/account/tokens)
 
 ## File naming
 
