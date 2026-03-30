@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.3-beta] - 2026-03-30
+
+### Added
+- Public npm distribution for the Odin runtime as `@plazmodium/odin` with the `odin` CLI entrypoint for `odin mcp` and `odin init`.
+- Maintainer npm publishing guide plus manual MCP wiring examples for Claude Code, Amp, OpenCode, Codex, and Cursor.
+
+### Fixed
+- Runtime bootstrap now defaults to `runtime.mode: in_memory` with archive disabled so MCP smoke tests do not require Supabase credentials.
+- `odin.apply_migrations` now reports clearer errors for invalid or local `SUPABASE_URL` values and reminds users that runtime config changes require an MCP server restart.
+- Runtime dependency advisories resolved in the published lockfile (`yaml`, `picomatch`, `path-to-regexp`).
+
+### Changed
+- Runtime packaging now prefers the published `npx -y @plazmodium/odin ...` install path while keeping repo-checkout flow as the maintainer fallback.
+- Root `package.json`, runtime package metadata, runtime MCP server version, and README release badge updated to `0.3.3-beta`.
+- Runtime docs now clarify that the npm package ships the MCP runtime only; the dashboard remains part of the full `odin-workflow` repo.
+
 ## [0.3.2-beta] - 2026-03-24
 
 ### Fixed
