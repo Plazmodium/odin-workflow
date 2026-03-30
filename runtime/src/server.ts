@@ -19,7 +19,7 @@ import type { ReviewAdapter } from './adapters/review/types.js';
 import { InMemoryWorkflowStateAdapter } from './adapters/workflow-state/in-memory.js';
 import { SupabaseWorkflowStateAdapter } from './adapters/workflow-state/supabase.js';
 import type { WorkflowStateAdapter } from './adapters/workflow-state/types.js';
-import { loadRuntimeConfig } from './config.js';
+import { CONFIG_RESTART_NOTE, loadRuntimeConfig, summarizeRuntimeConfig } from './config.js';
 import {
   ApplyMigrationsInputSchema,
   ArchiveFeatureReleaseInputSchema,
@@ -74,6 +74,13 @@ import { safeToolHandler } from './utils.js';
 
 const project_root = process.env.ODIN_PROJECT_ROOT ?? process.cwd();
 const runtime_config = loadRuntimeConfig(project_root);
+const runtime_summary = summarizeRuntimeConfig(project_root, runtime_config);
+
+console.error(`[Odin Runtime] Project root: ${runtime_summary.project_root}`);
+console.error(`[Odin Runtime] Runtime mode: ${runtime_summary.runtime_mode}`);
+console.error(`[Odin Runtime] Review adapter: ${runtime_summary.review_provider}`);
+console.error(`[Odin Runtime] Skills auto-detect: ${runtime_summary.skills_auto_detect ? 'enabled' : 'disabled'}`);
+console.error(`[Odin Runtime] ${CONFIG_RESTART_NOTE}`);
 
 function createWorkflowStateAdapter(): WorkflowStateAdapter {
   const config = runtime_config;
@@ -83,7 +90,7 @@ function createWorkflowStateAdapter(): WorkflowStateAdapter {
       console.error(
         '[Odin Runtime] FATAL: runtime.mode is "supabase" but SUPABASE_URL and/or SUPABASE_SECRET_KEY are missing.\n' +
         '  → Set them in .env or .odin/config.yaml, or change runtime.mode to "in_memory".\n' +
-        '  → Run `odin-runtime-init` to generate config scaffolding.'
+        '  → Run `odin init` (or `odin-runtime-init`) to generate config scaffolding.'
       );
       process.exit(1);
     }
@@ -107,8 +114,16 @@ function createWorkflowStateAdapter(): WorkflowStateAdapter {
 const workflow_state = createWorkflowStateAdapter();
 
 function createArchiveAdapter(): ArchiveAdapter | null {
-  if (runtime_config.archive?.provider !== 'supabase') {
-    console.error('[Odin Runtime] Archive adapter: disabled (no archive provider configured)');
+  const provider = runtime_config.archive?.provider ?? 'none';
+  if (provider !== 'supabase') {
+    console.error('[Odin Runtime] Archive adapter: disabled (provider: none)');
+    return null;
+  }
+
+  if (!runtime_config.supabase?.url || !runtime_config.supabase?.secret_key) {
+    console.error(
+      '[Odin Runtime] Archive adapter: disabled (SUPABASE_URL and SUPABASE_SECRET_KEY are required when archive.provider is "supabase")'
+    );
     return null;
   }
 
@@ -147,7 +162,7 @@ const formal_verification_adapter = createFormalVerificationAdapter(project_root
 const server = new McpServer(
   {
     name: 'odin',
-    version: '0.3.2-beta',
+    version: '0.3.3-beta',
   },
   {
     capabilities: {

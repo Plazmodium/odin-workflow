@@ -6,8 +6,16 @@ A single-install MCP server that gives your AI coding agent an 11-phase developm
 
 ### 1. Install
 
+Preferred published-package flow:
+
 ```bash
-cd system/mcp-servers/odin-runtime
+npx -y @plazmodium/odin init --project-root /path/to/your/project --tool opencode --write-mcp
+```
+
+Maintainer repo-checkout flow:
+
+```bash
+cd runtime
 npm install
 npm run build
 ```
@@ -15,17 +23,13 @@ npm run build
 ### 2. Bootstrap your project
 
 ```bash
-# For Amp
-npm run init:project -- --project-root /path/to/your/project --tool amp --write-mcp
+# Published-package MCP command snippets
+npx -y @plazmodium/odin init --project-root /path/to/your/project --tool amp --write-mcp
+npx -y @plazmodium/odin init --project-root /path/to/your/project --tool opencode --write-mcp
 
-# For Claude Code
-npm run init:project -- --project-root /path/to/your/project --tool claude-code --write-mcp
-
-# For OpenCode
-npm run init:project -- --project-root /path/to/your/project --tool opencode --write-mcp
-
-# For Codex
-npm run init:project -- --project-root /path/to/your/project --tool codex --write-mcp
+# Source-checkout snippets while working on Odin from this repo
+npm run init:project -- --project-root /path/to/your/project --tool amp --distribution source --write-mcp
+npm run init:project -- --project-root /path/to/your/project --tool codex --distribution source --write-mcp
 ```
 
 This creates:
@@ -34,7 +38,65 @@ This creates:
 - `.env.example` — required environment variables (commit this)
 - Your harness config file (`opencode.json`, `.mcp.json`, or `.codex/config.toml`, depending on tool)
 
-Important: Odin bootstraps with `runtime.mode: supabase` by default. Before your harness can load the Odin MCP server, your project root must have a `.env` or `.env.local` file with `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (or those values must be set directly in `.odin/config.yaml`). If those values are missing, the Odin server exits at startup and your harness will show the MCP as failed/closed. If you are only testing MCP wiring first, change `.odin/config.yaml` to `runtime.mode: in_memory`.
+Important: Odin bootstraps with `runtime.mode: in_memory` by default so MCP wiring can work without external services. Switch `.odin/config.yaml` to `runtime.mode: supabase` when you are ready for persistent workflow state.
+
+If you are developing Odin from this repo, use the repo-checkout `--distribution source` flow shown above.
+
+If you are the maintainer preparing that publish, use [the npm publish guide](https://github.com/Plazmodium/odin-workflow/blob/dev/docs/guides/NPM-PUBLISH.md).
+
+### Manual MCP wiring
+
+If you do not want Odin to write your harness config for you, add the MCP server manually.
+
+For Claude Code / Amp:
+
+```json
+{
+  "mcpServers": {
+    "odin": {
+      "command": "npx",
+      "args": ["-y", "@plazmodium/odin", "mcp"],
+      "env": {
+        "ODIN_PROJECT_ROOT": "/absolute/path/to/your/project"
+      }
+    }
+  }
+}
+```
+
+For OpenCode:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "odin": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@plazmodium/odin",
+        "mcp"
+      ],
+      "enabled": true,
+      "environment": {
+        "ODIN_PROJECT_ROOT": "/absolute/path/to/your/project"
+      }
+    }
+  }
+}
+```
+
+For Codex:
+
+```toml
+[mcp_servers.odin]
+command = "npx"
+args = ["-y", "@plazmodium/odin", "mcp"]
+env = { ODIN_PROJECT_ROOT = "/absolute/path/to/your/project" }
+```
+
+For Cursor, use the same command, args, and env values in the MCP Servers settings UI.
 
 ### 3. Add your database credentials
 
@@ -45,21 +107,23 @@ cp .env.example .env
 
 Use the project root `.env` or `.env.local` file that lives next to `opencode.json` / `.mcp.json` / `.odin/`. Odin does not read env files from nested app directories.
 
-Odin supports two database connection methods:
+Runtime config is loaded once at server startup. If you change `.env`, `.env.local`, or `.odin/config.yaml`, restart the Odin MCP server before retrying tools.
 
-- **Direct PostgreSQL** (any provider — Neon, Railway, self-hosted, Supabase, etc.):
+Odin uses two database paths today:
+
+- **Direct PostgreSQL** (any provider — Neon, Railway, self-hosted, local Supabase Postgres, etc.) for `odin.apply_migrations`:
   ```env
   DATABASE_URL=postgresql://user:password@host:5432/dbname
   ```
 
-- **Supabase Management API** (Supabase-specific):
+- **Supabase runtime + management API** for full persistent Odin workflow state plus archival:
   ```env
   SUPABASE_URL=https://your-project.supabase.co
   SUPABASE_SECRET_KEY=your-secret-key
   SUPABASE_ACCESS_TOKEN=your-management-api-access-token
   ```
 
-`DATABASE_URL` takes priority if both are set.
+`DATABASE_URL` takes priority inside `odin.apply_migrations`. It does not replace Supabase-backed workflow state for the main runtime.
 
 ### 4. Start using Odin
 
@@ -92,6 +156,17 @@ Your AI agent now has these tools available:
 | `odin.explore_knowledge` | Explore knowledge clusters, cross-domain bridges, and domain stats |
 | `odin.apply_migrations` | Apply pending database migrations (auto-detects existing schema) |
 
+## Dashboard
+
+`@plazmodium/odin` ships the MCP runtime only. It does **not** bundle the Next.js dashboard.
+
+If you want the dashboard UI for feature health, learnings, claims, and eval visibility, use the full Odin repository:
+
+- Repo: https://github.com/Plazmodium/odin-workflow
+- Dashboard app: https://github.com/Plazmodium/odin-workflow/tree/dev/dashboard
+
+The dashboard is a separate app and is not included in the npm tarball.
+
 ## Configuration
 
 Odin uses two files:
@@ -100,10 +175,10 @@ Odin uses two files:
 
 ```yaml
 runtime:
-  mode: supabase        # or "in_memory" for local-only use
+  mode: in_memory       # quick-start mode; switch to "supabase" for persistent workflow state
 
 database:
-  url: ${DATABASE_URL}  # direct PostgreSQL (any provider)
+  url: ${DATABASE_URL}  # used by odin.apply_migrations for direct PostgreSQL
 
 supabase:
   url: ${SUPABASE_URL}
@@ -122,16 +197,16 @@ formal_verification:
   timeout_seconds: 120
 
 archive:
-  provider: supabase
+  provider: none
 ```
 
 **`.env`** (uncommitted) — secret values:
 
 ```env
-# Option A: Direct PostgreSQL (works with any provider)
+# Option A: Direct PostgreSQL for odin.apply_migrations
 DATABASE_URL=postgresql://user:password@host:5432/dbname
 
-# Option B: Supabase Management API
+# Option B: Supabase runtime + management API
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SECRET_KEY=your-secret-key
 SUPABASE_ACCESS_TOKEN=your-management-api-access-token
@@ -139,10 +214,10 @@ SUPABASE_ACCESS_TOKEN=your-management-api-access-token
 
 ### Runtime Modes
 
-- **`supabase`** (recommended) — Full workflow state backed by Supabase. Requires `SUPABASE_URL` and `SUPABASE_SECRET_KEY`. The runtime will fail fast with a clear error if credentials are missing. Provides all features including release archival via Supabase Storage.
-- **`in_memory`** — Local-only scaffold mode. No external dependencies. State is lost when the process exits. Useful for testing the runtime surface without a Supabase project.
+- **`supabase`** — Full persistent workflow state backed by Supabase. Requires `SUPABASE_URL` and `SUPABASE_SECRET_KEY`. Enable `archive.provider: supabase` when you want release archival too.
+- **`in_memory`** — Zero-dependency smoke-test mode. State is lost when the process exits. Useful for testing MCP wiring and prompt flow before provisioning Supabase.
 
-> **Note on `DATABASE_URL`**: Using direct PostgreSQL (Neon, Railway, etc.) provides full workflow state and migrations, but **release archival** (`odin.archive_feature_release`) requires Supabase Storage. If you use `DATABASE_URL` without Supabase credentials, the archive tool will return an error. All other tools work normally.
+> **Note on `DATABASE_URL`**: today it powers `odin.apply_migrations`, including local PostgreSQL or local Supabase Postgres access. The main Odin workflow runtime still uses the Supabase workflow-state adapter when `runtime.mode: supabase`.
 
 ## Optional: TLA+ Design Verification
 

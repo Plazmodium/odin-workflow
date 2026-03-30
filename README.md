@@ -88,10 +88,11 @@ In short: **Odin is a feature workflow system, not a sub-task swarm orchestrator
 ## Prerequisites
 
 - **Node.js 18+** and **npm**
-- **PostgreSQL database** — any provider: [Supabase](https://supabase.com) (recommended), [Neon](https://neon.tech), [Railway](https://railway.app), self-hosted, etc.
 - **AI coding assistant** with MCP support (Amp, Claude Code, Cursor, etc.)
+- **Supabase project** if you want persistent workflow state, archival, and the dashboard
+- **PostgreSQL database** only if you want to use direct `DATABASE_URL` for `odin.apply_migrations`
 
-> **Supabase recommended**: Provides full feature set including release archival (Supabase Storage) and the monitoring dashboard. Other PostgreSQL providers work for all workflow tools except `odin.archive_feature_release`.
+> **Runtime contract**: today the full persistent Odin runtime uses the Supabase workflow-state adapter. Direct PostgreSQL via `DATABASE_URL` currently powers `odin.apply_migrations`, including local PostgreSQL or local Supabase Postgres setups.
 
 ## Quick Start
 
@@ -104,41 +105,51 @@ cd odin-workflow
 
 ### 2. Install & bootstrap the Odin Runtime
 
+Preferred published-package flow:
+
+```bash
+npx -y @plazmodium/odin init --project-root /path/to/your/project --tool opencode --write-mcp
+```
+
+Maintainer repo-checkout flow:
+
 ```bash
 cd runtime
 npm install
 npm run build
 ```
 
-Run the bootstrap commands from `odin-workflow/runtime` (the script lives in `runtime/package.json`):
+Run the bootstrap commands from `odin-workflow/runtime`:
 
 ```bash
-# For Amp / Claude Code / OpenCode:
-npm run init:project -- --project-root /path/to/your/project --tool amp --write-mcp
+# For Amp / Claude Code / OpenCode from this repo checkout:
+npm run init:project -- --project-root /path/to/your/project --tool amp --distribution source --write-mcp
 
-# For Codex:
-npm run init:project -- --project-root /path/to/your/project --tool codex --write-mcp
+# For Codex from this repo checkout:
+npm run init:project -- --project-root /path/to/your/project --tool codex --distribution source --write-mcp
 ```
 
-If you prefer to run the bootstrap from inside your target project directory, call the built init CLI directly instead of `npm run`:
+If you prefer to run the bootstrap from inside your target project directory, call the built CLI directly:
 
 ```bash
 cd /path/to/your/project
-node /absolute/path/to/odin-workflow/runtime/dist/init.js --tool amp --write-mcp
+node /absolute/path/to/odin-workflow/runtime/dist/cli.js init --tool amp --distribution source --write-mcp
 ```
 
 This creates `.odin/config.yaml`, `.odin/skills/`, `.env.example`, and your harness config file. For OpenCode, that file is `opencode.json`. Secrets stay in `.env` — never in the MCP config.
 
-Important: Odin bootstraps with `runtime.mode: supabase` by default. Before your harness can load the Odin MCP server, your project root must have a `.env` or `.env.local` file with `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (or those values must be set directly in `.odin/config.yaml`). If those values are missing, the Odin server exits at startup and your harness will show the MCP as failed/closed. If you are only testing MCP wiring first, change `.odin/config.yaml` to `runtime.mode: in_memory`.
+Important: Odin now bootstraps with `runtime.mode: in_memory` by default so you can verify MCP wiring before provisioning external services. Switch `.odin/config.yaml` to `runtime.mode: supabase` when you are ready for persistent workflow state.
 
-For Claude Code / Amp, manually add this server entry:
+If you are developing Odin itself from this repo, use the repo-checkout `--distribution source` flow shown above.
+
+For Claude Code / Amp, use:
 
 ```json
 {
   "mcpServers": {
     "odin": {
-      "command": "node",
-      "args": ["/absolute/path/to/runtime/dist/server.js"],
+      "command": "npx",
+      "args": ["-y", "@plazmodium/odin", "mcp"],
       "env": {
         "ODIN_PROJECT_ROOT": "/absolute/path/to/your/project"
       }
@@ -147,7 +158,46 @@ For Claude Code / Amp, manually add this server entry:
 }
 ```
 
-For OpenCode, add this to `opencode.json` in your project root:
+For Claude Code / Amp from a repo checkout today, use:
+
+```json
+{
+  "mcpServers": {
+    "odin": {
+      "command": "node",
+      "args": ["/absolute/path/to/odin-workflow/runtime/dist/server.js"],
+      "env": {
+        "ODIN_PROJECT_ROOT": "/absolute/path/to/your/project"
+      }
+    }
+  }
+}
+```
+
+For OpenCode, use:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "odin": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@plazmodium/odin",
+        "mcp"
+      ],
+      "enabled": true,
+      "environment": {
+        "ODIN_PROJECT_ROOT": "/absolute/path/to/your/project"
+      }
+    }
+  }
+}
+```
+
+For OpenCode from a repo checkout today, use:
 
 ```json
 {
@@ -157,7 +207,7 @@ For OpenCode, add this to `opencode.json` in your project root:
       "type": "local",
       "command": [
         "node",
-        "/absolute/path/to/runtime/dist/server.js"
+        "/absolute/path/to/odin-workflow/runtime/dist/server.js"
       ],
       "enabled": true,
       "environment": {
@@ -178,6 +228,8 @@ For OpenCode, add this to `opencode.json` in your project root:
 
 See [runtime/README.md](runtime/README.md) for full configuration, available tools, and adapter architecture.
 
+Maintainers preparing the npm release should use [docs/guides/NPM-PUBLISH.md](docs/guides/NPM-PUBLISH.md).
+
 ### 3. Add your database credentials
 
 ```bash
@@ -187,21 +239,23 @@ cp .env.example .env
 
 Use the project root `.env` or `.env.local` file that lives next to your MCP config and `.odin/`. Odin does not read env files from nested app directories.
 
+Runtime config is loaded once at server startup. If you change `.env`, `.env.local`, or `.odin/config.yaml`, restart the Odin MCP server before retrying tools.
+
 Choose one:
 
-- **Direct PostgreSQL** (any provider):
+- **Direct PostgreSQL** for `odin.apply_migrations` (any provider, including local PostgreSQL):
   ```env
   DATABASE_URL=postgresql://user:password@host:5432/dbname
   ```
 
-- **Supabase** (recommended — enables all features including archival):
+- **Supabase** for full persistent runtime state plus archival:
   ```env
   SUPABASE_URL=https://your-project.supabase.co
   SUPABASE_SECRET_KEY=your-secret-key
   SUPABASE_ACCESS_TOKEN=your-management-api-access-token
   ```
 
-`DATABASE_URL` takes priority if both are set. For Supabase, generate the access token at [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens).
+`DATABASE_URL` takes priority inside `odin.apply_migrations`. It does not replace the Supabase workflow-state adapter for the main Odin runtime. For Supabase, generate the access token at [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens).
 
 ### Optional: Enable TLA+ design verification
 
