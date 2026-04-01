@@ -61,6 +61,8 @@ export const ARTIFACT_OUTPUT_TYPES = [
 ] as const;
 
 export const DEVELOPMENT_EVAL_MODES = ['l1_minimal', 'plan_required'] as const;
+export const SKILL_PROPOSAL_STATUSES = ['CANDIDATE', 'DRAFT_READY'] as const;
+export const SKILL_PROPOSAL_REVIEW_STATUSES = ['DRAFT', 'APPROVED', 'REJECTED', 'PUBLISHED'] as const;
 
 export type PhaseId = (typeof PHASE_IDS)[number];
 export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
@@ -75,6 +77,8 @@ export type QualityGateStatus = (typeof QUALITY_GATE_STATUSES)[number];
 export type LearningCategory = (typeof LEARNING_CATEGORIES)[number];
 export type ArtifactOutputType = (typeof ARTIFACT_OUTPUT_TYPES)[number];
 export type DevelopmentEvalMode = (typeof DEVELOPMENT_EVAL_MODES)[number];
+export type SkillProposalStatus = (typeof SKILL_PROPOSAL_STATUSES)[number];
+export type SkillProposalReviewStatus = (typeof SKILL_PROPOSAL_REVIEW_STATUSES)[number];
 
 export type PersistedTargetType = 'skill' | 'agent_definition' | 'agents_md';
 
@@ -312,6 +316,42 @@ export interface RelatedLearningRecord {
   shared_domain_count: number;
 }
 
+export interface SkillProposalCandidate {
+  topic_key: string;
+  display_name: string;
+  status: SkillProposalStatus;
+  evidence_count: number;
+  feature_count: number;
+  sample_tags: string[];
+  latest_learning_at: string;
+  recent_examples: Array<{
+    learning_id: string;
+    title: string;
+    feature_id: string;
+    created_at: string;
+  }>;
+}
+
+export interface SkillProposalRecord {
+  topic_key: string;
+  display_name: string;
+  status: SkillProposalReviewStatus;
+  skill_name: string;
+  skill_category: string;
+  draft_markdown: string;
+  validation_errors: string[];
+  validation_warnings: string[];
+  published_path: string | null;
+  decision_notes: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  published_by: string | null;
+  published_at: string | null;
+}
+
 export interface AgentInvocationRecord {
   id: string;
   feature_id: string;
@@ -354,6 +394,9 @@ export interface PhaseAgentInstructions {
   name: string;
   role_summary: string;
   constraints: string[];
+  definition_markdown?: string | null;
+  definition_source?: 'built_in' | 'none';
+  definition_source_path?: string | null;
 }
 
 export interface PhaseContextBundle {

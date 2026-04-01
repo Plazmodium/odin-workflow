@@ -1,6 +1,6 @@
-# Multi-Agent SDD Workflow: Complete Example
+# Legacy Multi-Agent SDD Workflow Example
 
-This document demonstrates a complete feature implementation using the three-agent system (Architect → Guardian → Builder), with practical usage instructions for AI coding assistants (e.g., **Claude Code**, **OpenCode**, **Cursor**, **Codex**).
+> **Legacy note**: This document describes an older pre-v2 Architect → Guardian → Builder flow. It is kept for historical reference only and is **not** the current Odin workflow. For the active workflow, use `ODIN.md` and `agents/definitions/`.
 
 ---
 

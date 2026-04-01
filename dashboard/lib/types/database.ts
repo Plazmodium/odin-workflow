@@ -480,6 +480,8 @@ export interface LearningChainSummary {
 
 export type PropagationTargetType = 'agents_md' | 'skill' | 'agent_definition';
 export type PropagationStatusLabel = 'no_targets' | 'pending' | 'partial' | 'complete';
+export type SkillProposalCandidateStatus = 'CANDIDATE' | 'DRAFT_READY';
+export type SkillProposalStatus = 'DRAFT' | 'APPROVED' | 'REJECTED' | 'PUBLISHED';
 
 export interface SkillPropagationItem {
   learning_id: string;
@@ -518,6 +520,44 @@ export interface LearningPropagationOverview {
   propagated_count: number;
   pending_count: number;
   propagation_status: PropagationStatusLabel;
+}
+
+export interface SkillProposalCandidateEvidence {
+  learning_id: string;
+  feature_id: string;
+  title: string;
+  learning_created_at: string;
+}
+
+export interface SkillProposalCandidateRecord {
+  topic_key: string;
+  display_name: string;
+  status: SkillProposalCandidateStatus;
+  evidence_count: number;
+  feature_count: number;
+  sample_tags: string[];
+  latest_learning_at: string;
+  recent_examples: SkillProposalCandidateEvidence[];
+}
+
+export interface SkillProposalRecord {
+  topic_key: string;
+  display_name: string;
+  status: SkillProposalStatus;
+  skill_name: string;
+  skill_category: string;
+  draft_markdown: string;
+  validation_errors: string[];
+  validation_warnings: string[];
+  published_path: string | null;
+  decision_notes: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  published_by: string | null;
+  published_at: string | null;
 }
 
 // ============================================================

@@ -21,3 +21,9 @@ Choose one connection path:
 ## File naming
 
 Files are named `NNN_description.sql` and applied in lexicographic order.
+
+Latest additive bundled migrations include:
+
+- `008_related_learnings.sql`
+- `009_skill_proposal_candidates.sql`
+- `010_skill_proposals.sql`

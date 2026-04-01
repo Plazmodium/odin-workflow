@@ -5,6 +5,7 @@
 
 import type { SkillAdapter } from '../adapters/skills/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import { loadBuiltInAgentDefinition } from '../builtin-assets.js';
 import { resolveWorkflowActorName } from '../domain/actors.js';
 import { appendDevelopmentEvalChecks, buildDevelopmentEvalContext } from '../domain/development-evals.js';
 import { getPhaseAgentInstructions, getPhaseContract, isWatchedPhase } from '../domain/phases.js';
@@ -71,6 +72,7 @@ export async function handlePreparePhaseContext(
   const open_gates = open_gate_records.map(formatOpenGateSummary);
   const phase = getPhaseContract(input.phase);
   const agent = getPhaseAgentInstructions(input.phase);
+  const agent_definition = loadBuiltInAgentDefinition(input.phase);
   const actor_name = resolveWorkflowActorName(input.phase, input.agent_name ?? agent.name);
   const development_evals = buildDevelopmentEvalContext(feature, input.phase, all_artifacts, open_gate_records);
   const watcher_constraints =
@@ -103,6 +105,9 @@ export async function handlePreparePhaseContext(
       ...agent,
       name: actor_name,
       constraints: [...new Set([...agent.constraints, ...development_evals.harness_prompt_block, ...watcher_constraints])],
+      definition_markdown: agent_definition?.markdown ?? null,
+      definition_source: agent_definition == null ? 'none' : 'built_in',
+      definition_source_path: agent_definition?.source_path ?? null,
     },
     invocation:
       invocation == null

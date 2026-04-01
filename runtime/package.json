@@ -1,6 +1,6 @@
 {
   "name": "@plazmodium/odin",
-  "version": "0.3.3-beta",
+  "version": "0.3.5-beta",
   "description": "Odin MCP runtime server for the 11-phase workflow",
   "homepage": "https://github.com/Plazmodium/odin-workflow/tree/dev/runtime",
   "bugs": {
@@ -15,6 +15,7 @@
   "main": "./dist/server.js",
   "files": [
     "dist",
+    "builtin",
     "migrations",
     "README.md"
   ],
@@ -27,11 +28,12 @@
     "odin-runtime-init": "./dist/init.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-builtin-assets.mjs",
     "dev": "tsc --watch",
     "init:project": "node dist/cli.js init",
+    "prepack": "npm run build",
     "start": "node dist/server.js",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist builtin",
     "test": "npm run build && vitest run",
     "type-check": "tsc --noEmit"
   },

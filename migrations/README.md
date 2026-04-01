@@ -27,6 +27,15 @@ Run these migrations in order on a fresh Supabase project:
 
 -- 7. Odin v2 phase alignment
 \i 007_odin_v2_phase_alignment.sql
+
+-- 8. Related learnings retrieval
+\i 008_related_learnings.sql
+
+-- 9. Skill proposal candidate storage
+\i 009_skill_proposal_candidates.sql
+
+-- 10. Skill proposal workflow
+\i 010_skill_proposals.sql
 ```
 
 Or via Supabase MCP:
@@ -47,6 +56,9 @@ Or via Supabase MCP:
 | `005_odin_v2_schema.sql` | v2 schema extensions | Product/Reviewer-ready phase enum, watcher/security tables |
 | `006_odin_v2_functions.sql` | v2 verification functions | Claims, policy engine, watcher review, security helpers |
 | `007_odin_v2_phase_alignment.sql` | v2 phase remap | Historical phase remap + v2 phase-numbering overrides |
+| `008_related_learnings.sql` | related learnings | Cross-feature learning retrieval by shared propagation target |
+| `009_skill_proposal_candidates.sql` | skill proposal pipeline foundation | Relational storage for deterministic generated-skill candidates |
+| `010_skill_proposals.sql` | skill proposal workflow | Draft/approval/publish state for governed generated-skill proposals |
 
 ## Schema Summary
 
@@ -135,6 +147,8 @@ These migrations extend Odin for v2 features. **Run AFTER the base migrations (0
 | `005_odin_v2_schema.sql` | New enums, tables for 11-phase workflow, watchers, security findings |
 | `006_odin_v2_functions.sql` | Functions for claims, policy engine, watcher reviews, security findings |
 | `007_odin_v2_phase_alignment.sql` | Remaps persisted phase values and overrides core workflow functions to use v2 numbering |
+| `009_skill_proposal_candidates.sql` | Relational storage for deterministic skill proposal candidates and recent evidence rows |
+| `010_skill_proposals.sql` | Draft/approval/publish state for governed generated-skill proposals |
 | `008_related_learnings.sql` | `get_related_learnings()` function for cross-feature knowledge retrieval via shared propagation targets (Memory Palace Wave 2) |
 
 ### v2 Features
@@ -210,5 +224,5 @@ Or via Supabase MCP:
 
 - **Schema Version**: 2.0.0
 - **Created**: 2026-02-16
-- **Last Updated**: 2026-03-17 (Memory Palace Wave 2 — related learnings function)
+- **Last Updated**: 2026-03-31 (Skill proposal workflow foundation)
 - **Consolidated from**: Migrations 001-028

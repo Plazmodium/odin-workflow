@@ -34,6 +34,8 @@ npm run init:project -- --project-root /path/to/your/project --tool codex --dist
 
 This creates:
 - `.odin/config.yaml` — runtime configuration (commit this)
+- `.odin/ODIN.md` — bundled Odin framework guide for the harness to read locally
+- `.odin/agents/definitions/` — bundled phase agent definitions and shared context
 - `.odin/skills/` — project-local skill overrides (commit this)
 - `.env.example` — required environment variables (commit this)
 - Your harness config file (`opencode.json`, `.mcp.json`, or `.codex/config.toml`, depending on tool)
@@ -148,6 +150,12 @@ Your AI agent now has these tools available:
 | `odin.run_policy_checks` | Run deterministic policy checks for submitted claims |
 | `odin.verify_design` | Run formal design verification (TLA+ model checking) on a `.machine.ts` DSL file |
 | `odin.capture_learning` | Capture a reusable learning with semantic domain matching |
+| `odin.get_skill_proposal_queue` | Inspect repeated unresolved learning topics that may warrant a generated skill draft |
+| `odin.get_skill_proposals` | List drafted, approved, rejected, or published skill proposal records |
+| `odin.record_skill_proposal_draft` | Persist a drafted generated-skill proposal and run deterministic validation |
+| `odin.record_skill_proposal_decision` | Approve or reject a drafted skill proposal |
+| `odin.publish_skill_proposal` | Publish an approved skill proposal into `.odin/skills/generated/` |
+| `odin.sync_skill_proposal_candidates` | Persist the current deterministic proposal queue for later review/approval workflows |
 | `odin.get_feature_status` | Inspect feature state with workflow details |
 | `odin.verify_claims` | Check claim verification status |
 | `odin.get_claims_needing_review` | List claims waiting for watcher review |
@@ -273,8 +281,10 @@ Recommended harness behavior:
 ```text
 1. Call odin.prepare_phase_context(...)
 2. Build the agent prompt from:
+   - .odin/ODIN.md (framework-level rules)
    - context.agent.role_summary
    - context.agent.constraints
+   - context.agent.definition_markdown
    - context.development_evals.harness_prompt_block
 3. Keep context.development_evals.status_summary visible to the operator
 4. Do not treat eval instructions as a replacement for formal verification, Semgrep, tests, runtime checks, or watcher checks
@@ -284,14 +294,16 @@ Canonical eval-aware orchestration snippet:
 
 ```text
 When orchestrating Odin phases:
-1. Call odin.prepare_phase_context({ feature_id, phase, agent_name }).
-2. Build the active agent prompt from:
+1. Read `.odin/ODIN.md` once so the harness has the framework-level rules in project context.
+2. Call odin.prepare_phase_context({ feature_id, phase, agent_name }).
+3. Build the active agent prompt from:
    - context.agent.role_summary
    - context.agent.constraints
+   - context.agent.definition_markdown
    - context.development_evals.harness_prompt_block
-3. Use odin.get_development_eval_status({ feature_id }) when you need focused eval state.
-4. Record eval artifacts/gates with odin.record_eval_plan, odin.record_eval_run, and odin.record_quality_gate.
-5. Never let Development Evals override odin.verify_design, odin.run_review_checks, tests, runtime verification, or watcher checks.
+4. Use odin.get_development_eval_status({ feature_id }) when you need focused eval state.
+5. Record eval artifacts/gates with odin.record_eval_plan, odin.record_eval_run, and odin.record_quality_gate.
+6. Never let Development Evals override odin.verify_design, odin.run_review_checks, tests, runtime verification, or watcher checks.
 ```
 
 If the harness wants a focused eval-only read path instead of parsing `odin.get_feature_status`, call:
@@ -327,6 +339,9 @@ Odin's learning system uses **semantic domain matching** to automatically route 
 3. **Auto-targeting**: Matches passing both gates (≥ 1 strong keyword hit AND ≥ 0.60 relevance) are auto-declared as propagation targets. Weaker matches are returned as suggestions
 4. **Cross-feature corridors**: `odin.prepare_phase_context` retrieves related learnings from other features that share propagation targets, with tag intersection fallback
 5. **Resonance ranking**: Related learnings are ranked by domain density, corroboration (same-category learnings from different features), and recency — never modifying `confidence_score`
+6. **Proposal surfacing**: Repeated unresolved tags can be inspected via `odin.get_skill_proposal_queue` to identify candidate topics for governed skill drafting
+7. **Proposal persistence**: `odin.sync_skill_proposal_candidates` snapshots the current candidate queue into workflow state so later approval/draft flows and dashboard surfaces can build on stable relational state
+8. **Governed skill workflow**: draft generation, approval, and publish happen through `odin.record_skill_proposal_draft`, `odin.record_skill_proposal_decision`, and `odin.publish_skill_proposal` rather than automatic built-in self-modification
 
 ### Exploration
 

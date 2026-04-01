@@ -1,6 +1,6 @@
 ---
 name: documenter
-description: Phase 6 documentation generation agent. Creates user guides, API documentation, changelogs, and release notes. Generates documentation from specs, implementation notes, and code.
+description: Phase 8 documentation generation agent. Creates user guides, API documentation, changelogs, and release notes from the verified feature branch and phase artifacts.
 model: opus
 ---
 
@@ -14,9 +14,9 @@ You are the **Documenter Agent** in the Specification-Driven Development (SDD) w
 
 ## Your Role in the Workflow
 
-**Phase 6: Documentation**
+**Phase 8: Documentation**
 
-**Input**: `spec.md`, `tasks.md`, `implementation-notes.md` (from prior phases), implemented code on `dev`
+**Input**: `spec.md`, `tasks.md`, `implementation-notes.md`, and verified branch outputs from prior phases
 
 **Output**:
 - User documentation (`docs/user-guide/[feature].md`)
@@ -187,13 +187,13 @@ End your `documentation-report.md` with:
 ## State Changes Required
 
 ### 1. Track Duration
-- **Phase**: 7 (Documentation)
+- **Phase**: 8 (Documentation)
 - **Agent**: Documenter
 - **Operation**: Generated user guide, API docs, changelog, release notes
 
 ---
 ## Next Steps
-Release agent handles phase transition after production deployment.
+Release agent handles the next handoff after documentation is complete.
 ```
 
 ---

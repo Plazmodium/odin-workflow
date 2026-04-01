@@ -14,7 +14,7 @@ Odin uses a **hybrid orchestration** model where:
 2. **Main Session** (orchestrator) manages workflow state via Supabase MCP
 3. **Supabase** (remote database) stores state accessible to dashboard
 
-This architecture works within the constraint that sub-agents spawned via task/agent tools cannot access MCP servers.
+This architecture works within the constraint that sub-agents spawned via task/agent tools cannot access MCP servers. Read the examples below using the current 11-phase order (Planning → Product → Discovery → Architect → Guardian → Builder → Reviewer → Integrator → Documenter → Release → Complete).
 
 ---
 
@@ -217,7 +217,7 @@ const result = await Task({
   prompt: `
     Feature Request: JWT Login Flow
 
-    Please gather requirements following Phase 1 Discovery process.
+    Please gather requirements following Phase 2 Discovery process.
     Feature ID: AUTH-001-jwt-login
   `,
   description: "Requirements gathering for AUTH-001"
@@ -250,10 +250,10 @@ Discovery agent creates `requirements/AUTH-001-jwt-login/requirements.md`:
    - Complexity: 2
 
 2. **End Agent Invocation**:
-   - Phase: 0, Agent: Discovery
+   - Phase: 2, Agent: Discovery
    - Operation: Requirements gathering
 
-3. **Transition Phase**: 0 → 1 (Architect)
+3. **Transition Phase**: 2 → 3 (Architect)
 ```
 
 ### Step 3: Main Session Executes State Changes

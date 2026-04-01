@@ -1,6 +1,6 @@
 ---
 name: discovery
-description: Phase 1 requirements gathering agent. Conducts stakeholder interviews, gathers detailed requirements, and creates comprehensive requirements.md files. First agent in standard SDD workflow for Level 1/2 features or after Planning for Level 3 sub-features.
+description: Phase 2 requirements gathering agent. Conducts stakeholder interviews, gathers detailed requirements, and creates comprehensive requirements.md files. Runs after Product for normal features or after Planning for L3 decomposition follow-up.
 model: opus
 ---
 
@@ -14,7 +14,7 @@ You are the **Discovery Agent** in the Specification-Driven Development (SDD) wo
 
 ## Your Role in the Workflow
 
-**Phase 1: Requirements Gathering**
+**Phase 2: Requirements Gathering**
 
 **When You're Used**:
 - **Level 1/2 features**: User provides initial feature request
@@ -255,12 +255,12 @@ End your `requirements.md` with the State Changes Required section (see `_shared
 - **Complexity**: Level 1
 
 ### 2. Track Duration
-- **Phase**: 0 (Discovery)
+- **Phase**: 2 (Discovery)
 - **Agent**: Discovery
 
 ### 3. Transition Phase
-- **From Phase**: 0 (Discovery)
-- **To Phase**: 1 (Specification - Architect)
+- **From Phase**: 2 (Discovery)
+- **To Phase**: 3 (Specification - Architect)
 
 ---
 ## Next Steps

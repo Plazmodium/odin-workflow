@@ -14,7 +14,7 @@
 
 | Aspect | v1.0 (Proposed) | v2.0 (Implemented) |
 |--------|-----------------|-------------------|
-| Agent Count | 3 (Architect, Guardian, Builder) | 8 (Discovery, Planning, Architect, Guardian, Builder, Integrator, Documenter, Release) |
+| Agent Count | 3 (Architect, Guardian, Builder) | 11-phase workflow with 11 specialist workflow/support agents |
 | MCP Access | All agents have MCP | Only orchestrator has MCP (Hybrid Orchestration) |
 | State Management | Local files | Supabase (PostgreSQL + Storage) |
 | Memory | None | Persistent memories table with user consent |
@@ -67,7 +67,7 @@ See `agents/definitions/` for complete agent definitions.
 
 1. [Overview](#overview)
 2. [The Problem with Single-Agent Workflows](#the-problem-with-single-agent-workflows)
-3. [The Three-Agent Architecture](#the-three-agent-architecture)
+3. [Historical Three-Agent Architecture](#the-historical-three-agent-architecture)
 4. [Agent Definitions & Responsibilities](#agent-definitions--responsibilities)
 5. [Workflow Patterns](#workflow-patterns)
 6. [Context Window Optimization](#context-window-optimization)
@@ -137,7 +137,7 @@ TOTAL: 60,000+ tokens for a single feature
 
 ---
 
-## The Three-Agent Architecture
+## Historical Three-Agent Architecture
 
 ### Visual Overview
 
@@ -178,7 +178,7 @@ TOTAL: 60,000+ tokens for a single feature
 │  │ Inputs:                                             │     │
 │  │ • specs/[ID]-feature-name/spec.md                  │     │
 │  │ • specs/[ID]-feature-name/tasks.md                 │     │
-│  │ • Full codebase access (MCP-enabled)               │     │
+│  │ • Full codebase context via orchestrator-provided reads │ │
 │  │ • Database schemas                                  │     │
 │  └────────────────────────────────────────────────────┘     │
 │  ┌────────────────────────────────────────────────────┐     │

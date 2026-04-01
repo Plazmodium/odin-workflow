@@ -13,6 +13,8 @@ import {
   PHASE_OUTCOMES,
   RISK_LEVELS,
   REVIEW_TOOLS,
+  SKILL_PROPOSAL_STATUSES,
+  SKILL_PROPOSAL_REVIEW_STATUSES,
   WATCHER_REVIEW_VERDICTS,
 } from './types.js';
 
@@ -110,6 +112,41 @@ export const GetFeatureStatusInputSchema = z.object({
 
 export const GetDevelopmentEvalStatusInputSchema = z.object({
   feature_id: z.string().min(1),
+});
+
+export const GetSkillProposalQueueInputSchema = z.object({
+  statuses: z.array(z.enum(SKILL_PROPOSAL_STATUSES)).default(['DRAFT_READY', 'CANDIDATE']),
+  limit: z.int().positive().max(100).default(20),
+});
+
+export const SyncSkillProposalCandidatesInputSchema = z.object({});
+
+export const RecordSkillProposalDraftInputSchema = z.object({
+  topic_key: z.string().min(1),
+  draft_markdown: z.string().min(1),
+  drafted_by: z.string().min(1),
+});
+
+export const GetSkillProposalsInputSchema = z.object({
+  statuses: z.array(z.enum(SKILL_PROPOSAL_REVIEW_STATUSES)).default([
+    'DRAFT',
+    'APPROVED',
+    'REJECTED',
+    'PUBLISHED',
+  ]),
+  limit: z.int().positive().max(100).default(20),
+});
+
+export const RecordSkillProposalDecisionInputSchema = z.object({
+  topic_key: z.string().min(1),
+  status: z.union([z.literal('APPROVED'), z.literal('REJECTED')]),
+  decided_by: z.string().min(1),
+  notes: z.string().optional(),
+});
+
+export const PublishSkillProposalInputSchema = z.object({
+  topic_key: z.string().min(1),
+  published_by: z.string().min(1),
 });
 
 export const VerifyClaimsInputSchema = z.object({
@@ -229,6 +266,12 @@ export type RecordEvalRunInput = z.infer<typeof RecordEvalRunInputSchema>;
 export type GetNextPhaseInput = z.infer<typeof GetNextPhaseInputSchema>;
 export type GetFeatureStatusInput = z.infer<typeof GetFeatureStatusInputSchema>;
 export type GetDevelopmentEvalStatusInput = z.infer<typeof GetDevelopmentEvalStatusInputSchema>;
+export type GetSkillProposalQueueInput = z.infer<typeof GetSkillProposalQueueInputSchema>;
+export type SyncSkillProposalCandidatesInput = z.infer<typeof SyncSkillProposalCandidatesInputSchema>;
+export type RecordSkillProposalDraftInput = z.infer<typeof RecordSkillProposalDraftInputSchema>;
+export type GetSkillProposalsInput = z.infer<typeof GetSkillProposalsInputSchema>;
+export type RecordSkillProposalDecisionInput = z.infer<typeof RecordSkillProposalDecisionInputSchema>;
+export type PublishSkillProposalInput = z.infer<typeof PublishSkillProposalInputSchema>;
 export type VerifyClaimsInput = z.infer<typeof VerifyClaimsInputSchema>;
 export type SubmitClaimInput = z.infer<typeof SubmitClaimInputSchema>;
 export type RunPolicyChecksInput = z.infer<typeof RunPolicyChecksInputSchema>;

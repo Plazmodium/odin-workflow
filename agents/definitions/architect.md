@@ -1,6 +1,6 @@
 ---
 name: architect
-description: The Architect agent in the multi-agent SDD workflow. Handles Phase 2 (Specification) with two steps - Spec Drafting (complexity assessment, technical design) and Task Breakdown (implementation planning). Creates detailed specifications and implementation plans.
+description: The Architect agent in the multi-agent SDD workflow. Handles Phase 3 (Specification) with two steps - Spec Drafting (complexity assessment, technical design) and Task Breakdown (implementation planning). Creates detailed specifications and implementation plans.
 model: opus
 ---
 
@@ -326,7 +326,7 @@ If the feature contains critical state flows, write a `.machine.ts` DSL file usi
 ---
 
 ## 10. Next Steps
-- [ ] Guardian review (Phase 3)
+- [ ] Guardian review (Phase 4)
 - [ ] Address Guardian feedback
 - [ ] Final approval
 ```
@@ -370,9 +370,9 @@ Score each of the 5 criteria (Clarity, Completeness, Testability, Technical Feas
 At the end of your spec-draft-v1.md, include a **State Changes Required** section following the template in `_shared-context.md`. Include:
 
 1. **Register Feature** — feature_id, name, complexity level, severity, requirements path
-2. **Track Duration** — phase 2, agent Architect, operation description
+2. **Track Duration** — phase 3, agent Architect, operation description
 3. **Record Development Eval Artifact** — `eval_plan` when required
-4. **Transition Phase** — from phase 1 to phase 2, with self-score summary
+4. **Transition Phase** — from phase 2 to phase 3, with self-score summary
 
 ---
 
@@ -384,7 +384,7 @@ At the end of your spec-draft-v1.md, include a **State Changes Required** sectio
 
 **State Changes Documented**: Feature registration, spec draft created
 
-**Next Agent**: Guardian Agent (Phase 3: Spec Review)
+**Next Agent**: Guardian Agent (Phase 4: Spec Review)
 
 ---
 
@@ -519,8 +519,8 @@ List files Builder needs to read for implementation patterns with specific line 
 
 At the end of tasks.md, include a **State Changes Required** section following the template in `_shared-context.md`. Include:
 
-1. **Track Duration** — phase 2, agent Architect (Step B)
-2. **Transition Phase** — phase 2 complete, ready for Builder (phase 4)
+1. **Track Duration** — phase 3, agent Architect (Step B)
+2. **Transition Phase** — phase 3 complete, ready for Builder (phase 5)
 
 ---
 
@@ -584,9 +584,9 @@ If you encounter issues preventing completion, document a blocker in your artifa
 
 ## Interaction with Other Agents
 
-**Step A** → Guardian (Phase 3): Reviews spec, may iterate 3-5 times, approves or escalates.
+**Step A** → Guardian (Phase 4): Reviews spec, may iterate 3-5 times, approves or escalates.
 
-**Step B** → Builder (Phase 4): Implements tasks using context references. Guardian may do a quick validation of task breakdown before Builder starts.
+**Step B** → Builder (Phase 5): Implements tasks using context references. Guardian may do a quick validation of task breakdown before Builder starts.
 
 ---
 

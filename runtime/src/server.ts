@@ -29,7 +29,10 @@ import {
   GetDevelopmentEvalStatusInputSchema,
   GetFeatureStatusInputSchema,
   GetNextPhaseInputSchema,
+  GetSkillProposalQueueInputSchema,
+  GetSkillProposalsInputSchema,
   PreparePhaseContextInputSchema,
+  PublishSkillProposalInputSchema,
   RecordCommitInputSchema,
   RecordEvalPlanInputSchema,
   RecordEvalRunInputSchema,
@@ -38,11 +41,14 @@ import {
   RecordQualityGateInputSchema,
   RecordPullRequestInputSchema,
   RecordPhaseResultInputSchema,
+  RecordSkillProposalDecisionInputSchema,
+  RecordSkillProposalDraftInputSchema,
   RecordWatcherReviewInputSchema,
   RunReviewChecksInputSchema,
   RunPolicyChecksInputSchema,
   StartFeatureInputSchema,
   SubmitClaimInputSchema,
+  SyncSkillProposalCandidatesInputSchema,
   VerifyClaimsInputSchema,
   VerifyDesignInputSchema,
 } from './schemas.js';
@@ -54,7 +60,10 @@ import { handleGetClaimsNeedingReview } from './tools/get-claims-needing-review.
 import { handleGetDevelopmentEvalStatus } from './tools/get-development-eval-status.js';
 import { handleGetFeatureStatus } from './tools/get-feature-status.js';
 import { handleGetNextPhase } from './tools/get-next-phase.js';
+import { handleGetSkillProposalQueue } from './tools/get-skill-proposal-queue.js';
+import { handleGetSkillProposals } from './tools/get-skill-proposals.js';
 import { handlePreparePhaseContext } from './tools/prepare-phase-context.js';
+import { handlePublishSkillProposal } from './tools/publish-skill-proposal.js';
 import { handleRecordCommit } from './tools/record-commit.js';
 import { handleRecordEvalPlan } from './tools/record-eval-plan.js';
 import { handleRecordEvalRun } from './tools/record-eval-run.js';
@@ -63,11 +72,14 @@ import { handleRecordPhaseArtifact } from './tools/record-phase-artifact.js';
 import { handleRecordPullRequest } from './tools/record-pull-request.js';
 import { handleRecordQualityGate } from './tools/record-quality-gate.js';
 import { handleRecordPhaseResult } from './tools/record-phase-result.js';
+import { handleRecordSkillProposalDecision } from './tools/record-skill-proposal-decision.js';
+import { handleRecordSkillProposalDraft } from './tools/record-skill-proposal-draft.js';
 import { handleRecordWatcherReview } from './tools/record-watcher-review.js';
 import { handleRunReviewChecks } from './tools/run-review-checks.js';
 import { handleRunPolicyChecks } from './tools/run-policy-checks.js';
 import { handleStartFeature } from './tools/start-feature.js';
 import { handleSubmitClaim } from './tools/submit-claim.js';
+import { handleSyncSkillProposalCandidates } from './tools/sync-skill-proposal-candidates.js';
 import { handleVerifyClaims } from './tools/verify-claims.js';
 import { handleVerifyDesign } from './tools/verify-design.js';
 import { safeToolHandler } from './utils.js';
@@ -162,7 +174,7 @@ const formal_verification_adapter = createFormalVerificationAdapter(project_root
 const server = new McpServer(
   {
     name: 'odin',
-    version: '0.3.3-beta',
+    version: '0.3.5-beta',
   },
   {
     capabilities: {
@@ -359,6 +371,66 @@ server.registerTool(
     inputSchema: ExploreKnowledgeInputSchema,
   },
   safeToolHandler(async (input) => handleExploreKnowledge(workflow_state, skill_adapter, input))
+);
+
+server.registerTool(
+  'odin.get_skill_proposal_queue',
+  {
+    title: 'Get Skill Proposal Queue',
+    description: 'Inspect repeated unresolved learning topics that may warrant a generated skill draft.',
+    inputSchema: GetSkillProposalQueueInputSchema,
+  },
+  safeToolHandler(async (input) => handleGetSkillProposalQueue(workflow_state, skill_adapter, input))
+);
+
+server.registerTool(
+  'odin.get_skill_proposals',
+  {
+    title: 'Get Skill Proposals',
+    description: 'List drafted, approved, rejected, or published skill proposal records.',
+    inputSchema: GetSkillProposalsInputSchema,
+  },
+  safeToolHandler(async (input) => handleGetSkillProposals(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.record_skill_proposal_draft',
+  {
+    title: 'Record Skill Proposal Draft',
+    description: 'Persist a drafted generated-skill proposal and run deterministic validation on it.',
+    inputSchema: RecordSkillProposalDraftInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordSkillProposalDraft(workflow_state, skill_adapter, input))
+);
+
+server.registerTool(
+  'odin.record_skill_proposal_decision',
+  {
+    title: 'Record Skill Proposal Decision',
+    description: 'Approve or reject a drafted skill proposal after validation review.',
+    inputSchema: RecordSkillProposalDecisionInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordSkillProposalDecision(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.publish_skill_proposal',
+  {
+    title: 'Publish Skill Proposal',
+    description: 'Publish an approved skill proposal into .odin/skills/generated and refresh proposal state.',
+    inputSchema: PublishSkillProposalInputSchema,
+  },
+  safeToolHandler(async (input) => handlePublishSkillProposal(workflow_state, skill_adapter, project_root, input))
+);
+
+server.registerTool(
+  'odin.sync_skill_proposal_candidates',
+  {
+    title: 'Sync Skill Proposal Candidates',
+    description: 'Persist the current deterministic skill proposal candidate queue into workflow state for later review.',
+    inputSchema: SyncSkillProposalCandidatesInputSchema,
+  },
+  safeToolHandler(async (input) => handleSyncSkillProposalCandidates(workflow_state, skill_adapter, input))
 );
 
 server.registerTool(

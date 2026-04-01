@@ -21,6 +21,10 @@ import type {
   RelatedLearningRecord,
   ReviewCheckRecord,
   ReviewFinding,
+  SkillProposalCandidate,
+  SkillProposalRecord,
+  SkillProposalReviewStatus,
+  SkillProposalStatus,
   WatcherQueueClaim,
   WatcherReviewRecord,
 } from '../../types.js';
@@ -29,6 +33,16 @@ export interface ListAllLearningsFilter {
   feature_id?: string;
   category?: LearningCategory;
   min_confidence?: number;
+}
+
+export interface ListSkillProposalCandidatesFilter {
+  statuses?: SkillProposalStatus[];
+  limit?: number;
+}
+
+export interface ListSkillProposalsFilter {
+  statuses?: SkillProposalReviewStatus[];
+  limit?: number;
 }
 
 export interface WorkflowStateAdapter {
@@ -71,4 +85,10 @@ export interface WorkflowStateAdapter {
   declarePropagationTarget(learning_id: string, target_type: PersistedTargetType, target_path: string | null, relevance: number): Promise<void>;
   listRelatedLearnings(feature_id: string, limit?: number): Promise<RelatedLearningRecord[]>;
   listAllLearnings(filter?: ListAllLearningsFilter): Promise<LearningRecord[]>;
+  replaceSkillProposalCandidates(candidates: SkillProposalCandidate[]): Promise<void>;
+  listSkillProposalCandidates(filter?: ListSkillProposalCandidatesFilter): Promise<SkillProposalCandidate[]>;
+  upsertSkillProposalDraft(proposal: Omit<SkillProposalRecord, 'created_at' | 'updated_at' | 'approved_by' | 'approved_at' | 'published_by' | 'published_at'>): Promise<SkillProposalRecord>;
+  listSkillProposals(filter?: ListSkillProposalsFilter): Promise<SkillProposalRecord[]>;
+  recordSkillProposalDecision(topic_key: string, status: 'APPROVED' | 'REJECTED', actor: string, notes?: string): Promise<SkillProposalRecord>;
+  markSkillProposalPublished(topic_key: string, published_by: string, published_path: string): Promise<SkillProposalRecord>;
 }
