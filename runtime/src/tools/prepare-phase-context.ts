@@ -5,8 +5,10 @@
 
 import type { SkillAdapter } from '../adapters/skills/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import type { RuntimeConfig } from '../config.js';
 import { loadBuiltInAgentDefinition } from '../builtin-assets.js';
 import { resolveWorkflowActorName } from '../domain/actors.js';
+import { resolveAutomationDecision } from '../domain/automation-policy.js';
 import { appendDevelopmentEvalChecks, buildDevelopmentEvalContext } from '../domain/development-evals.js';
 import { getPhaseAgentInstructions, getPhaseContract, isWatchedPhase } from '../domain/phases.js';
 import { formatOpenGateSummary } from '../domain/quality-gates.js';
@@ -45,6 +47,7 @@ function buildArtifactLineage(artifacts: PhaseArtifact[]): PhaseContextBundle['a
 export async function handlePreparePhaseContext(
   adapter: WorkflowStateAdapter,
   skill_adapter: SkillAdapter,
+  config: RuntimeConfig,
   input: PreparePhaseContextInput
 ) {
   const feature = await adapter.getFeature(input.feature_id);
@@ -62,11 +65,12 @@ export async function handlePreparePhaseContext(
         adapter.listRelatedLearnings(input.feature_id, 5),
       ])
     : [[], []];
-  const [open_blockers, open_gate_records, open_findings, pending_claims, claims_needing_review] = await Promise.all([
+  const [open_blockers, open_gate_records, open_findings, pending_claims, claim_verification, claims_needing_review] = await Promise.all([
     adapter.listOpenBlockers(input.feature_id),
     adapter.listOpenGateRecords(input.feature_id),
     adapter.listOpenFindings(input.feature_id),
     adapter.listPendingClaims(input.feature_id),
+    adapter.listClaimVerificationStatus(input.feature_id),
     adapter.listClaimsNeedingReview(input.feature_id),
   ]);
   const open_gates = open_gate_records.map(formatOpenGateSummary);
@@ -75,6 +79,16 @@ export async function handlePreparePhaseContext(
   const agent_definition = loadBuiltInAgentDefinition(input.phase);
   const actor_name = resolveWorkflowActorName(input.phase, input.agent_name ?? agent.name);
   const development_evals = buildDevelopmentEvalContext(feature, input.phase, all_artifacts, open_gate_records);
+  const automation = resolveAutomationDecision({
+    config,
+    feature,
+    open_blockers,
+    open_gate_records,
+    open_findings,
+    pending_claims,
+    claim_verification,
+    claims_needing_review_count: claims_needing_review.length,
+  });
   const watcher_constraints =
     isWatchedPhase(input.phase) && claims_needing_review.length > 0
       ? [
@@ -109,6 +123,7 @@ export async function handlePreparePhaseContext(
       definition_source: agent_definition == null ? 'none' : 'built_in',
       definition_source_path: agent_definition?.source_path ?? null,
     },
+    automation,
     invocation:
       invocation == null
         ? null

@@ -107,6 +107,62 @@ describe('SupabaseWorkflowStateAdapter.recordCommit', () => {
   });
 });
 
+describe('SupabaseWorkflowStateAdapter.listAgentInvocations', () => {
+  function createAdapterWithClient(client: Record<string, unknown>) {
+    const adapter = new SupabaseWorkflowStateAdapter({
+      supabase: {
+        url: 'https://example.supabase.co',
+        secret_key: 'test-secret-key',
+      },
+    } as RuntimeConfig);
+
+    Object.assign(adapter, { client });
+    return adapter;
+  }
+
+  it('maps completed invocation rows from Supabase', async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn(async () => ({
+        data: [
+          {
+            id: 'inv_1',
+            feature_id: 'FEAT-INV',
+            phase: '5',
+            agent_name: 'builder-agent',
+            operation: 'Phase 5: Builder',
+            skills_used: ['testing/vitest'],
+            started_at: '2026-04-01T10:00:00.000Z',
+            ended_at: '2026-04-01T10:10:00.000Z',
+            duration_ms: 600000,
+          },
+        ],
+        error: null,
+      })),
+    };
+
+    const from = vi.fn(() => query);
+    const adapter = createAdapterWithClient({ from });
+    const invocations = await adapter.listAgentInvocations('FEAT-INV');
+
+    expect(from).toHaveBeenCalledWith('agent_invocations');
+    expect(invocations).toEqual([
+      {
+        id: 'inv_1',
+        feature_id: 'FEAT-INV',
+        phase: '5',
+        agent_name: 'builder-agent',
+        operation: 'Phase 5: Builder',
+        skills_used: ['testing/vitest'],
+        started_at: '2026-04-01T10:00:00.000Z',
+        ended_at: '2026-04-01T10:10:00.000Z',
+        duration_ms: 600000,
+      },
+    ]);
+  });
+});
+
 describe('SupabaseWorkflowStateAdapter skill proposal persistence', () => {
   function createAdapterWithClient(client: Record<string, unknown>) {
     const adapter = new SupabaseWorkflowStateAdapter({

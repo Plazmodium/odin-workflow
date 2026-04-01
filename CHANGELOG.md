@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.6-beta] - 2026-04-01
+
+### Added
+- Runtime automation policy support with `guarded` and `auto_pr` modes, explicit config validation, and automation snapshots surfaced through `odin.prepare_phase_context` and `odin.get_feature_status`.
+- Release-phase invocation coverage summaries in `odin.get_feature_status` so orchestrators can gate PR handoff without leaving the tool-driven workflow.
+
+### Changed
+- Release/orchestrator guidance now treats `context.automation` as the trusted PR-action boundary for this release while keeping merge human-only.
+- Runtime bootstrap, shipped guide, agent definitions, and README docs now describe the guarded default, opt-in `auto_pr`, and unsupported `auto_merge` contract.
+- Root package version, runtime package version, runtime MCP server version, runtime lockfile, and README badge updated to `0.3.6-beta`.
+
 ## [0.3.5-beta] - 2026-03-31
 
 ### Added
