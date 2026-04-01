@@ -43,6 +43,9 @@ Confirm the package includes:
 - `dist/cli.js`
 - `dist/server.js`
 - `dist/init.js`
+- `builtin/ODIN.md`
+- `builtin/skills/`
+- `builtin/agent-definitions/`
 - `migrations/`
 - `README.md`
 

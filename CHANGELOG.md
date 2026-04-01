@@ -4,6 +4,29 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.5-beta] - 2026-03-31
+
+### Added
+- Governed skill-proposal pipeline for unresolved learnings: deterministic candidate detection, persisted proposal workflow state, draft validation, approval, and publish flow into `.odin/skills/generated/`.
+- New runtime tools for the proposal workflow: `get_skill_proposal_queue`, `get_skill_proposals`, `record_skill_proposal_draft`, `record_skill_proposal_decision`, `publish_skill_proposal`, and `sync_skill_proposal_candidates`.
+- Dashboard visibility for skill proposal candidates and proposal draft/approval/publish state on the Learnings page.
+
+### Changed
+- Runtime migrations now include `009_skill_proposal_candidates.sql` and `010_skill_proposals.sql` in both the public migrations folder and bundled runtime migrations.
+- `odin.capture_learning` now surfaces unresolved proposal candidates and can keep proposal candidate state in sync.
+- Root package version, runtime package version, runtime MCP server version, runtime lockfile, and README badge updated to `0.3.5-beta`.
+
+## [0.3.4-beta] - 2026-03-30
+
+### Added
+- The npm package now bundles `ODIN.md`, built-in skills, and built-in phase agent definitions inside the tarball.
+- `odin.prepare_phase_context` now exposes packaged phase-definition markdown so harnesses can build prompts from shipped Odin instructions instead of relying only on hard-coded summaries.
+
+### Changed
+- `odin init` now copies `.odin/ODIN.md` and `.odin/agents/definitions/` into the target project alongside `.odin/config.yaml`, `.odin/skills/`, and `.env.example`.
+- Runtime docs now instruct harnesses to read `.odin/ODIN.md` and use `context.agent.definition_markdown` during phase orchestration.
+- Root package version, runtime package version, runtime MCP server version, runtime lockfile, and README badge updated to `0.3.4-beta`.
+
 ## [0.3.3-beta] - 2026-03-30
 
 ### Added

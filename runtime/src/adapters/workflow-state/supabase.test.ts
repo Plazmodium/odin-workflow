@@ -106,3 +106,285 @@ describe('SupabaseWorkflowStateAdapter.recordCommit', () => {
     });
   });
 });
+
+describe('SupabaseWorkflowStateAdapter skill proposal persistence', () => {
+  function createAdapterWithClient(client: Record<string, unknown>) {
+    const adapter = new SupabaseWorkflowStateAdapter({
+      supabase: {
+        url: 'https://example.supabase.co',
+        secret_key: 'test-secret-key',
+      },
+    } as RuntimeConfig);
+
+    Object.assign(adapter, { client });
+    return adapter;
+  }
+
+  it('replaces skill proposal candidates through one RPC call', async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: null }));
+    const adapter = createAdapterWithClient({ rpc });
+
+    await adapter.replaceSkillProposalCandidates([
+      {
+        topic_key: 'artifactsigning',
+        display_name: 'Artifact Signing',
+        status: 'DRAFT_READY',
+        evidence_count: 3,
+        feature_count: 2,
+        sample_tags: ['artifact-signing'],
+        latest_learning_at: '2026-03-31T12:00:00.000Z',
+        recent_examples: [
+          {
+            learning_id: 'learn-1',
+            title: 'Need artifact signing',
+            feature_id: 'FEAT-A',
+            created_at: '2026-03-31T12:00:00.000Z',
+          },
+        ],
+      },
+    ]);
+
+    expect(rpc).toHaveBeenCalledWith('replace_skill_proposal_candidates', {
+      p_candidates: [
+        expect.objectContaining({
+          topic_key: 'artifactsigning',
+          status: 'DRAFT_READY',
+          recent_examples: [
+            expect.objectContaining({
+              learning_id: 'learn-1',
+              feature_id: 'FEAT-A',
+            }),
+          ],
+        }),
+      ],
+    });
+  });
+
+  it('hydrates proposal evidence and applies status filtering before limit', async () => {
+    let requested_statuses: string[] = [];
+    const candidate_query = {
+      in: vi.fn((_: string, statuses: string[]) => {
+        requested_statuses = statuses;
+        return candidate_query;
+      }),
+      then: (resolve: (value: { data: unknown; error: null }) => unknown) =>
+        resolve({
+          data: [
+            {
+              topic_key: 'artifactsigning',
+              display_name: 'Artifact Signing',
+              status: 'DRAFT_READY',
+              evidence_count: 3,
+              feature_count: 3,
+              sample_tags: ['artifact-signing'],
+              latest_learning_at: '2026-03-31T12:00:00.000Z',
+            },
+            {
+              topic_key: 'provenanceattestation',
+              display_name: 'Provenance Attestation',
+              status: 'CANDIDATE',
+              evidence_count: 1,
+              feature_count: 1,
+              sample_tags: ['provenance-attestation'],
+              latest_learning_at: '2026-03-31T11:00:00.000Z',
+            },
+          ].filter((row) => requested_statuses.length === 0 || requested_statuses.includes(row.status)),
+          error: null,
+        }),
+    };
+
+    const evidence_query = {
+      in: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      then: (resolve: (value: { data: unknown; error: null }) => unknown) =>
+        resolve({
+          data: [
+            {
+              proposal_topic_key: 'provenanceattestation',
+              learning_id: 'learn-2',
+              feature_id: 'FEAT-B',
+              title: 'Need provenance attestation',
+              learning_created_at: '2026-03-31T11:00:00.000Z',
+            },
+          ],
+          error: null,
+        }),
+    };
+
+    const from = vi.fn((table: string) => {
+      if (table === 'skill_proposal_candidates') {
+        return { select: vi.fn(() => candidate_query) };
+      }
+
+      if (table === 'skill_proposal_evidence') {
+        return { select: vi.fn(() => evidence_query) };
+      }
+
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    const adapter = createAdapterWithClient({ from });
+    const proposals = await adapter.listSkillProposalCandidates({ statuses: ['CANDIDATE'], limit: 1 });
+
+    expect(candidate_query.in).toHaveBeenCalledWith('status', ['CANDIDATE']);
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0]).toMatchObject({
+      topic_key: 'provenanceattestation',
+      status: 'CANDIDATE',
+      recent_examples: [
+        expect.objectContaining({
+          learning_id: 'learn-2',
+          feature_id: 'FEAT-B',
+        }),
+      ],
+    });
+  });
+
+  it('stores and updates skill proposal workflow rows', async () => {
+    const upsert_chain = {
+      select: vi.fn().mockReturnThis(),
+      single: vi.fn(async () => ({
+        data: {
+          topic_key: 'artifactsigning',
+          display_name: 'Artifact Signing',
+          status: 'DRAFT',
+          skill_name: 'artifact-signing',
+          skill_category: 'backend',
+          draft_markdown: 'draft',
+          validation_errors: [],
+          validation_warnings: [],
+          decision_notes: null,
+          created_by: 'skill-creator-agent',
+          created_at: '2026-03-31T10:00:00.000Z',
+          updated_at: '2026-03-31T10:05:00.000Z',
+          approved_by: null,
+          approved_at: null,
+          published_by: null,
+          published_at: null,
+          published_path: null,
+        },
+        error: null,
+      })),
+    };
+
+    const update_chain = {
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      single: vi.fn(async () => ({
+        data: {
+          topic_key: 'artifactsigning',
+          display_name: 'Artifact Signing',
+          status: 'APPROVED',
+          skill_name: 'artifact-signing',
+          skill_category: 'backend',
+          draft_markdown: 'draft',
+          validation_errors: [],
+          validation_warnings: [],
+          decision_notes: 'looks good',
+          created_by: 'skill-creator-agent',
+          created_at: '2026-03-31T10:00:00.000Z',
+          updated_at: '2026-03-31T10:06:00.000Z',
+          approved_by: 'guardian-agent',
+          approved_at: '2026-03-31T10:06:00.000Z',
+          published_by: null,
+          published_at: null,
+          published_path: null,
+        },
+        error: null,
+      })),
+    };
+
+    const from = vi.fn((table: string) => {
+      if (table !== 'skill_proposals') {
+        throw new Error(`Unexpected table: ${table}`);
+      }
+
+      return {
+        upsert: vi.fn(() => upsert_chain),
+        update: vi.fn(() => update_chain),
+      };
+    });
+
+    const adapter = createAdapterWithClient({ from });
+    const draft = await adapter.upsertSkillProposalDraft({
+      topic_key: 'artifactsigning',
+      display_name: 'Artifact Signing',
+      status: 'DRAFT',
+      skill_name: 'artifact-signing',
+      skill_category: 'backend',
+      draft_markdown: 'draft',
+      validation_errors: [],
+      validation_warnings: [],
+      published_path: null,
+      decision_notes: null,
+      created_by: 'skill-creator-agent',
+    });
+
+    expect(draft.status).toBe('DRAFT');
+
+    const approved = await adapter.recordSkillProposalDecision(
+      'artifactsigning',
+      'APPROVED',
+      'guardian-agent',
+      'looks good',
+    );
+
+    expect(update_chain.eq).toHaveBeenCalledWith('topic_key', 'artifactsigning');
+    expect(update_chain.eq).toHaveBeenCalledWith('status', 'DRAFT');
+    expect(approved).toMatchObject({
+      status: 'APPROVED',
+      approved_by: 'guardian-agent',
+      decision_notes: 'looks good',
+    });
+  });
+
+  it('requires approved status when marking a proposal as published', async () => {
+    const update_chain = {
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      single: vi.fn(async () => ({
+        data: {
+          topic_key: 'artifactsigning',
+          display_name: 'Artifact Signing',
+          status: 'PUBLISHED',
+          skill_name: 'artifact-signing',
+          skill_category: 'backend',
+          draft_markdown: 'draft',
+          validation_errors: [],
+          validation_warnings: [],
+          decision_notes: null,
+          created_by: 'skill-creator-agent',
+          created_at: '2026-03-31T10:00:00.000Z',
+          updated_at: '2026-03-31T10:07:00.000Z',
+          approved_by: 'guardian-agent',
+          approved_at: '2026-03-31T10:06:00.000Z',
+          published_by: 'release-agent',
+          published_at: '2026-03-31T10:07:00.000Z',
+          published_path: '.odin/skills/generated/backend/artifact-signing/SKILL.md',
+        },
+        error: null,
+      })),
+    };
+
+    const from = vi.fn((table: string) => {
+      if (table !== 'skill_proposals') {
+        throw new Error(`Unexpected table: ${table}`);
+      }
+
+      return {
+        update: vi.fn(() => update_chain),
+      };
+    });
+
+    const adapter = createAdapterWithClient({ from });
+    const published = await adapter.markSkillProposalPublished(
+      'artifactsigning',
+      'release-agent',
+      '.odin/skills/generated/backend/artifact-signing/SKILL.md',
+    );
+
+    expect(update_chain.eq).toHaveBeenCalledWith('topic_key', 'artifactsigning');
+    expect(update_chain.eq).toHaveBeenCalledWith('status', 'APPROVED');
+    expect(published.status).toBe('PUBLISHED');
+  });
+});

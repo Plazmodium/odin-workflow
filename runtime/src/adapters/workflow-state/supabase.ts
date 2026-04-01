@@ -26,11 +26,18 @@ import type {
   RelatedLearningRecord,
   ReviewCheckRecord,
   ReviewFinding,
+  SkillProposalCandidate,
+  SkillProposalRecord,
   VerificationStatus,
   WatcherQueueClaim,
   WatcherReviewRecord,
 } from '../../types.js';
-import type { ListAllLearningsFilter, WorkflowStateAdapter } from './types.js';
+import type {
+  ListAllLearningsFilter,
+  ListSkillProposalCandidatesFilter,
+  ListSkillProposalsFilter,
+  WorkflowStateAdapter,
+} from './types.js';
 
 type JsonRecord = { [key: string]: unknown };
 
@@ -49,6 +56,32 @@ function getSingleRpcRow(data: unknown, operation: string): JsonRecord {
   }
 
   throw new Error(`Failed to ${operation}: RPC returned an unexpected shape.`);
+}
+
+function mapSkillProposalRecord(row: JsonRecord): SkillProposalRecord {
+  return {
+    topic_key: String(row.topic_key),
+    display_name: String(row.display_name),
+    status: String(row.status) as SkillProposalRecord['status'],
+    skill_name: String(row.skill_name),
+    skill_category: String(row.skill_category),
+    draft_markdown: String(row.draft_markdown),
+    validation_errors: Array.isArray(row.validation_errors)
+      ? row.validation_errors.map((value) => String(value))
+      : [],
+    validation_warnings: Array.isArray(row.validation_warnings)
+      ? row.validation_warnings.map((value) => String(value))
+      : [],
+    published_path: row.published_path == null ? null : String(row.published_path),
+    decision_notes: row.decision_notes == null ? null : String(row.decision_notes),
+    created_by: String(row.created_by),
+    created_at: String(row.created_at),
+    updated_at: String(row.updated_at),
+    approved_by: row.approved_by == null ? null : String(row.approved_by),
+    approved_at: row.approved_at == null ? null : String(row.approved_at),
+    published_by: row.published_by == null ? null : String(row.published_by),
+    published_at: row.published_at == null ? null : String(row.published_at),
+  };
 }
 
 function toFeatureRecord(row: JsonRecord): FeatureRecord {
@@ -1010,6 +1043,230 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       created_by: String(row.created_by),
       created_at: String(row.created_at),
     }));
+  }
+
+  async replaceSkillProposalCandidates(candidates: SkillProposalCandidate[]): Promise<void> {
+    const payload = candidates.map((candidate) => ({
+      topic_key: candidate.topic_key,
+      display_name: candidate.display_name,
+      status: candidate.status,
+      evidence_count: candidate.evidence_count,
+      feature_count: candidate.feature_count,
+      sample_tags: candidate.sample_tags,
+      latest_learning_at: candidate.latest_learning_at,
+      recent_examples: candidate.recent_examples,
+    }));
+
+    const { error } = await this.client.rpc('replace_skill_proposal_candidates', {
+      p_candidates: payload,
+    });
+
+    if (error != null) {
+      throw new Error(`Failed to replace skill proposal candidates in Supabase: ${error.message}`);
+    }
+  }
+
+  async listSkillProposalCandidates(filter?: ListSkillProposalCandidatesFilter): Promise<SkillProposalCandidate[]> {
+    let query = this.client.from('skill_proposal_candidates').select('*');
+
+    if (filter?.statuses != null && filter.statuses.length > 0) {
+      query = query.in('status', filter.statuses);
+    }
+
+    const { data, error } = await query;
+
+    if (error != null) {
+      throw new Error(`Failed to list skill proposal candidates from Supabase: ${error.message}`);
+    }
+
+    const rows = (data as JsonRecord[] | null) ?? [];
+    const mapped = rows.map((row) => ({
+      topic_key: String(row.topic_key),
+      display_name: String(row.display_name),
+      status: String(row.status) as SkillProposalCandidate['status'],
+      evidence_count: Number(row.evidence_count),
+      feature_count: Number(row.feature_count),
+      sample_tags: Array.isArray(row.sample_tags) ? row.sample_tags.map((value) => String(value)) : [],
+      latest_learning_at: String(row.latest_learning_at),
+      recent_examples: [] as SkillProposalCandidate['recent_examples'],
+    }));
+
+    mapped.sort((left, right) => {
+      if (left.status !== right.status) {
+        return left.status === 'DRAFT_READY' ? -1 : 1;
+      }
+
+      if (left.feature_count !== right.feature_count) {
+        return right.feature_count - left.feature_count;
+      }
+
+      if (left.evidence_count !== right.evidence_count) {
+        return right.evidence_count - left.evidence_count;
+      }
+
+      const recency = right.latest_learning_at.localeCompare(left.latest_learning_at);
+      if (recency !== 0) {
+        return recency;
+      }
+
+      return left.topic_key.localeCompare(right.topic_key);
+    });
+
+    const limited = filter?.limit == null ? mapped : mapped.slice(0, filter.limit);
+    if (limited.length === 0) {
+      return [];
+    }
+
+    const topic_keys = limited.map((proposal) => proposal.topic_key);
+    const { data: evidence_data, error: evidence_error } = await this.client
+      .from('skill_proposal_evidence')
+      .select('*')
+      .in('proposal_topic_key', topic_keys)
+      .order('learning_created_at', { ascending: false });
+
+    if (evidence_error != null) {
+      throw new Error(`Failed to list skill proposal evidence from Supabase: ${evidence_error.message}`);
+    }
+
+    const examples_by_topic = new Map<string, SkillProposalCandidate['recent_examples']>();
+    for (const row of (evidence_data as JsonRecord[] | null) ?? []) {
+      const topic_key = String(row.proposal_topic_key);
+      const existing = examples_by_topic.get(topic_key) ?? [];
+      if (existing.some((example) => example.learning_id === String(row.learning_id))) {
+        continue;
+      }
+
+      existing.push({
+        learning_id: String(row.learning_id),
+        title: String(row.title),
+        feature_id: String(row.feature_id),
+        created_at: String(row.learning_created_at),
+      });
+      examples_by_topic.set(topic_key, existing.slice(0, 3));
+    }
+
+    return limited.map((proposal) => ({
+      ...proposal,
+      recent_examples: examples_by_topic.get(proposal.topic_key) ?? [],
+    }));
+  }
+
+  async upsertSkillProposalDraft(
+    proposal: Omit<SkillProposalRecord, 'created_at' | 'updated_at' | 'approved_by' | 'approved_at' | 'published_by' | 'published_at'>,
+  ): Promise<SkillProposalRecord> {
+    const timestamp = new Date().toISOString();
+    const { data, error } = await this.client
+      .from('skill_proposals')
+      .upsert(
+        {
+          topic_key: proposal.topic_key,
+          display_name: proposal.display_name,
+          status: proposal.status,
+          skill_name: proposal.skill_name,
+          skill_category: proposal.skill_category,
+          draft_markdown: proposal.draft_markdown,
+          validation_errors: proposal.validation_errors,
+          validation_warnings: proposal.validation_warnings,
+          published_path: proposal.published_path,
+          decision_notes: proposal.decision_notes,
+          approved_by: null,
+          approved_at: null,
+          published_by: null,
+          published_at: null,
+          created_by: proposal.created_by,
+          updated_at: timestamp,
+        },
+        { onConflict: 'topic_key' },
+      )
+      .select('*')
+      .single();
+
+    if (error != null || data == null) {
+      throw new Error(`Failed to upsert skill proposal draft in Supabase: ${error?.message ?? 'No row returned.'}`);
+    }
+
+    return mapSkillProposalRecord(data as JsonRecord);
+  }
+
+  async listSkillProposals(filter?: ListSkillProposalsFilter): Promise<SkillProposalRecord[]> {
+    let query = this.client.from('skill_proposals').select('*').order('updated_at', { ascending: false });
+
+    if (filter?.statuses != null && filter.statuses.length > 0) {
+      query = query.in('status', filter.statuses);
+    }
+
+    if (filter?.limit != null) {
+      query = query.limit(filter.limit);
+    }
+
+    const { data, error } = await query;
+
+    if (error != null) {
+      throw new Error(`Failed to list skill proposals from Supabase: ${error.message}`);
+    }
+
+    return ((data as JsonRecord[] | null) ?? []).map(mapSkillProposalRecord);
+  }
+
+  async recordSkillProposalDecision(
+    topic_key: string,
+    status: 'APPROVED' | 'REJECTED',
+    actor: string,
+    notes?: string,
+  ): Promise<SkillProposalRecord> {
+    const patch: JsonRecord = {
+      status,
+      decision_notes: notes ?? null,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (status === 'APPROVED') {
+      patch.approved_by = actor;
+      patch.approved_at = patch.updated_at;
+    } else {
+      patch.approved_by = null;
+      patch.approved_at = null;
+      patch.published_by = null;
+      patch.published_at = null;
+      patch.published_path = null;
+    }
+
+    const { data, error } = await this.client
+      .from('skill_proposals')
+      .update(patch)
+      .eq('topic_key', topic_key)
+      .eq('status', 'DRAFT')
+      .select('*')
+      .single();
+
+    if (error != null || data == null) {
+      throw new Error(`Failed to record skill proposal decision in Supabase: ${error?.message ?? 'No row returned.'}`);
+    }
+
+    return mapSkillProposalRecord(data as JsonRecord);
+  }
+
+  async markSkillProposalPublished(topic_key: string, published_by: string, published_path: string): Promise<SkillProposalRecord> {
+    const timestamp = new Date().toISOString();
+    const { data, error } = await this.client
+      .from('skill_proposals')
+      .update({
+        status: 'PUBLISHED',
+        published_by,
+        published_at: timestamp,
+        published_path,
+        updated_at: timestamp,
+      })
+      .eq('topic_key', topic_key)
+      .eq('status', 'APPROVED')
+      .select('*')
+      .single();
+
+    if (error != null || data == null) {
+      throw new Error(`Failed to mark skill proposal as published in Supabase: ${error?.message ?? 'No row returned.'}`);
+    }
+
+    return mapSkillProposalRecord(data as JsonRecord);
   }
 
   async listRelatedLearnings(feature_id: string, limit = 5): Promise<RelatedLearningRecord[]> {

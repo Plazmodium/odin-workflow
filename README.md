@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.3.3--beta-orange" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.3.5--beta-orange" alt="Version">
   <img src="https://img.shields.io/badge/workflow-11_phase-blue" alt="11-phase workflow">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
 </p>
@@ -81,7 +81,8 @@ In short: **Odin is a feature workflow system, not a sub-task swarm orchestrator
 - **Semgrep-backed review phase** with severity-based blocking behavior
 - **Supabase-backed learnings and EVALS** for workflow state, memory, and health
 - **Odin MCP Runtime** — single-install TypeScript MCP server as the agent control plane
-- **Memory Palace** — semantic learning propagation with domain matching and cross-feature knowledge corridors
+- **Memory Palace** — semantic learning propagation with domain matching, cross-feature knowledge corridors, and resonance scoring
+- **Governed skill proposals** — repeated unresolved learnings surface draft-ready skill candidates with deterministic validation, approval, and project-local publish flow
 - **TLA+ formal verification** — opt-in design verification for state machine specs via tla-precheck
 - **Dashboard support** for claims, watcher verification, security findings, and the 11-phase model
 
@@ -136,7 +137,7 @@ cd /path/to/your/project
 node /absolute/path/to/odin-workflow/runtime/dist/cli.js init --tool amp --distribution source --write-mcp
 ```
 
-This creates `.odin/config.yaml`, `.odin/skills/`, `.env.example`, and your harness config file. For OpenCode, that file is `opencode.json`. Secrets stay in `.env` — never in the MCP config.
+This creates `.odin/config.yaml`, `.odin/ODIN.md`, `.odin/agents/definitions/`, `.odin/skills/`, `.env.example`, and your harness config file. For OpenCode, that file is `opencode.json`. Secrets stay in `.env` — never in the MCP config.
 
 Important: Odin now bootstraps with `runtime.mode: in_memory` by default so you can verify MCP wiring before provisioning external services. Switch `.odin/config.yaml` to `runtime.mode: supabase` when you are ready for persistent workflow state.
 
@@ -226,7 +227,7 @@ For OpenCode from a repo checkout today, use:
 | **Cursor** | Settings → MCP Servers |
 | **Codex** | `.codex/config.toml` (`[mcp_servers.odin]`) |
 
-See [runtime/README.md](runtime/README.md) for full configuration, available tools, and adapter architecture.
+See [runtime/README.md](runtime/README.md) for full configuration, available tools, adapter architecture, and the recommended harness flow using `.odin/ODIN.md` plus `odin.prepare_phase_context`.
 
 Maintainers preparing the npm release should use [docs/guides/NPM-PUBLISH.md](docs/guides/NPM-PUBLISH.md).
 
@@ -448,8 +449,9 @@ Odin is in active beta. The current workflow is implemented and dogfooded.
 ### What Works
 
 - 11-phase workflow with database-enforced sequential phase transitions
-- Odin MCP Runtime — single-install TypeScript MCP server (13 tools, including self-service migrations)
-- Memory Palace — semantic learning propagation with domain matching and cross-feature knowledge corridors
+- Odin MCP Runtime — single-install TypeScript MCP server (30 tools, including self-service migrations and governed skill-proposal workflow)
+- Memory Palace — semantic learning propagation with domain matching, cross-feature knowledge corridors, and resonance scoring
+- Governed skill proposal pipeline — repeated unresolved tags move through candidate, draft, approval, and publish into `.odin/skills/generated/`
 - TLA+ formal verification — opt-in design verification for state machine specs
 - Dashboard with 11-phase timeline, watcher verification, security findings, learnings
 - 36+ skills across frontend, backend, database, testing, devops, API, architecture

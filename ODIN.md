@@ -1,7 +1,7 @@
 # ODIN.md
 
 > **Odin** is a Specification-Driven Development (SDD) framework for AI-assisted development.
-> It provides 12 specialized agents, adaptive complexity levels, a learnings system with
+> It provides 11 specialized workflow/support agents, adaptive complexity levels, a learnings system with
 > confidence scoring, EVALS for health monitoring, and Watcher verification for critical phases.
 
 ---
@@ -51,7 +51,7 @@ When developers use AI coding assistants without proper specifications:
 
 1. **Spec-First, Always**: Implementation code is never written without an approved specification. The spec is the contract.
 
-2. **Context Pulling > Context Pushing**: AI agents autonomously fetch what they need (via MCP) instead of developers manually copy-pasting files, schemas, and tickets.
+2. **Context Pulling > Context Pushing**: The orchestrator session pulls what agents need (via MCP and other tools) instead of developers manually copy-pasting files, schemas, and tickets.
 
 3. **Adaptive Complexity**: Not every task needs a 10-page specification. Match the spec depth to the task complexity.
 
@@ -61,7 +61,7 @@ When developers use AI coding assistants without proper specifications:
 - **Learnings system** with confidence scoring and multi-target propagation
 - **Development Evals** for pre/post-build behavior verification
 - **EVALS** for health monitoring and performance diagnostics
-- **11-phase workflow** with 12 specialized agents
+- **11-phase workflow** with 11 specialized workflow/support agents
 - **Watcher verification** - Policy Engine + LLM escalation for critical phases
 - **Skills system** with 36+ domain-specific knowledge modules
 
@@ -71,7 +71,7 @@ When developers use AI coding assistants without proper specifications:
 
 | Phase | Name | Agent | Watched? | Description |
 |-------|------|-------|----------|-------------|
-| 0 | Planning | Planner | No | Epic decomposition (L3 only) |
+| 0 | Planning | Planner | No | Planning kickoff; L3 decomposes epics, L1/L2 can stay brief |
 | 1 | Product | Product | No | PRD generation (complexity-gated) |
 | 2 | Discovery | Discovery | No | Requirements gathering |
 | 3 | Architect | Architect | No | Specification drafting |
@@ -92,7 +92,7 @@ All features: PLANNING -> PRODUCT -> DISCOVERY -> ARCHITECT -> GUARDIAN -> BUILD
 
 > **Watched agents** (Builder, Integrator, Release) emit structured claims that are verified by the Policy Engine and optionally the LLM Watcher. See [Watcher Verification](#watcher-verification).
 
-> **Detailed Documentation**: See [multi-agent-protocol.md](docs/framework/multi-agent-protocol.md)
+> **Detailed Documentation**: See `agents/definitions/` for phase prompts and [runtime/README.md](runtime/README.md) for runtime setup.
 
 ### Orchestrator Loop
 
@@ -311,7 +311,7 @@ Before implementation, score your spec:
 
 ---
 
-## The 12 Agents
+## The 11 Agents
 
 | Agent | Phases | Watched? | Role |
 |-------|--------|----------|------|
@@ -326,7 +326,6 @@ Before implementation, score your spec:
 | [Documenter](agents/definitions/documenter.md) | 8 | No | Documentation generation |
 | [Release](agents/definitions/release.md) | 9 | **YES** | PR creation and feature archival |
 | [Watcher](agents/definitions/watcher.md) | Any | - | LLM escalation for claim verification |
-| [Consultant](agents/definitions/spec-driven-dev-consultant.md) | Any | No | Spec refinement and analysis |
 
 All agents inherit shared context from [_shared-context.md](agents/definitions/_shared-context.md).
 
@@ -483,7 +482,8 @@ odin.verify_claims({ feature_id: "FEAT-001" })
 | `CODE_DELETED` | Builder | File removed |
 | `TEST_PASSED` | Builder | Tests pass |
 | `BUILD_SUCCEEDED` | Builder | Build completes |
-| `INTEGRATION_VERIFIED` | Integrator | Merge + tests + runtime verified |
+| `TEST_ADDED` | Builder | Tests added for acceptance/regression coverage |
+| `INTEGRATION_VERIFIED` | Integrator | Feature branch build/tests/runtime verified |
 | `PR_CREATED` | Release | Pull request created |
 | `ARCHIVE_CREATED` | Release | Feature archived |
 
@@ -597,8 +597,8 @@ The `dev_initials` and `author` parameters in `odin.start_feature` identify the 
 4. Each phase: `odin.prepare_phase_context` → agent work → `odin.record_phase_artifact` → `odin.record_phase_result`
 5. `odin.prepare_phase_context` starts the phase invocation timer; `odin.record_phase_result` completes it
 6. Release phase creates PR via `gh pr create`, then records it with `odin.record_pr`
-7. After the human merges the PR, record the merge with `odin.record_merge`
-6. Human reviews and merges (NEVER the agent)
+7. Human reviews and merges the PR (NEVER the agent)
+8. After the human merges the PR, record the merge with `odin.record_merge`
 
 > **CRITICAL**: Create the git branch BEFORE calling `odin.start_feature`. If branch creation fails (e.g., branch already exists, git error), do NOT create the feature — you would have a dead DB record with no branch. The branch is the real artifact; the DB record is tracking.
 
@@ -666,7 +666,7 @@ The runtime handles file upload (to Supabase Storage) and database recording aut
 - **Knowledge base**: Reference past specs for similar features
 - **Debugging**: Understand original requirements when bugs arise
 
-> **Setup**: See [SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) for Edge Function deployment.
+> **Setup**: See [SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) for Supabase migrations and private archive bucket setup.
 
 ---
 
@@ -837,7 +837,7 @@ The `odin` server is the Odin MCP Runtime. It provides all `odin.*` tools, manag
 
 | Tool | Purpose | When Used |
 |------|---------|-----------|
-| `context7` | Library docs lookup | Architect, Builder |
+| `context7` | Library docs lookup | Orchestrator on behalf of Architect/Builder |
 | `sequentialthinking` | Complex multi-step reasoning | Any complex task |
 | `memory` | Knowledge graph | Optional knowledge backup |
 
@@ -854,7 +854,7 @@ The `odin` server is the Odin MCP Runtime. It provides all `odin.*` tools, manag
 
 ### Security Rules
 
-- Odin runtime handles database access — agents use `odin.*` tools, not raw SQL
+- Odin runtime handles database access - the orchestrator uses `odin.*` tools on behalf of agents, never raw SQL in normal workflow execution
 - Docker Gateway: only invoke tools documented in agent definitions
 
 ---
@@ -1002,6 +1002,28 @@ odin.capture_learning({
 odin.explore_knowledge({
   tags: ["nextjs", "caching"]
 })
+
+odin.get_skill_proposal_queue({
+  statuses: ["DRAFT_READY", "CANDIDATE"],
+  limit: 10
+})
+
+odin.record_skill_proposal_draft({
+  topic_key: "artifactsigning",
+  drafted_by: "skill-creator-agent",
+  draft_markdown: "---\nname: artifact-signing\ndescription: Guidance for deterministic artifact signing.\ncategory: backend\n---\n\n# Artifact Signing\n"
+})
+
+odin.record_skill_proposal_decision({
+  topic_key: "artifactsigning",
+  status: "APPROVED",
+  decided_by: "guardian-agent"
+})
+
+odin.publish_skill_proposal({
+  topic_key: "artifactsigning",
+  published_by: "release-agent"
+})
 ```
 
 ### Status & Release
@@ -1035,7 +1057,7 @@ odin.record_merge({
 
 1. **Read the framework**: [SDD-framework.md](docs/framework/SDD-framework.md)
 2. **Set up the runtime**: [runtime/README.md](runtime/README.md)
-3. **Understand agents**: [multi-agent-protocol.md](docs/framework/multi-agent-protocol.md)
+3. **Understand agents**: `agents/definitions/`
 4. **See an example**: [example-workflow.md](docs/guides/example-workflow.md)
 5. **Database setup**: [SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md)
 6. **Explore skills**: [SKILLS-SYSTEM.md](docs/reference/SKILLS-SYSTEM.md)

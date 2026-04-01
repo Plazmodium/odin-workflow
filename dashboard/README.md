@@ -9,7 +9,7 @@ Web-based dashboard for the Odin SDD Framework. Visualizes system health, featur
 | `/` | **Health Overview** — System health gauge, active alerts (with acknowledge/resolve), features table, quick stats, recent learnings |
 | `/features` | **Features List** — All features with filtering (status, complexity, severity, git, health), sorting, and search |
 | `/features/[id]` | **Feature Detail** — Enhanced phase timeline (11 phases, clickable/expandable), agent profiler (with watcher indicators), quality gates, blockers, **Watcher Verification panel** (v2), **Security Findings panel** (v2), EVAL breakdown, activity timeline, transition history, commits, **archives** (for completed features) |
-| `/learnings` | **Learnings** — React Flow evolution graph, propagation history (display-only), skill targets, conflicts |
+| `/learnings` | **Learnings** — React Flow evolution graph, propagation history (display-only), skill targets, governed skill proposals, conflicts |
 | `/learnings/[id]` | **Learning Detail** — Full content, evolution chain timeline, propagation status per target |
 | `/evals` | **EVALS History** — Health trend chart, 7/30/90-day period comparison, agent performance, alert history, system activity timeline |
 
@@ -34,12 +34,12 @@ Web-based dashboard for the Odin SDD Framework. Visualizes system health, featur
 ### 1. Prerequisites
 
 - Node.js 18+
-- A Supabase project with Odin migrations applied (see `system/database/supabase-migrations/`)
+- A Supabase project with Odin migrations applied (see `migrations/`)
 
 ### 2. Install Dependencies
 
 ```bash
-cd system/dashboard
+cd dashboard
 npm install
 ```
 
@@ -106,7 +106,7 @@ components/
 │                             # ArchivesSection, ArchiveFileModal (markdown viewer with copy),
 │                             # WatcherVerificationPanel (v2), SecurityFindingsPanel (v2)
 ├── learnings/                # LearningGraph, EvolutionChainTimeline, PropagationHistoryTable,
-│                             # PropagationStatusTable, ConflictsTable, SkillPropagationQueue
+│                             # PropagationStatusTable, ConflictsTable, SkillPropagationQueue, SkillProposalBoard
 └── evals/                    # HealthTrendChart, PeriodComparison, AgentPerformance, AlertHistoryTable
 
 lib/
@@ -120,7 +120,7 @@ lib/
 ├── data/                     # Server-side data fetching functions
 │   ├── health.ts             # System health, feature overview, alerts, quick stats
 │   ├── features.ts           # Feature status, durations, invocations, gates, blockers, evals
-│   ├── learnings.ts          # Active learnings, propagation history, conflicts, chains
+│   ├── learnings.ts          # Active learnings, propagation history, skill proposals, conflicts, chains
 │   ├── audit.ts              # Audit log (feature-scoped and system-wide)
 │   ├── evals.ts              # System health history, agent evals, alert history
 │   ├── archives.ts           # Feature archive metadata from Supabase Storage

@@ -1,51 +1,30 @@
 export const dynamic = 'force-dynamic';
 
-import { getActiveLearnings, getPropagationHistory, getOpenConflicts, getAllSkillPropagationTargets, getAllPropagationTargets, getDomainClusters } from '@/lib/data/learnings';
+import { getActiveLearnings, getPropagationHistory, getOpenConflicts, getAllSkillPropagationTargets, getAllPropagationTargets, getDomainClusters, getSkillProposalCandidates, getSkillProposals } from '@/lib/data/learnings';
 import { LearningGraph } from '@/components/learnings/learning-graph';
 import { DomainClusterMap } from '@/components/learnings/domain-cluster-map';
 import { PropagationHistoryTable } from '@/components/learnings/propagation-history-table';
 import { SkillPropagationQueue } from '@/components/learnings/skill-propagation-queue';
+import { SkillProposalBoard } from '@/components/learnings/skill-proposal-board';
 import { ConflictsTable } from '@/components/learnings/conflicts-table';
 import { PollingSubscription } from '@/components/realtime/realtime-page';
 import { PanelInfoTooltip } from '@/components/shared/panel-info-tooltip';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Brain, CheckCircle, ShieldAlert, FileCode, Network } from 'lucide-react';
+import { Brain, CheckCircle, ShieldAlert, FileCode, Network, Sparkles } from 'lucide-react';
 import { EmptyState } from '@/components/layout/empty-state';
 
 export default async function LearningsPage() {
-  const [learnings, propagationHistory, allSkillTargets, conflicts, propagationTargets, domainData] = await Promise.all([
+  const [learnings, propagationHistory, allSkillTargets, conflicts, propagationTargets, domainData, skillProposalCandidates, skillProposals] = await Promise.all([
     getActiveLearnings(),
     getPropagationHistory(),
     getAllSkillPropagationTargets(),
     getOpenConflicts(),
     getAllPropagationTargets(),
     getDomainClusters(),
+    getSkillProposalCandidates(),
+    getSkillProposals(),
   ]);
-
-  if (learnings.length === 0) {
-    return (
-      <>
-      <PollingSubscription />
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            Learnings
-            <PanelInfoTooltip text="Knowledge captured during feature development. Learnings evolve as understanding deepens and propagate to documentation when confidence is high enough." />
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Knowledge evolution graph and propagation management
-          </p>
-        </div>
-        <EmptyState
-          icon={<Brain className="h-10 w-10" />}
-          title="No learnings yet"
-          description="Learnings are created during the SDD workflow as agents discover patterns, decisions, and conventions."
-        />
-      </div>
-      </>
-    );
-  }
 
   // Stats
   const highConfidence = learnings.filter((l) => l.confidence_score >= 0.8).length;
@@ -125,6 +104,15 @@ export default async function LearningsPage() {
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="skill-proposals">
+            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+            Skill Proposals
+            {skillProposalCandidates.length + skillProposals.length > 0 && (
+              <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">
+                {skillProposalCandidates.length + skillProposals.length}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="conflicts">
             <ShieldAlert className="h-3.5 w-3.5 mr-1.5" />
             Conflicts
@@ -137,7 +125,15 @@ export default async function LearningsPage() {
         </TabsList>
 
         <TabsContent value="graph">
-          <LearningGraph learnings={learnings} propagationTargets={propagationTargets} />
+          {learnings.length === 0 ? (
+            <EmptyState
+              icon={<Brain className="h-10 w-10" />}
+              title="No learnings yet"
+              description="Learnings are created during the SDD workflow as agents discover patterns, decisions, and conventions."
+            />
+          ) : (
+            <LearningGraph learnings={learnings} propagationTargets={propagationTargets} />
+          )}
         </TabsContent>
 
         <TabsContent value="knowledge-map">
@@ -150,6 +146,10 @@ export default async function LearningsPage() {
 
         <TabsContent value="skill-propagation">
           <SkillPropagationQueue items={allSkillTargets} />
+        </TabsContent>
+
+        <TabsContent value="skill-proposals">
+          <SkillProposalBoard candidates={skillProposalCandidates} proposals={skillProposals} />
         </TabsContent>
 
         <TabsContent value="conflicts">

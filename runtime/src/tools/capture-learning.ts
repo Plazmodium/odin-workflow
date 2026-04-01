@@ -6,8 +6,9 @@
 import type { SkillAdapter } from '../adapters/skills/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
 import { matchDomains } from '../domain/matching.js';
+import { buildSkillProposalQueue, collectSkillProposalSignals } from '../domain/skill-proposals.js';
 import type { CaptureLearningInput } from '../schemas.js';
-import type { DomainMatch } from '../types.js';
+import type { DomainMatch, SkillProposalCandidate } from '../types.js';
 import { createErrorResult, createId, createTextResult } from '../utils.js';
 
 function formatMatchSummary(match: DomainMatch) {
@@ -47,6 +48,8 @@ export async function handleCaptureLearning(
 
   let persisted_domains: ReturnType<typeof formatMatchSummary>[] = [];
   let suggested_domains: ReturnType<typeof formatMatchSummary>[] = [];
+  let proposal_candidates: SkillProposalCandidate[] = [];
+  let proposal_queue: SkillProposalCandidate[] = [];
 
   if (input.domain_tags.length > 0) {
     const domains = await skill_adapter.listKnowledgeDomains();
@@ -66,13 +69,24 @@ export async function handleCaptureLearning(
 
     persisted_domains = persisted_matches.map(formatMatchSummary);
     suggested_domains = suggested_matches.map(formatMatchSummary);
+
+    const proposal_signals = collectSkillProposalSignals(input.domain_tags, matches);
+    if (proposal_signals.length > 0) {
+      proposal_queue = buildSkillProposalQueue(await adapter.listAllLearnings(), domains);
+      await adapter.replaceSkillProposalCandidates(proposal_queue);
+      const signaled_topics = new Set(proposal_signals.map((signal) => signal.topic_key));
+      proposal_candidates = proposal_queue.filter((candidate) => signaled_topics.has(candidate.topic_key));
+    }
   }
 
   return createTextResult(
     `Captured ${learning.category} learning for feature ${learning.feature_id}.` +
       (persisted_domains.length > 0
         ? ` Auto-declared ${persisted_domains.length} propagation target(s).`
+        : '') +
+      (proposal_candidates.length > 0
+        ? ` Surfaced ${proposal_candidates.length} skill proposal candidate(s).`
         : ''),
-    { learning, persisted_domains, suggested_domains }
+    { learning, persisted_domains, suggested_domains, proposal_candidates, proposal_queue_total: proposal_queue.length }
   );
 }

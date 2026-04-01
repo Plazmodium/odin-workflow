@@ -831,7 +831,7 @@ All checks pass, implementation approach is sound.
 ## Next Steps
 The orchestrator should:
 1. Execute state changes via Supabase MCP
-2. Spawn Builder agent for Phase 4 implementation
+2. Spawn Builder agent for Phase 5 implementation
 3. Provide spec.md, tasks.md, and context.md to Builder
 ```
 
@@ -1034,7 +1034,7 @@ Always create `review.md`:
 - [ ] Tasks in correct dependency order
 - [ ] Context bundle created (8k-15k tokens)
 - [ ] Context bundle is self-contained
-- [ ] Phase transition to Phase 4 (Builder) completed
+- [ ] Phase transition to Phase 5 (Builder) completed
 
 ---
 

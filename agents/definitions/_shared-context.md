@@ -235,19 +235,19 @@ Odin tracks git branches per feature. When a feature is created, a branch name i
 - **With dev initials**: `{initials}/feature/{FEATURE-ID}` (e.g., `jd/feature/AUTH-001`)
 - **Without initials**: `feature/{FEATURE-ID}` (e.g., `feature/AUTH-001`)
 
-The orchestrator creates the git branch **BEFORE calling `create_feature()`**. The branch must exist before the DB record is created:
+The orchestrator creates the git branch **BEFORE calling `odin.start_feature()`**. The branch must exist before the feature is recorded:
 ```
 # 1. Create branch FIRST
 git checkout -b {dev_initials}/feature/{FEATURE-ID}
 
-# 2. Only after branch exists, create the DB record
-SELECT * FROM create_feature(...);
+# 2. Only after branch exists, record the feature in Odin
+odin.start_feature(...)
 ```
 
-> **CRITICAL**: If branch creation fails, do NOT call `create_feature()`. A dead DB record with no branch is worse than no record at all.
+> **CRITICAL**: If branch creation fails, do NOT call `odin.start_feature()`. A dead workflow record with no branch is worse than no record at all.
 
 Agents that interact with git should:
-1. **Orchestrator**: Create the feature branch FIRST, then call `create_feature()` — do NOT defer branch creation to Builder
+1. **Orchestrator**: Create the feature branch FIRST, then call `odin.start_feature()` — do NOT defer branch creation to Builder
 2. **Builder**: Commit after each task, include commit tracking in State Changes
 3. **Integrator**: Verify build and runtime on the feature branch
 4. **Release**: Create PR via `gh pr create`, request human review — **NEVER merge PRs**
@@ -274,7 +274,7 @@ After each commit, document it in State Changes Required:
 - **Deletions**: 30
 ```
 
-The orchestrator records commits via `record_commit()` in Supabase.
+The orchestrator records commits via `odin.record_commit()`.
 
 ---
 
@@ -284,9 +284,9 @@ The orchestrator records commits via `record_commit()` in Supabase.
 
 PR merging is ALWAYS a human decision. This applies to ALL agents with git/gh access. No exceptions. No "auto-merge if tests pass." No "merge if approved." NEVER.
 
-- **Release agent**: Creates PR via `gh pr create`, records PR URL via `record_pr()`, then STOPS
+- **Release agent**: Creates PR via `gh pr create`, records PR URL via `odin.record_pr()`, then STOPS
 - **Human**: Reviews, approves, and merges the PR
-- **After merge**: Human (or agent on instruction) calls `record_merge()` to update tracking
+- **After merge**: Human (or agent on instruction) calls `odin.record_merge()` to update tracking
 
 ---
 
@@ -323,7 +323,7 @@ If bugs are found post-release:
 
 ## CRITICAL: NEVER Skip Phases OR Steps
 
-**All 11 phases must be executed for every feature.** This is enforced at the database level — `transition_phase()` will reject any attempt to skip a phase.
+**All 11 phases must be executed for every feature.** Odin's runtime transition rules reject any attempt to skip a phase.
 
 **All steps within each phase must also be executed.** Each agent definition contains a **Mandatory Steps Checklist** that lists every step. No step may be silently skipped.
 
@@ -332,7 +332,7 @@ If bugs are found post-release:
 - An L1 phase can be a single sentence, but it must still be recorded
 - An L1 step can produce minimal output, but it must still execute
 - When documenting State Changes, always use `To Phase: [current + 1]`
-- Phase 10 (Complete) is set by `complete_feature()`, not by `transition_phase()`
+- Phase 10 (Complete) is set by the runtime completion flow, not by a manual skip
 
 **If you think a phase or step is unnecessary**: You're wrong. Execute it briefly. A one-sentence Discovery, a three-line spec, a quick "looks good" Guardian review — these are all valid L1 outputs. If a step truly does not apply (e.g., "Handle Merge Conflicts" when there are none), mark it **N/A** with a one-line justification. Never silently skip it.
 
@@ -350,7 +350,7 @@ Before each phase, the orchestrator MUST:
 **Enforcement levels**:
 | Level | What | Enforced By | Mechanism |
 |-------|------|-------------|-----------|
-| Phase | All 11 phases run (0-10) | Database | `transition_phase()` rejects skips |
+| Phase | All 11 phases run (0-10) | Runtime | phase-result transition rules reject skips |
 | Step | All steps within a phase run | Agent checklist | Orchestrator verifies each step |
 
 **Complexity affects depth, not coverage**:

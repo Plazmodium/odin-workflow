@@ -93,7 +93,7 @@ The Watcher agent is called via LLM escalation when the Policy Engine cannot mak
   - HIGH risk claims
   - Claims with missing evidence
   - Policy Engine inconclusive results
-- **Returns:** PASS/FAIL/NEEDS_REVIEW with reasoning and confidence
+- **Returns:** PASS/FAIL with reasoning and confidence; the Policy Engine may emit NEEDS_REVIEW before Watcher escalation
 - **Not a phase agent** — runs as a sub-agent when needed
 
 ## Watched Agents (v2)

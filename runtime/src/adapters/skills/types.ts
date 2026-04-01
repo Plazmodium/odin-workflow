@@ -19,4 +19,5 @@ export interface ResolveSkillsResult {
 export interface SkillAdapter {
   resolveSkills(input: ResolveSkillsInput): Promise<ResolveSkillsResult>;
   listKnowledgeDomains(): Promise<KnowledgeDomain[]>;
+  invalidateCaches(): void;
 }

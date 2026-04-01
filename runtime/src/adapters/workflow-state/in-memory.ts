@@ -25,11 +25,18 @@ import type {
   RelatedLearningRecord,
   ReviewCheckRecord,
   ReviewFinding,
+  SkillProposalCandidate,
+  SkillProposalRecord,
   VerificationStatus,
   WatcherQueueClaim,
   WatcherReviewRecord,
 } from '../../types.js';
-import type { ListAllLearningsFilter, WorkflowStateAdapter } from './types.js';
+import type {
+  ListAllLearningsFilter,
+  ListSkillProposalCandidatesFilter,
+  ListSkillProposalsFilter,
+  WorkflowStateAdapter,
+} from './types.js';
 
 export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
   private readonly features = new Map<string, FeatureRecord>();
@@ -44,6 +51,8 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
   private readonly watcher_reviews = new Map<string, WatcherReviewRecord[]>();
   private readonly invocations = new Map<string, AgentInvocationRecord>();
   private readonly propagation_targets: Array<{ learning_id: string; target_type: PersistedTargetType; target_path: string | null; relevance: number }> = [];
+  private readonly skill_proposals = new Map<string, SkillProposalCandidate>();
+  private readonly skill_proposal_records = new Map<string, SkillProposalRecord>();
   private invocation_counter = 0;
 
   async startFeature(
@@ -351,7 +360,7 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
 
   async completeAgentInvocation(invocation_id: string): Promise<AgentInvocationRecord> {
     const record = this.invocations.get(invocation_id);
-    if (record == null) {
+    if (record == null || record.ended_at != null) {
       throw new Error(`Invocation not found or already ended: ${invocation_id}`);
     }
 
@@ -456,12 +465,10 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
   }
 
   async listRelatedLearnings(feature_id: string, limit = 5): Promise<RelatedLearningRecord[]> {
-    // Get all propagation targets for this feature's learnings
     const feature_learnings = this.learnings.get(feature_id) ?? [];
     const feature_learning_ids = new Set(feature_learnings.map((l) => l.id));
     const feature_targets = this.propagation_targets.filter((t) => feature_learning_ids.has(t.learning_id));
 
-    // Collect all learnings across all features
     const all_learnings: LearningRecord[] = [];
     for (const [fid, learnings] of this.learnings.entries()) {
       if (fid !== feature_id) {
@@ -470,7 +477,6 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
     }
 
     if (feature_targets.length > 0) {
-      // Primary path: shared propagation targets
       const target_keys = new Set(
         feature_targets.map((t) => `${t.target_type}:${t.target_path ?? ''}`)
       );
@@ -501,7 +507,6 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
         .slice(0, limit);
     }
 
-    // Fallback: tag intersection (>= 2 shared tags)
     const feature_tags = new Set(feature_learnings.flatMap((l) => l.tags));
     if (feature_tags.size === 0) {
       return [];
@@ -544,7 +549,131 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
       all = all.filter((l) => l.category === filter.category);
     }
 
+    if (filter?.min_confidence != null) {
+      const in_memory_confidence = 0.5;
+      all = all.filter(() => in_memory_confidence >= filter.min_confidence!);
+    }
+
     return all.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+
+  async replaceSkillProposalCandidates(candidates: SkillProposalCandidate[]): Promise<void> {
+    this.skill_proposals.clear();
+    for (const candidate of candidates) {
+      this.skill_proposals.set(candidate.topic_key, candidate);
+    }
+  }
+
+  async listSkillProposalCandidates(filter?: ListSkillProposalCandidatesFilter): Promise<SkillProposalCandidate[]> {
+    let proposals = Array.from(this.skill_proposals.values());
+
+    if (filter?.statuses != null && filter.statuses.length > 0) {
+      const allowed = new Set(filter.statuses);
+      proposals = proposals.filter((proposal) => allowed.has(proposal.status));
+    }
+
+    proposals.sort((left, right) => {
+      if (left.status !== right.status) {
+        return left.status === 'DRAFT_READY' ? -1 : 1;
+      }
+
+      if (left.feature_count !== right.feature_count) {
+        return right.feature_count - left.feature_count;
+      }
+
+      if (left.evidence_count !== right.evidence_count) {
+        return right.evidence_count - left.evidence_count;
+      }
+
+      const recency = right.latest_learning_at.localeCompare(left.latest_learning_at);
+      if (recency !== 0) {
+        return recency;
+      }
+
+      return left.topic_key.localeCompare(right.topic_key);
+    });
+
+    return filter?.limit == null ? proposals : proposals.slice(0, filter.limit);
+  }
+
+  async upsertSkillProposalDraft(
+    proposal: Omit<SkillProposalRecord, 'created_at' | 'updated_at' | 'approved_by' | 'approved_at' | 'published_by' | 'published_at'>,
+  ): Promise<SkillProposalRecord> {
+    const existing = this.skill_proposal_records.get(proposal.topic_key);
+    const now = new Date().toISOString();
+
+    const next: SkillProposalRecord = {
+      ...proposal,
+      created_at: existing?.created_at ?? now,
+      updated_at: now,
+      approved_by: null,
+      approved_at: null,
+      published_by: null,
+      published_at: null,
+    };
+
+    this.skill_proposal_records.set(proposal.topic_key, next);
+    return next;
+  }
+
+  async listSkillProposals(filter?: ListSkillProposalsFilter): Promise<SkillProposalRecord[]> {
+    let proposals = Array.from(this.skill_proposal_records.values());
+
+    if (filter?.statuses != null && filter.statuses.length > 0) {
+      const allowed = new Set(filter.statuses);
+      proposals = proposals.filter((proposal) => allowed.has(proposal.status));
+    }
+
+    proposals.sort((left, right) => right.updated_at.localeCompare(left.updated_at) || left.topic_key.localeCompare(right.topic_key));
+    return filter?.limit == null ? proposals : proposals.slice(0, filter.limit);
+  }
+
+  async recordSkillProposalDecision(
+    topic_key: string,
+    status: 'APPROVED' | 'REJECTED',
+    actor: string,
+    notes?: string,
+  ): Promise<SkillProposalRecord> {
+    const existing = this.skill_proposal_records.get(topic_key);
+    if (existing == null) {
+      throw new Error(`Skill proposal not found: ${topic_key}`);
+    }
+
+    const now = new Date().toISOString();
+    const next: SkillProposalRecord = {
+      ...existing,
+      status,
+      decision_notes: notes ?? null,
+      updated_at: now,
+      approved_by: status === 'APPROVED' ? actor : null,
+      approved_at: status === 'APPROVED' ? now : null,
+      published_by: status === 'REJECTED' ? null : existing.published_by,
+      published_at: status === 'REJECTED' ? null : existing.published_at,
+      published_path: status === 'REJECTED' ? null : existing.published_path,
+    };
+
+    this.skill_proposal_records.set(topic_key, next);
+    return next;
+  }
+
+  async markSkillProposalPublished(topic_key: string, published_by: string, published_path: string): Promise<SkillProposalRecord> {
+    const existing = this.skill_proposal_records.get(topic_key);
+    if (existing == null) {
+      throw new Error(`Skill proposal not found: ${topic_key}`);
+    }
+
+    const now = new Date().toISOString();
+    const next: SkillProposalRecord = {
+      ...existing,
+      status: 'PUBLISHED',
+      published_by,
+      published_at: now,
+      published_path,
+      updated_at: now,
+    };
+
+    this.skill_proposal_records.set(topic_key, next);
+    return next;
   }
 
   private touchFeature(feature_id: string): void {

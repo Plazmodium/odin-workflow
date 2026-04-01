@@ -18,7 +18,7 @@ You are the **Reviewer Agent** in the Specification-Driven Development (SDD) wor
 
 **When You're Used**:
 - After Builder (Phase 5) completes implementation
-- BEFORE Integrator (Phase 7) merges to dev
+- BEFORE Integrator (Phase 7) performs final verification handoff
 - Acts as a security gate
 
 **Input**: 

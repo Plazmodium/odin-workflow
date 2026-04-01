@@ -32,6 +32,20 @@ describe('InMemoryWorkflowStateAdapter.startAgentInvocation', () => {
   it('throws when completing a non-existent invocation', async () => {
     await expect(adapter.completeAgentInvocation('inv_nonexistent')).rejects.toThrow('Invocation not found');
   });
+
+  it('throws when completing the same invocation twice', async () => {
+    await adapter.startFeature({
+      id: 'FEAT-INV-2',
+      name: 'Invocation Test 2',
+      complexity_level: 1,
+      severity: 'ROUTINE',
+    });
+
+    const invocation = await adapter.startAgentInvocation('FEAT-INV-2', '3', 'architect-agent', 'Generating spec');
+    await adapter.completeAgentInvocation(invocation.id);
+
+    await expect(adapter.completeAgentInvocation(invocation.id)).rejects.toThrow('already ended');
+  });
 });
 
 describe('InMemoryWorkflowStateAdapter.recordPhaseResult', () => {
@@ -45,7 +59,6 @@ describe('InMemoryWorkflowStateAdapter.recordPhaseResult', () => {
       complexity_level: 1,
       severity: 'ROUTINE',
     });
-    // Advance to phase 5 (Builder) so rework tests make sense
     for (const phase of ['0', '1', '2', '3', '4'] as const) {
       const nextPhase = String(Number(phase) + 1);
       await adapter.recordPhaseResult({
@@ -182,6 +195,28 @@ describe('InMemoryWorkflowStateAdapter.listRelatedLearnings', () => {
 
     const related = await adapter.listRelatedLearnings('FEAT-A', 3);
     expect(related).toHaveLength(3);
+  });
+});
+
+describe('InMemoryWorkflowStateAdapter.listAllLearnings', () => {
+  it('applies the shared min_confidence contract using the in-memory default confidence', async () => {
+    const adapter = new InMemoryWorkflowStateAdapter();
+    await adapter.startFeature({ id: 'FEAT-L', name: 'Learning Feature', complexity_level: 1, severity: 'ROUTINE' });
+
+    await adapter.captureLearning({
+      id: 'learn-min-confidence',
+      feature_id: 'FEAT-L',
+      phase: '3',
+      title: 'Learning',
+      content: 'Content',
+      category: 'PATTERN',
+      tags: ['nextjs'],
+      created_by: 'tester',
+      created_at: new Date().toISOString(),
+    });
+
+    expect(await adapter.listAllLearnings({ min_confidence: 0.5 })).toHaveLength(1);
+    expect(await adapter.listAllLearnings({ min_confidence: 0.6 })).toHaveLength(0);
   });
 });
 

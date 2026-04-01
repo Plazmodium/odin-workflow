@@ -19,6 +19,8 @@ import type {
   SkillPropagationItemWithStatus,
   PropagationStatus,
   LearningPropagationOverview,
+  SkillProposalCandidateRecord,
+  SkillProposalRecord,
 } from '@/lib/types/database';
 
 export async function getActiveLearnings(): Promise<ActiveLearning[]> {
@@ -287,6 +289,111 @@ export async function getLearningPropagationOverview(): Promise<
     .order('pending_count', { ascending: false });
   if (error || !data) return [];
   return data as LearningPropagationOverview[];
+}
+
+export async function getSkillProposalCandidates(): Promise<SkillProposalCandidateRecord[]> {
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from('skill_proposal_candidates')
+    .select('*')
+    .order('latest_learning_at', { ascending: false });
+
+  if (error || !data) {
+    return [];
+  }
+
+  const rows = data as Array<Record<string, unknown>>;
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const topicKeys = rows.map((row) => String(row.topic_key));
+  const { data: evidenceData } = await supabase
+    .from('skill_proposal_evidence')
+    .select('*')
+    .in('proposal_topic_key', topicKeys)
+    .order('learning_created_at', { ascending: false });
+
+  const evidenceByTopic = new Map<string, SkillProposalCandidateRecord['recent_examples']>();
+  for (const row of (evidenceData as Array<Record<string, unknown>> | null) ?? []) {
+    const topicKey = String(row.proposal_topic_key);
+    const existing = evidenceByTopic.get(topicKey) ?? [];
+    if (!existing.some((item) => item.learning_id === String(row.learning_id))) {
+      existing.push({
+        learning_id: String(row.learning_id),
+        feature_id: String(row.feature_id),
+        title: String(row.title),
+        learning_created_at: String(row.learning_created_at),
+      });
+      evidenceByTopic.set(topicKey, existing.slice(0, 3));
+    }
+  }
+
+  return rows.map((row) => ({
+    topic_key: String(row.topic_key),
+    display_name: String(row.display_name),
+    status: String(row.status) as SkillProposalCandidateRecord['status'],
+    evidence_count: Number(row.evidence_count),
+    feature_count: Number(row.feature_count),
+    sample_tags: Array.isArray(row.sample_tags) ? row.sample_tags.map((value) => String(value)) : [],
+    latest_learning_at: String(row.latest_learning_at),
+    recent_examples: evidenceByTopic.get(String(row.topic_key)) ?? [],
+  })).sort((left, right) => {
+    if (left.status !== right.status) {
+      return left.status === 'DRAFT_READY' ? -1 : 1;
+    }
+
+    if (left.feature_count !== right.feature_count) {
+      return right.feature_count - left.feature_count;
+    }
+
+    if (left.evidence_count !== right.evidence_count) {
+      return right.evidence_count - left.evidence_count;
+    }
+
+    const recency = right.latest_learning_at.localeCompare(left.latest_learning_at);
+    if (recency !== 0) {
+      return recency;
+    }
+
+    return left.topic_key.localeCompare(right.topic_key);
+  });
+}
+
+export async function getSkillProposals(): Promise<SkillProposalRecord[]> {
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from('skill_proposals')
+    .select('*')
+    .order('updated_at', { ascending: false });
+
+  if (error || !data) {
+    return [];
+  }
+
+  return (data as Array<Record<string, unknown>>).map((row) => ({
+    topic_key: String(row.topic_key),
+    display_name: String(row.display_name),
+    status: String(row.status) as SkillProposalRecord['status'],
+    skill_name: String(row.skill_name),
+    skill_category: String(row.skill_category),
+    draft_markdown: String(row.draft_markdown),
+    validation_errors: Array.isArray(row.validation_errors)
+      ? row.validation_errors.map((value) => String(value))
+      : [],
+    validation_warnings: Array.isArray(row.validation_warnings)
+      ? row.validation_warnings.map((value) => String(value))
+      : [],
+    published_path: row.published_path == null ? null : String(row.published_path),
+    decision_notes: row.decision_notes == null ? null : String(row.decision_notes),
+    created_by: String(row.created_by),
+    created_at: String(row.created_at),
+    updated_at: String(row.updated_at),
+    approved_by: row.approved_by == null ? null : String(row.approved_by),
+    approved_at: row.approved_at == null ? null : String(row.approved_at),
+    published_by: row.published_by == null ? null : String(row.published_by),
+    published_at: row.published_at == null ? null : String(row.published_at),
+  }));
 }
 
 // ============================================================
