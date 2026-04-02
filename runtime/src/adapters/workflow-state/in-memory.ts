@@ -33,6 +33,7 @@ import type {
 } from '../../types.js';
 import type {
   ListAllLearningsFilter,
+  ListFeaturesFilter,
   ListSkillProposalCandidatesFilter,
   ListSkillProposalsFilter,
   WorkflowStateAdapter,
@@ -63,6 +64,7 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
       ...feature,
       status: 'PLANNED',
       current_phase: '0',
+      completed_at: undefined,
       created_at: now,
       updated_at: now,
     };
@@ -74,6 +76,14 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
 
   async getFeature(feature_id: string): Promise<FeatureRecord | null> {
     return this.features.get(feature_id) ?? null;
+  }
+
+  async listFeatures(filter?: ListFeaturesFilter): Promise<FeatureRecord[]> {
+    const statuses = filter?.statuses;
+
+    return Array.from(this.features.values())
+      .filter((feature) => statuses == null || statuses.length === 0 || statuses.includes(feature.status))
+      .sort((left, right) => left.created_at.localeCompare(right.created_at));
   }
 
   async recordPhaseArtifact(artifact: PhaseArtifact): Promise<PhaseArtifact> {
@@ -99,6 +109,10 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
     const existing = this.results.get(result.feature_id) ?? [];
     this.results.set(result.feature_id, [...existing, result]);
 
+    if (result.outcome === 'completed' && result.phase === '9' && result.next_phase === '10') {
+      return this.completeFeature(result.feature_id, result.created_by);
+    }
+
     let next_status = feature.status;
     let next_phase = feature.current_phase;
 
@@ -122,6 +136,45 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
     this.features.set(result.feature_id, updated);
 
     return updated;
+  }
+
+  async completeFeature(feature_id: string, _completed_by: string): Promise<FeatureRecord | null> {
+    const feature = this.features.get(feature_id);
+    if (feature == null) {
+      return null;
+    }
+
+    const completed_phases = new Set(
+      Array.from(this.invocations.values())
+        .filter(
+          (invocation) =>
+            invocation.feature_id === feature_id && invocation.ended_at != null && invocation.duration_ms != null
+        )
+        .map((invocation) => invocation.phase)
+    );
+    const expected_phases: PhaseId[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+    if (expected_phases.some((phase) => !completed_phases.has(phase))) {
+      const blocked: FeatureRecord = {
+        ...feature,
+        status: 'BLOCKED',
+        updated_at: new Date().toISOString(),
+      };
+
+      this.features.set(feature_id, blocked);
+      return blocked;
+    }
+
+    const completed: FeatureRecord = {
+      ...feature,
+      status: 'COMPLETED',
+      current_phase: '10',
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    this.features.set(feature_id, completed);
+    return completed;
   }
 
   async listOpenBlockers(_feature_id: string): Promise<string[]> {
@@ -396,6 +449,16 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
     pr_url: string,
     pr_number: number
   ): Promise<{ feature_id: string; pr_url: string; pr_number: number }> {
+    const feature = this.features.get(feature_id);
+    if (feature != null) {
+      this.features.set(feature_id, {
+        ...feature,
+        pr_url,
+        pr_number,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
     return { feature_id, pr_url, pr_number };
   }
 
@@ -403,15 +466,27 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
     feature_id: string,
     merged_by: string
   ): Promise<{ feature_id: string; merged_at: string; merged_by: string; pr_url?: string; pr_number?: number }> {
+    const merged_at = new Date().toISOString();
+    const feature = this.features.get(feature_id);
+    if (feature != null) {
+      this.features.set(feature_id, {
+        ...feature,
+        merged_at,
+        updated_at: merged_at,
+      });
+    }
+
     return {
       feature_id,
-      merged_at: new Date().toISOString(),
+      merged_at,
       merged_by,
+      pr_url: feature?.pr_url,
+      pr_number: feature?.pr_number,
     };
   }
 
   async recordAuditEvent(
-    _feature_id: string,
+    _feature_id: string | null,
     _operation: string,
     _agent_name: string,
     _details?: Record<string, unknown>
@@ -476,10 +551,12 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
   }
 
   async listRelatedLearnings(feature_id: string, limit = 5): Promise<RelatedLearningRecord[]> {
+    // Get all propagation targets for this feature's learnings
     const feature_learnings = this.learnings.get(feature_id) ?? [];
     const feature_learning_ids = new Set(feature_learnings.map((l) => l.id));
     const feature_targets = this.propagation_targets.filter((t) => feature_learning_ids.has(t.learning_id));
 
+    // Collect all learnings across all features
     const all_learnings: LearningRecord[] = [];
     for (const [fid, learnings] of this.learnings.entries()) {
       if (fid !== feature_id) {
@@ -488,6 +565,7 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
     }
 
     if (feature_targets.length > 0) {
+      // Primary path: shared propagation targets
       const target_keys = new Set(
         feature_targets.map((t) => `${t.target_type}:${t.target_path ?? ''}`)
       );
@@ -518,6 +596,7 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
         .slice(0, limit);
     }
 
+    // Fallback: tag intersection (>= 2 shared tags)
     const feature_tags = new Set(feature_learnings.flatMap((l) => l.tags));
     if (feature_tags.size === 0) {
       return [];

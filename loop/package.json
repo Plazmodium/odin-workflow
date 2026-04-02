@@ -1,0 +1,25 @@
+{
+  "name": "ralph-loop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "tick": "node dist/cli.js tick",
+    "watch": "node dist/cli.js watch",
+    "test:simulation": "npm run build && vitest run src/scenario.test.ts",
+    "test": "npm run build && vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

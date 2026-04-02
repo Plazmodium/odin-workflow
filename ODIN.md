@@ -92,7 +92,7 @@ All features: PLANNING -> PRODUCT -> DISCOVERY -> ARCHITECT -> GUARDIAN -> BUILD
 
 > **Watched agents** (Builder, Integrator, Release) emit structured claims that are verified by the Policy Engine and optionally the LLM Watcher. See [Watcher Verification](#watcher-verification).
 
-> **Detailed Documentation**: See `agents/definitions/` for phase prompts and [runtime/README.md](runtime/README.md) for runtime setup.
+> **Detailed Documentation**: See `agents/definitions/` for phase prompts and [system/mcp-servers/odin-runtime/README.md](system/mcp-servers/odin-runtime/README.md) for runtime setup.
 
 ### Orchestrator Loop
 
@@ -124,9 +124,9 @@ This is the canonical step-by-step workflow the orchestrator follows for every f
 4. In `guarded`, STOP at human PR handoff. In `auto_pr`, create/record the PR when policy allows it, then wait for human merge.
 ```
 
-> **Remember**: Only the main orchestrator session can call `odin.*` tools. Task-spawned sub-agents cannot access MCP — they produce output that the orchestrator persists.
-
 When a project opts into runtime automation policy, the orchestrator must consult the `automation` block returned by `odin.prepare_phase_context` before attempting PR-related actions. `odin.record_pr` and `odin.record_merge` persist facts after external git/GitHub actions; they are not the trusted authorization boundary by themselves.
+
+> **Remember**: Only the main orchestrator session can call `odin.*` tools. Task-spawned sub-agents cannot access MCP — they produce output that the orchestrator persists.
 
 ### Feature Is the Unit of Execution
 
@@ -691,7 +691,7 @@ The runtime handles file upload (to Supabase Storage) and database recording aut
 - L1 steps can produce minimal output, but they must still execute
 - Forward transitions must be sequential: 0→1→2→3→4→5→6→7→8→9
 - Backward transitions (rework) can go to any earlier phase
-- Phase 10 (Complete) is set automatically when the release phase completes successfully
+- Phase 10 (Complete) is set automatically when the release phase completes successfully after the merge is recorded
 
 **Example**: An L1 bug fix still goes through all phases AND all steps:
 - Phase 0 (Planning): "Single bug fix, no epic"
@@ -724,7 +724,7 @@ Agents may create pull requests only when the release-phase `context.automation`
 
 ### Stop At The Human Boundary
 
-In the default `guarded` mode, the release flow stops at human PR handoff. If a project explicitly enables `automation.mode: auto_pr`, the orchestrator may create and record the PR when `context.automation.capabilities.can_open_pr` is true, but merge still waits for a human.
+In the default `guarded` mode, the release flow stops at human PR handoff. If a project explicitly enables `automation.mode: auto_pr`, the orchestrator may create and record the PR when `context.automation.capabilities.can_open_pr` is true, but merge still waits for a human. After the human merges, the orchestrator can re-pick the Release phase and close the feature through the runtime-owned completion path.
 
 ### Bug Fixes Create Learnings
 
@@ -778,7 +778,7 @@ Current runtime contract:
   - `DATABASE_URL` for direct PostgreSQL migrations
   - `SUPABASE_URL` + `SUPABASE_ACCESS_TOKEN` for Supabase Management API migrations
 
-Database schema is applied via `odin.apply_migrations`, which auto-detects existing schemas and tracks applied migrations. See [runtime/README.md](runtime/README.md) for full configuration.
+Database schema is applied via `odin.apply_migrations`, which auto-detects existing schemas and tracks applied migrations. See [system/mcp-servers/odin-runtime/README.md](system/mcp-servers/odin-runtime/README.md) for full configuration.
 
 ### MCP Limitation
 
@@ -835,7 +835,7 @@ Keep only Context & Goals and Acceptance Criteria.
 | `filesystem` | Direct file access | Recommended |
 | `github` | Pull issues, PRs, tickets | Optional |
 
-The `odin` server is the Odin MCP Runtime. It provides all `odin.*` tools, manages persistent workflow state through Supabase in `runtime.mode: supabase`, and supports migration-only direct PostgreSQL access through `odin.apply_migrations`. See [runtime/README.md](runtime/README.md) for setup.
+The `odin` server is the Odin MCP Runtime. It provides all `odin.*` tools, manages persistent workflow state through Supabase in `runtime.mode: supabase`, and supports migration-only direct PostgreSQL access through `odin.apply_migrations`. See [system/mcp-servers/odin-runtime/README.md](system/mcp-servers/odin-runtime/README.md) for setup.
 
 **Docker Gateway Toolkit:**
 
@@ -1035,6 +1035,16 @@ odin.publish_skill_proposal({
 ```
 odin.get_feature_status({ feature_id: "FEAT-001" })
 
+odin.pick_next_autonomous_phase({
+  supervisor_name: "ralph-loop"
+})
+
+odin.record_supervisor_event({
+  supervisor_name: "ralph-loop",
+  event_type: "tick_noop",
+  summary: "No autonomous phase is eligible right now."
+})
+
 odin.prepare_phase_context({ feature_id: "FEAT-001", phase: "9" })
 // inspect context.automation before any gh/PR action
 
@@ -1050,9 +1060,24 @@ odin.record_pr({
   pr_number: 42
 })
 
+odin.record_release_handoff({
+  feature_id: "FEAT-001",
+  summary: "Release handoff prepared and PR recorded.",
+  created_by: "ralph-loop"
+})
+
 odin.record_merge({
   feature_id: "FEAT-001",
   merged_by: "human"
+})
+
+odin.record_phase_result({
+  feature_id: "FEAT-001",
+  phase: "9",
+  outcome: "completed",
+  next_phase: "10",
+  summary: "Release closed after human merge",
+  created_by: "release-agent"
 })
 ```
 
@@ -1064,7 +1089,7 @@ odin.record_merge({
 ## Getting Started
 
 1. **Read the framework**: [SDD-framework.md](docs/framework/SDD-framework.md)
-2. **Set up the runtime**: [runtime/README.md](runtime/README.md)
+2. **Set up the runtime**: [system/mcp-servers/odin-runtime/README.md](system/mcp-servers/odin-runtime/README.md)
 3. **Understand agents**: `agents/definitions/`
 4. **See an example**: [example-workflow.md](docs/guides/example-workflow.md)
 5. **Database setup**: [SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md)

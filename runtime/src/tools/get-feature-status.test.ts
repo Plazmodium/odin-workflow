@@ -38,7 +38,6 @@ function createFeature(overrides: Partial<FeatureRecord> = {}): FeatureRecord {
     current_phase: '5',
     complexity_level: 2,
     severity: 'ROUTINE',
-    base_branch: 'main',
     branch_name: 'gr/feature/FEAT-002',
     created_at: '2026-03-13T00:00:00.000Z',
     updated_at: '2026-03-13T00:00:00.000Z',
@@ -226,6 +225,16 @@ describe('handleGetFeatureStatus', () => {
         capabilities: { can_open_pr: boolean };
         blocking_reasons: string[];
       };
+      autonomy: {
+        status: string;
+        detail: string;
+      };
+      release: {
+        pr_url: string | null;
+        pr_number: number | null;
+        merged_at: string | null;
+        completed_at: string | null;
+      };
       counts: Record<string, number>;
       current_phase: { name: string };
       next_phase: { name: string };
@@ -264,6 +273,16 @@ describe('handleGetFeatureStatus', () => {
       },
     });
     expect(status.automation.blocking_reasons).toContain('1 open blocker(s) still need resolution');
+    expect(status.autonomy).toMatchObject({
+      status: 'blocked',
+      detail: 'Needs approval',
+    });
+    expect(status.release).toEqual({
+      pr_url: null,
+      pr_number: null,
+      merged_at: null,
+      completed_at: null,
+    });
     expect(status.latest_review_check.summary).toBe('0 findings');
     expect(status.latest_feature_eval.overall_score).toBe(98);
     expect(status.workflow.claim_verification_summary).toEqual({

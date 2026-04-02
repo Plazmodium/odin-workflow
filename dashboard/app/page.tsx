@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { getLatestSystemHealth, getAllFeaturesSummary, getActiveAlerts, getQuickStats, getActiveLearningStats, getRecentLearnings } from '@/lib/data/health';
+import { getRalphLoopStatus } from '@/lib/data/loop';
 import { refreshSystemHealth } from '@/lib/actions/refresh-evals';
 import { HealthGauge } from '@/components/shared/health-gauge';
 import { RefreshEvalsButton } from '@/components/shared/refresh-evals-button';
@@ -8,6 +9,7 @@ import { AlertsPanel } from '@/components/health/alerts-panel';
 import { FeaturesTable } from '@/components/health/features-table';
 import { LearningSummary } from '@/components/health/learnings-summary';
 import { QuickStats } from '@/components/health/quick-stats';
+import { RalphLoopPanel } from '@/components/health/ralph-loop-panel';
 import { PollingSubscription } from '@/components/realtime/realtime-page';
 import { SoundNotificationWatcher } from '@/components/sound/sound-notification-watcher';
 import { PanelInfoTooltip } from '@/components/shared/panel-info-tooltip';
@@ -15,13 +17,14 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { formatRelativeTime, safeJsonValue } from '@/lib/utils';
 
 export default async function HealthOverviewPage() {
-  const [systemHealth, features, alerts, quickStats, learningStats, recentLearnings] = await Promise.all([
+  const [systemHealth, features, alerts, quickStats, learningStats, recentLearnings, ralphLoopStatus] = await Promise.all([
     getLatestSystemHealth(7),
     getAllFeaturesSummary(),
     getActiveAlerts(),
     getQuickStats(),
     getActiveLearningStats(),
     getRecentLearnings(5),
+    getRalphLoopStatus(),
   ]);
 
   return (
@@ -104,6 +107,8 @@ export default async function HealthOverviewPage() {
           <AlertsPanel alerts={alerts} />
         </div>
       </div>
+
+      <RalphLoopPanel status={ralphLoopStatus} />
 
       {/* Features Table */}
       <div>

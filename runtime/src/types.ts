@@ -65,6 +65,18 @@ export const SKILL_PROPOSAL_STATUSES = ['CANDIDATE', 'DRAFT_READY'] as const;
 export const SKILL_PROPOSAL_REVIEW_STATUSES = ['DRAFT', 'APPROVED', 'REJECTED', 'PUBLISHED'] as const;
 export const AUTOMATION_MODES = ['guarded', 'auto_pr', 'auto_merge'] as const;
 export const AUTOMATION_MERGE_STRATEGIES = ['squash', 'merge', 'rebase'] as const;
+export const AUTONOMY_BOARD_STATUSES = [
+  'ready_for_phase',
+  'running',
+  'blocked',
+  'waiting_on_review',
+  'waiting_on_watchers',
+  'waiting_on_human_pr',
+  'waiting_on_human_merge',
+  'completed',
+] as const;
+export const AUTONOMY_SELECTION_REASONS = ['ready_for_phase', 'merged_and_ready_to_close_release'] as const;
+export const SUPERVISOR_EVENT_TYPES = ['tick_started', 'tick_selected', 'tick_noop', 'tick_failed', 'tick_completed'] as const;
 
 export type PhaseId = (typeof PHASE_IDS)[number];
 export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
@@ -83,6 +95,9 @@ export type SkillProposalStatus = (typeof SKILL_PROPOSAL_STATUSES)[number];
 export type SkillProposalReviewStatus = (typeof SKILL_PROPOSAL_REVIEW_STATUSES)[number];
 export type AutomationMode = (typeof AUTOMATION_MODES)[number];
 export type AutomationMergeStrategy = (typeof AUTOMATION_MERGE_STRATEGIES)[number];
+export type AutonomyBoardStatus = (typeof AUTONOMY_BOARD_STATUSES)[number];
+export type AutonomySelectionReason = (typeof AUTONOMY_SELECTION_REASONS)[number];
+export type SupervisorEventType = (typeof SUPERVISOR_EVENT_TYPES)[number];
 
 export type PersistedTargetType = 'skill' | 'agent_definition' | 'agents_md';
 
@@ -131,6 +146,20 @@ export interface AutomationDecision {
     claims_needing_review: number;
     claim_verification: AutomationClaimVerificationSummary;
   };
+}
+
+export interface AutonomyFeatureState {
+  status: AutonomyBoardStatus;
+  detail: string;
+  can_pick_now: boolean;
+  selection_reason: AutonomySelectionReason | null;
+}
+
+export interface ReleaseStatusSummary {
+  pr_url: string | null;
+  pr_number: number | null;
+  merged_at: string | null;
+  completed_at: string | null;
 }
 
 export interface KnowledgeDomain {
@@ -289,6 +318,10 @@ export interface FeatureRecord {
   dev_initials?: string;
   branch_name?: string;
   base_branch?: string;
+  pr_url?: string;
+  pr_number?: number;
+  merged_at?: string;
+  completed_at?: string;
   author?: string;
   created_at: string;
   updated_at: string;
@@ -446,7 +479,7 @@ export interface PhaseAgentInstructions {
   role_summary: string;
   constraints: string[];
   definition_markdown?: string | null;
-  definition_source?: 'built_in' | 'none';
+  definition_source?: 'built_in' | 'project_local' | 'none';
   definition_source_path?: string | null;
 }
 

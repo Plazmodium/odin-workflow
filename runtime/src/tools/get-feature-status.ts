@@ -6,6 +6,7 @@
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
 import type { RuntimeConfig } from '../config.js';
 import { resolveAutomationDecision } from '../domain/automation-policy.js';
+import { deriveAutonomyFeatureState } from '../domain/autonomous-pickup.js';
 import { buildDevelopmentEvalContext } from '../domain/development-evals.js';
 import { getNextPhaseId, getPhaseContract } from '../domain/phases.js';
 import { formatOpenGateSummary } from '../domain/quality-gates.js';
@@ -114,12 +115,29 @@ export async function handleGetFeatureStatus(
     claim_verification,
     claims_needing_review_count: claims_needing_review.length,
   });
+  const autonomy = deriveAutonomyFeatureState({
+    feature,
+    automation,
+    open_blockers,
+    open_gate_records,
+    open_findings,
+    pending_claims,
+    claims_needing_review_count: claims_needing_review.length,
+    has_open_invocation: invocations.some((invocation) => invocation.ended_at == null),
+  });
 
   return createTextResult(
     `Feature ${feature.id} is ${feature.status} in ${current_phase.name}.`,
     {
       feature,
       automation,
+      autonomy,
+      release: {
+        pr_url: feature.pr_url ?? null,
+        pr_number: feature.pr_number ?? null,
+        merged_at: feature.merged_at ?? null,
+        completed_at: feature.completed_at ?? null,
+      },
       current_phase,
       next_phase,
       counts: {
@@ -142,10 +160,10 @@ export async function handleGetFeatureStatus(
           passed: claim_verification.filter((claim) => claim.final_status === 'PASS').length,
           failed: claim_verification.filter((claim) => claim.final_status === 'FAIL').length,
           needs_review: claim_verification.filter((claim) => claim.final_status === 'NEEDS_REVIEW').length,
-          pending: claim_verification.filter((claim) => claim.final_status === 'PENDING').length,
-        },
-        invocation_coverage,
+        pending: claim_verification.filter((claim) => claim.final_status === 'PENDING').length,
       },
+      invocation_coverage,
+    },
       development_evals,
       latest_feature_eval,
       latest_review_check,

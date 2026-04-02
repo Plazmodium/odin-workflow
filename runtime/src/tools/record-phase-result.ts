@@ -67,6 +67,18 @@ export async function handleRecordPhaseResult(
   const next_phase =
     input.outcome === 'completed' ? input.next_phase ?? getNextPhaseId(input.phase) : input.next_phase ?? null;
   const workflow_actor = resolveWorkflowActorName(input.phase, input.created_by);
+  const completing_feature = input.phase === '9' && input.outcome === 'completed' && next_phase === '10';
+
+  if (completing_feature && feature.merged_at == null) {
+    return createErrorResult(
+      `Feature ${input.feature_id} cannot complete Release until a merge has been recorded with odin.record_merge.`,
+      {
+        feature_id: input.feature_id,
+        phase: input.phase,
+        next_phase,
+      }
+    );
+  }
 
   if (input.phase === '5' && input.outcome === 'completed') {
     await completeBuilderTasks(adapter, input.feature_id, workflow_actor);
@@ -75,6 +87,7 @@ export async function handleRecordPhaseResult(
   let invocation_id = (
     await adapter.findOpenAgentInvocation(input.feature_id, input.phase, workflow_actor)
   )?.id ?? null;
+  let invocation_completed = false;
 
   if (invocation_id == null && input.phase !== '10') {
     try {
@@ -88,6 +101,22 @@ export async function handleRecordPhaseResult(
       invocation_id = invocation.id;
     } catch {
       console.error(`[Odin Runtime] Failed to start agent invocation for ${input.feature_id} phase ${input.phase}`);
+      }
+  }
+
+  if (completing_feature && invocation_id != null) {
+    try {
+      await adapter.completeAgentInvocation(invocation_id);
+      invocation_completed = true;
+    } catch {
+      return createErrorResult(
+        `Feature ${input.feature_id} could not complete Release because the phase 9 invocation could not be closed first.`,
+        {
+          feature_id: input.feature_id,
+          phase: input.phase,
+          invocation_id,
+        }
+      );
     }
   }
 
@@ -104,7 +133,7 @@ export async function handleRecordPhaseResult(
   });
 
   // GAP-1: Complete the agent invocation
-  if (invocation_id != null) {
+  if (invocation_id != null && !invocation_completed) {
     try {
       await adapter.completeAgentInvocation(invocation_id);
     } catch {
@@ -112,8 +141,10 @@ export async function handleRecordPhaseResult(
     }
   }
 
+  const should_record_phase_gate = input.outcome === 'completed' && (!completing_feature || updated_feature?.status === 'COMPLETED');
+
   // GAP-2: Record quality gate when phase completes
-  if (input.outcome === 'completed') {
+  if (should_record_phase_gate) {
     try {
       const phase_contract = getPhaseContract(input.phase);
       await adapter.recordQualityGate(
@@ -135,18 +166,37 @@ export async function handleRecordPhaseResult(
     });
   }
 
+  if (completing_feature && updated_feature.status !== 'COMPLETED') {
+    return createErrorResult(
+      `Feature ${input.feature_id} could not complete Release because the runtime completion guard blocked finalization.`,
+      {
+        feature: updated_feature,
+        next_phase,
+        blocking_reasons: await adapter.listOpenBlockers(input.feature_id),
+      }
+    );
+  }
+
   // GAP-3: Compute feature eval when feature completes
   let feature_eval: FeatureEvalSummary | null = null;
   let auto_archive: { files_archived: number; storage_path: string } | null = null;
   if (updated_feature.status === 'COMPLETED') {
-    try {
-      feature_eval = await adapter.computeFeatureEval(input.feature_id);
-    } catch {
-      console.error(`[Odin Runtime] Failed to compute feature eval for ${input.feature_id}`);
+    if (completing_feature) {
+      try {
+        feature_eval = await adapter.getLatestFeatureEval(input.feature_id);
+      } catch {
+        console.error(`[Odin Runtime] Failed to load feature eval for ${input.feature_id}`);
+      }
+    } else {
+      try {
+        feature_eval = await adapter.computeFeatureEval(input.feature_id);
+      } catch {
+        console.error(`[Odin Runtime] Failed to compute feature eval for ${input.feature_id}`);
+      }
     }
 
     // GAP-5: Auto-archive artifacts when feature completes
-    if (archive_adapter != null) {
+    if (!completing_feature && archive_adapter != null) {
       try {
         auto_archive = await autoArchiveFeature(
           adapter,
