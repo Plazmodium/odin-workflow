@@ -50,6 +50,8 @@ describe('odin-runtime-init', () => {
     const config = readFileSync(join(tmpDir, '.odin', 'config.yaml'), 'utf8');
     expect(config).toContain('mode: in_memory');
     expect(config).toContain('provider: none');
+    expect(config).toContain('automation:');
+    expect(config).toContain('mode: guarded');
 
     const odinGuide = readFileSync(join(tmpDir, '.odin', 'ODIN.md'), 'utf8');
     expect(odinGuide).toContain('# Odin');

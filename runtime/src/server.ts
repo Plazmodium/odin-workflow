@@ -92,6 +92,11 @@ console.error(`[Odin Runtime] Project root: ${runtime_summary.project_root}`);
 console.error(`[Odin Runtime] Runtime mode: ${runtime_summary.runtime_mode}`);
 console.error(`[Odin Runtime] Review adapter: ${runtime_summary.review_provider}`);
 console.error(`[Odin Runtime] Skills auto-detect: ${runtime_summary.skills_auto_detect ? 'enabled' : 'disabled'}`);
+console.error(
+  `[Odin Runtime] Automation mode: ${runtime_summary.automation_mode}` +
+    `${runtime_summary.automation_paused ? ' (paused)' : ''}` +
+    `${runtime_summary.automation_kill_switch ? ' (kill-switch active)' : ''}`
+);
 console.error(`[Odin Runtime] ${CONFIG_RESTART_NOTE}`);
 
 function createWorkflowStateAdapter(): WorkflowStateAdapter {
@@ -174,7 +179,7 @@ const formal_verification_adapter = createFormalVerificationAdapter(project_root
 const server = new McpServer(
   {
     name: 'odin',
-    version: '0.3.5-beta',
+    version: '0.3.6-beta',
   },
   {
     capabilities: {
@@ -207,10 +212,10 @@ server.registerTool(
   'odin.get_feature_status',
   {
     title: 'Get Feature Status',
-    description: 'Return a richer feature status bundle with workflow counts and recent activity.',
+    description: 'Return a richer feature status bundle with workflow counts, invocation coverage, recent activity, and the current automation snapshot.',
     inputSchema: GetFeatureStatusInputSchema,
   },
-  safeToolHandler(async (input) => handleGetFeatureStatus(workflow_state, input))
+  safeToolHandler(async (input) => handleGetFeatureStatus(workflow_state, runtime_config, input))
 );
 
 server.registerTool(
@@ -240,7 +245,7 @@ server.registerTool(
     description: 'Assemble the working bundle an agent needs for a feature phase.',
     inputSchema: PreparePhaseContextInputSchema,
   },
-  safeToolHandler(async (input) => handlePreparePhaseContext(workflow_state, skill_adapter, input))
+  safeToolHandler(async (input) => handlePreparePhaseContext(workflow_state, skill_adapter, runtime_config, input))
 );
 
 server.registerTool(
@@ -277,20 +282,20 @@ server.registerTool(
   'odin.record_pr',
   {
     title: 'Record Pull Request',
-    description: 'Record the GitHub pull request created for a feature.',
+    description: 'Record the GitHub pull request created for a feature and return the current automation snapshot.',
     inputSchema: RecordPullRequestInputSchema,
   },
-  safeToolHandler(async (input) => handleRecordPullRequest(workflow_state, input))
+  safeToolHandler(async (input) => handleRecordPullRequest(workflow_state, runtime_config, input))
 );
 
 server.registerTool(
   'odin.record_merge',
   {
     title: 'Record Merge',
-    description: 'Record that a human merged the feature pull request.',
+    description: 'Record that a human merged the feature pull request and return the current automation snapshot.',
     inputSchema: RecordMergeInputSchema,
   },
-  safeToolHandler(async (input) => handleRecordMerge(workflow_state, input))
+  safeToolHandler(async (input) => handleRecordMerge(workflow_state, runtime_config, input))
 );
 
 server.registerTool(

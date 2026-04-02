@@ -145,7 +145,10 @@ const PHASE_AGENT_INSTRUCTIONS: Record<PhaseId, PhaseAgentInstructions> = {
   '9': {
     name: 'release-agent',
     role_summary: 'Prepare PR, archival, and release metadata.',
-    constraints: ['Agents never merge; humans decide merges.'],
+    constraints: [
+      'Consult context.automation before any PR action; guarded mode stops at human handoff, auto_pr only continues on allowlisted branches with clean gates.',
+      'Agents never merge; humans decide merges.',
+    ],
   },
   '10': {
     name: 'complete-agent',

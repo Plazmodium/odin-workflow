@@ -4,11 +4,14 @@
  */
 
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import type { RuntimeConfig } from '../config.js';
+import { resolveAutomationDecision } from '../domain/automation-policy.js';
 import type { RecordPullRequestInput } from '../schemas.js';
 import { createErrorResult, createTextResult } from '../utils.js';
 
 export async function handleRecordPullRequest(
   adapter: WorkflowStateAdapter,
+  config: RuntimeConfig,
   input: RecordPullRequestInput
 ) {
   const feature = await adapter.getFeature(input.feature_id);
@@ -18,10 +21,31 @@ export async function handleRecordPullRequest(
     });
   }
 
+  const [open_blockers, open_gate_records, open_findings, pending_claims, claim_verification, claims_needing_review] =
+    await Promise.all([
+      adapter.listOpenBlockers(input.feature_id),
+      adapter.listOpenGateRecords(input.feature_id),
+      adapter.listOpenFindings(input.feature_id),
+      adapter.listPendingClaims(input.feature_id),
+      adapter.listClaimVerificationStatus(input.feature_id),
+      adapter.listClaimsNeedingReview(input.feature_id),
+    ]);
+
+  const automation = resolveAutomationDecision({
+    config,
+    feature,
+    open_blockers,
+    open_gate_records,
+    open_findings,
+    pending_claims,
+    claim_verification,
+    claims_needing_review_count: claims_needing_review.length,
+  });
+
   const pull_request = await adapter.recordPullRequest(input.feature_id, input.pr_url, input.pr_number);
 
   return createTextResult(
     `Recorded PR #${pull_request.pr_number} for feature ${pull_request.feature_id}.`,
-    { pull_request }
+    { pull_request, automation }
   );
 }

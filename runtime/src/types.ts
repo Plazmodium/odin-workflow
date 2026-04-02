@@ -63,6 +63,8 @@ export const ARTIFACT_OUTPUT_TYPES = [
 export const DEVELOPMENT_EVAL_MODES = ['l1_minimal', 'plan_required'] as const;
 export const SKILL_PROPOSAL_STATUSES = ['CANDIDATE', 'DRAFT_READY'] as const;
 export const SKILL_PROPOSAL_REVIEW_STATUSES = ['DRAFT', 'APPROVED', 'REJECTED', 'PUBLISHED'] as const;
+export const AUTOMATION_MODES = ['guarded', 'auto_pr', 'auto_merge'] as const;
+export const AUTOMATION_MERGE_STRATEGIES = ['squash', 'merge', 'rebase'] as const;
 
 export type PhaseId = (typeof PHASE_IDS)[number];
 export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
@@ -79,8 +81,57 @@ export type ArtifactOutputType = (typeof ARTIFACT_OUTPUT_TYPES)[number];
 export type DevelopmentEvalMode = (typeof DEVELOPMENT_EVAL_MODES)[number];
 export type SkillProposalStatus = (typeof SKILL_PROPOSAL_STATUSES)[number];
 export type SkillProposalReviewStatus = (typeof SKILL_PROPOSAL_REVIEW_STATUSES)[number];
+export type AutomationMode = (typeof AUTOMATION_MODES)[number];
+export type AutomationMergeStrategy = (typeof AUTOMATION_MERGE_STRATEGIES)[number];
 
 export type PersistedTargetType = 'skill' | 'agent_definition' | 'agents_md';
+
+export interface AutomationPolicyConfig {
+  mode: AutomationMode;
+  allowed_base_branches: string[];
+  require_green_checks: boolean;
+  require_clean_policy_checks: boolean;
+  require_no_open_blockers: boolean;
+  require_watched_claims_verified: boolean;
+  paused: boolean;
+  kill_switch: boolean;
+  merge_strategy: AutomationMergeStrategy;
+}
+
+export interface AutomationCapabilities {
+  can_open_pr: boolean;
+  can_update_pr: boolean;
+  can_merge: boolean;
+  can_continue_without_human_prompt: boolean;
+}
+
+export interface AutomationClaimVerificationSummary {
+  total: number;
+  passed: number;
+  failed: number;
+  needs_review: number;
+  pending: number;
+}
+
+export interface AutomationDecision {
+  configured_mode: AutomationMode;
+  effective_mode: Exclude<AutomationMode, 'auto_merge'>;
+  paused: boolean;
+  kill_switch_active: boolean;
+  base_branch: string | null;
+  allowed_base_branch: boolean;
+  capabilities: AutomationCapabilities;
+  blocking_reasons: string[];
+  next_human_boundary: 'pr' | 'merge';
+  preconditions: {
+    open_blockers: number;
+    open_gates: number;
+    open_findings: number;
+    pending_claims: number;
+    claims_needing_review: number;
+    claim_verification: AutomationClaimVerificationSummary;
+  };
+}
 
 export interface KnowledgeDomain {
   id: string;
@@ -403,6 +454,7 @@ export interface PhaseContextBundle {
   feature: FeatureRecord;
   phase: PhaseContract;
   agent: PhaseAgentInstructions;
+  automation: AutomationDecision;
   invocation: {
     id: string;
     agent_name: string;

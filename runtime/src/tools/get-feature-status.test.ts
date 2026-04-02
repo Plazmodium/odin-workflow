@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import type { RuntimeConfig } from '../config.js';
 import type {
   ClaimVerificationSummary,
   FeatureEvalSummary,
@@ -12,6 +13,23 @@ import type {
 } from '../types.js';
 import { handleGetFeatureStatus } from './get-feature-status.js';
 
+function createConfig(mode: 'guarded' | 'auto_pr'): RuntimeConfig {
+  return {
+    runtime: { mode: 'in_memory' },
+    automation: {
+      mode,
+      allowed_base_branches: ['main'],
+      require_green_checks: true,
+      require_clean_policy_checks: true,
+      require_no_open_blockers: true,
+      require_watched_claims_verified: true,
+      paused: false,
+      kill_switch: false,
+      merge_strategy: 'squash',
+    },
+  };
+}
+
 function createFeature(overrides: Partial<FeatureRecord> = {}): FeatureRecord {
   return {
     id: 'FEAT-002',
@@ -20,6 +38,7 @@ function createFeature(overrides: Partial<FeatureRecord> = {}): FeatureRecord {
     current_phase: '5',
     complexity_level: 2,
     severity: 'ROUTINE',
+    base_branch: 'main',
     branch_name: 'gr/feature/FEAT-002',
     created_at: '2026-03-13T00:00:00.000Z',
     updated_at: '2026-03-13T00:00:00.000Z',
@@ -87,6 +106,21 @@ function createWorkflowAdapter(feature: FeatureRecord | null): WorkflowStateAdap
     ]),
     listOpenFindings: vi.fn(async () => ['HIGH: Finding (file.ts)']),
     listPendingClaims: vi.fn(async () => ['CODE_MODIFIED by builder-agent (NEEDS_REVIEW)']),
+    listClaimsNeedingReview: vi.fn(async () => [
+      {
+        claim_id: 'claim_1',
+        feature_id: 'FEAT-002',
+        phase: '5',
+        agent_name: 'builder-agent',
+        claim_type: 'CODE_MODIFIED',
+        claim_description: 'Changed endpoint handlers',
+        evidence_refs: {},
+        risk_level: 'HIGH',
+        policy_verdict: 'NEEDS_REVIEW',
+        policy_reason: 'Missing evidence references',
+        created_at: '2026-03-13T01:00:00.000Z',
+      },
+    ]),
     listClaimVerificationStatus: vi.fn(async () => [
       {
         claim_id: 'claim_1',
@@ -143,12 +177,38 @@ function createWorkflowAdapter(feature: FeatureRecord | null): WorkflowStateAdap
         created_at: '2026-03-13T03:00:00.000Z',
       },
     ] as LearningRecord[]),
+    listAgentInvocations: vi.fn(async () => [
+      {
+        id: 'inv_1',
+        feature_id: 'FEAT-002',
+        phase: '1',
+        agent_name: 'product-agent',
+        operation: 'Phase 1: Product',
+        skills_used: [],
+        started_at: '2026-03-13T00:00:00.000Z',
+        ended_at: '2026-03-13T00:05:00.000Z',
+        duration_ms: 300000,
+      },
+      {
+        id: 'inv_2',
+        feature_id: 'FEAT-002',
+        phase: '2',
+        agent_name: 'discovery-agent',
+        operation: 'Phase 2: Discovery',
+        skills_used: [],
+        started_at: '2026-03-13T00:06:00.000Z',
+        ended_at: '2026-03-13T00:10:00.000Z',
+        duration_ms: 240000,
+      },
+    ]),
   } as unknown as WorkflowStateAdapter;
 }
 
 describe('handleGetFeatureStatus', () => {
   it('returns an error when the feature is missing', async () => {
     const result = await handleGetFeatureStatus(createWorkflowAdapter(null), {
+      runtime: { mode: 'in_memory' },
+    } as RuntimeConfig, {
       feature_id: 'MISSING',
     });
 
@@ -157,16 +217,27 @@ describe('handleGetFeatureStatus', () => {
   });
 
   it('returns counts, next phase, latest review check, and latest eval summary', async () => {
-    const result = await handleGetFeatureStatus(createWorkflowAdapter(createFeature()), {
+    const result = await handleGetFeatureStatus(createWorkflowAdapter(createFeature({ base_branch: 'main' })), createConfig('auto_pr'), {
       feature_id: 'FEAT-002',
     });
     const status = result.structuredContent as {
+      automation: {
+        configured_mode: string;
+        capabilities: { can_open_pr: boolean };
+        blocking_reasons: string[];
+      };
       counts: Record<string, number>;
       current_phase: { name: string };
       next_phase: { name: string };
       latest_review_check: { summary: string };
       latest_feature_eval: { overall_score: number };
-      workflow: { claim_verification_summary: Record<string, number> };
+      workflow: {
+        claim_verification_summary: Record<string, number>;
+        invocation_coverage: {
+          pre_release_complete: boolean;
+          pre_release_missing: Array<{ phase: string; agent_name: string }>;
+        };
+      };
       development_evals: unknown;
       claim_verification: unknown[];
       recent_artifacts: unknown[];
@@ -186,6 +257,13 @@ describe('handleGetFeatureStatus', () => {
     });
     expect(status.current_phase.name).toBe('Builder');
     expect(status.next_phase.name).toBe('Reviewer');
+    expect(status.automation).toMatchObject({
+      configured_mode: 'auto_pr',
+      capabilities: {
+        can_open_pr: false,
+      },
+    });
+    expect(status.automation.blocking_reasons).toContain('1 open blocker(s) still need resolution');
     expect(status.latest_review_check.summary).toBe('0 findings');
     expect(status.latest_feature_eval.overall_score).toBe(98);
     expect(status.workflow.claim_verification_summary).toEqual({
@@ -194,6 +272,11 @@ describe('handleGetFeatureStatus', () => {
       failed: 0,
       needs_review: 1,
       pending: 0,
+    });
+    expect(status.workflow.invocation_coverage.pre_release_complete).toBe(false);
+    expect(status.workflow.invocation_coverage.pre_release_missing).toContainEqual({
+      phase: '3',
+      agent_name: 'architect-agent',
     });
     expect(status.development_evals).toMatchObject({
       mode: 'plan_required',
@@ -210,5 +293,89 @@ describe('handleGetFeatureStatus', () => {
     expect(status.claim_verification).toHaveLength(2);
     expect(status.recent_artifacts).toHaveLength(3);
     expect(status.recent_learnings).toHaveLength(1);
+  });
+
+  it('keeps automation decisions aligned with watcher queue semantics', async () => {
+    const feature = createFeature({ base_branch: 'main' });
+    const adapter: WorkflowStateAdapter = {
+      ...createWorkflowAdapter(feature),
+      listPendingClaims: vi.fn(async () => []),
+      listClaimVerificationStatus: vi.fn(async () => [
+        {
+          claim_id: 'claim_1',
+          claim_type: 'CODE_MODIFIED',
+          agent_name: 'builder-agent',
+          risk_level: 'LOW',
+          policy_verdict: 'PASS',
+          watcher_verdict: null,
+          final_status: 'PASS',
+        },
+      ]),
+      listClaimsNeedingReview: vi.fn(async () => [
+        {
+          claim_id: 'claim_1',
+          feature_id: 'FEAT-002',
+          phase: '5',
+          agent_name: 'builder-agent',
+          claim_type: 'CODE_MODIFIED',
+          claim_description: 'Changed endpoint handlers',
+          evidence_refs: {},
+          risk_level: 'LOW',
+          policy_verdict: 'PASS',
+          policy_reason: 'Watcher review still required',
+          created_at: '2026-03-13T01:00:00.000Z',
+        },
+      ]),
+      listAgentInvocations: vi.fn(async () => []),
+    } as WorkflowStateAdapter;
+
+    const result = await handleGetFeatureStatus(adapter, createConfig('auto_pr'), {
+      feature_id: 'FEAT-002',
+    });
+    const status = result.structuredContent as {
+      automation: {
+        capabilities: { can_open_pr: boolean };
+        blocking_reasons: string[];
+      };
+    };
+
+    expect(status.automation.capabilities.can_open_pr).toBe(false);
+    expect(status.automation.blocking_reasons).toContain('1 claim(s) still need watcher review');
+  });
+
+  it('treats a completed phase as covered even when the invocation used a custom actor name', async () => {
+    const feature = createFeature({ base_branch: 'main' });
+    const adapter: WorkflowStateAdapter = {
+      ...createWorkflowAdapter(feature),
+      listAgentInvocations: vi.fn(async () => [
+        {
+          id: 'inv_custom_release',
+          feature_id: 'FEAT-002',
+          phase: '1',
+          agent_name: 'release-captain',
+          operation: 'Phase 1: Product',
+          skills_used: [],
+          started_at: '2026-03-13T00:00:00.000Z',
+          ended_at: '2026-03-13T00:05:00.000Z',
+          duration_ms: 300000,
+        },
+      ]),
+    } as WorkflowStateAdapter;
+
+    const result = await handleGetFeatureStatus(adapter, createConfig('auto_pr'), {
+      feature_id: 'FEAT-002',
+    });
+    const status = result.structuredContent as {
+      workflow: {
+        invocation_coverage: {
+          pre_release_missing: Array<{ phase: string; agent_name: string }>;
+        };
+      };
+    };
+
+    expect(status.workflow.invocation_coverage.pre_release_missing).not.toContainEqual({
+      phase: '1',
+      agent_name: 'product-agent',
+    });
   });
 });
