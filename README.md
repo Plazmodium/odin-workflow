@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.3.5--beta-orange" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.3.6--beta-orange" alt="Version">
   <img src="https://img.shields.io/badge/workflow-11_phase-blue" alt="11-phase workflow">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
 </p>
@@ -39,6 +39,8 @@ A feature in Odin moves through a defined workflow:
 - verification runs through the workflow
 - a human reviews the result at the pull request stage
 
+By default, Odin runs in a `guarded` automation mode: agents can prepare and record work, but the human boundary remains at PR creation/review/merge unless a project explicitly opts into limited `auto_pr` behavior.
+
 This is intentional. Odin is not trying to become a swarm scheduler, IDE replacement, or background agent platform. Its job is to help an AI coding assistant build a **coherent feature slice** with clear contracts, strong guardrails, and a clean human checkpoint at the end.
 
 ### What Odin Optimizes For
@@ -46,7 +48,7 @@ This is intentional. Odin is not trying to become a swarm scheduler, IDE replace
 - **Feature-level flow** — one feature branch, one feature spec, one feature moving through the workflow
 - **Spec discipline** — implementation follows an approved spec instead of drifting through ad-hoc prompts
 - **Clear accountability** — each phase produces artifacts, checks, and state transitions that can be inspected later
-- **Human review at the right boundary** — the PR is the final approval point for integration and merge decisions
+- **Human review at the right boundary** — by default the PR is the final approval point for integration and merge decisions
 - **Low coordination overhead** — less time orchestrating agent swarms, more time getting a feature to done
 
 ### What Odin Does Not Try To Be

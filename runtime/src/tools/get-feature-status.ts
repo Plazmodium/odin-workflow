@@ -4,14 +4,63 @@
  */
 
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import type { RuntimeConfig } from '../config.js';
+import { resolveAutomationDecision } from '../domain/automation-policy.js';
 import { buildDevelopmentEvalContext } from '../domain/development-evals.js';
 import { getNextPhaseId, getPhaseContract } from '../domain/phases.js';
 import { formatOpenGateSummary } from '../domain/quality-gates.js';
 import type { GetFeatureStatusInput } from '../schemas.js';
+import type { AgentInvocationRecord, PhaseId } from '../types.js';
 import { createErrorResult, createTextResult } from '../utils.js';
+
+const EXPECTED_RELEASE_COVERAGE: Array<{ phase: PhaseId; agent_name: string }> = [
+  { phase: '1', agent_name: 'product-agent' },
+  { phase: '2', agent_name: 'discovery-agent' },
+  { phase: '3', agent_name: 'architect-agent' },
+  { phase: '4', agent_name: 'guardian-agent' },
+  { phase: '5', agent_name: 'builder-agent' },
+  { phase: '6', agent_name: 'reviewer-agent' },
+  { phase: '7', agent_name: 'integrator-agent' },
+  { phase: '8', agent_name: 'documenter-agent' },
+  { phase: '9', agent_name: 'release-agent' },
+];
+
+function buildInvocationCoverage(
+  invocations: AgentInvocationRecord[],
+): {
+  completed: Array<{ phase: PhaseId; agent_name: string; started_at: string; ended_at: string; duration_ms: number }>;
+  pre_release_complete: boolean;
+  pre_release_missing: Array<{ phase: PhaseId; agent_name: string }>;
+  pre_completion_complete: boolean;
+  pre_completion_missing: Array<{ phase: PhaseId; agent_name: string }>;
+} {
+  const completed = invocations.filter(
+    (invocation): invocation is AgentInvocationRecord & { ended_at: string; duration_ms: number } =>
+      invocation.ended_at != null && invocation.duration_ms != null
+  );
+  const completed_phases = new Set(completed.map((invocation) => invocation.phase));
+  const pre_release_expected = EXPECTED_RELEASE_COVERAGE.filter((entry) => entry.phase !== '9');
+  const pre_release_missing = pre_release_expected.filter((entry) => !completed_phases.has(entry.phase));
+  const pre_completion_missing = EXPECTED_RELEASE_COVERAGE.filter((entry) => !completed_phases.has(entry.phase));
+
+  return {
+    completed: completed.map((invocation) => ({
+      phase: invocation.phase,
+      agent_name: invocation.agent_name,
+      started_at: invocation.started_at,
+      ended_at: invocation.ended_at,
+      duration_ms: invocation.duration_ms,
+    })),
+    pre_release_complete: pre_release_missing.length === 0,
+    pre_release_missing,
+    pre_completion_complete: pre_completion_missing.length === 0,
+    pre_completion_missing,
+  };
+}
 
 export async function handleGetFeatureStatus(
   adapter: WorkflowStateAdapter,
+  config: RuntimeConfig,
   input: GetFeatureStatusInput
 ) {
   const feature = await adapter.getFeature(input.feature_id);
@@ -30,6 +79,8 @@ export async function handleGetFeatureStatus(
     open_findings,
     pending_claims,
     claim_verification,
+    claims_needing_review,
+    invocations,
     latest_feature_eval,
   ] =
     await Promise.all([
@@ -41,6 +92,8 @@ export async function handleGetFeatureStatus(
       adapter.listOpenFindings(input.feature_id),
       adapter.listPendingClaims(input.feature_id),
       adapter.listClaimVerificationStatus(input.feature_id),
+      adapter.listClaimsNeedingReview(input.feature_id),
+      adapter.listAgentInvocations(input.feature_id),
       adapter.getLatestFeatureEval(input.feature_id),
     ]);
 
@@ -50,11 +103,23 @@ export async function handleGetFeatureStatus(
   const latest_review_check = review_checks.at(-1) ?? null;
   const open_gates = open_gate_records.map(formatOpenGateSummary);
   const development_evals = buildDevelopmentEvalContext(feature, feature.current_phase, artifacts, open_gate_records);
+  const invocation_coverage = buildInvocationCoverage(invocations);
+  const automation = resolveAutomationDecision({
+    config,
+    feature,
+    open_blockers,
+    open_gate_records,
+    open_findings,
+    pending_claims,
+    claim_verification,
+    claims_needing_review_count: claims_needing_review.length,
+  });
 
   return createTextResult(
     `Feature ${feature.id} is ${feature.status} in ${current_phase.name}.`,
     {
       feature,
+      automation,
       current_phase,
       next_phase,
       counts: {
@@ -79,6 +144,7 @@ export async function handleGetFeatureStatus(
           needs_review: claim_verification.filter((claim) => claim.final_status === 'NEEDS_REVIEW').length,
           pending: claim_verification.filter((claim) => claim.final_status === 'PENDING').length,
         },
+        invocation_coverage,
       },
       development_evals,
       latest_feature_eval,

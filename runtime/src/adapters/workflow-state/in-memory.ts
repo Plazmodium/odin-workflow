@@ -316,6 +316,10 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
     return [...(this.learnings.get(feature_id) ?? [])];
   }
 
+  async listAgentInvocations(feature_id: string): Promise<AgentInvocationRecord[]> {
+    return Array.from(this.invocations.values()).filter((invocation) => invocation.feature_id === feature_id);
+  }
+
   async findOpenAgentInvocation(
     feature_id: string,
     phase: PhaseId,
@@ -405,6 +409,13 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
       merged_by,
     };
   }
+
+  async recordAuditEvent(
+    _feature_id: string,
+    _operation: string,
+    _agent_name: string,
+    _details?: Record<string, unknown>
+  ): Promise<void> {}
 
   async recordQualityGate(
     feature_id: string,

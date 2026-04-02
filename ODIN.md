@@ -117,13 +117,16 @@ This is the canonical step-by-step workflow the orchestrator follows for every f
       - Phase 7 (Integrator): resolve any partial eval_run with runtime evidence
       - Phase 9 (Release): odin.verify_claims({ ... }), check coverage,
                              odin.archive_feature_release({ ... }),
-                             gh pr create
+                             inspect context.automation,
+                             gh pr create only when policy allows it
    g. odin.record_phase_result({ ..., outcome: "completed" })
                                                      # Advance to next phase
-4. STOP after PR creation — wait for human to merge
+4. In `guarded`, STOP at human PR handoff. In `auto_pr`, create/record the PR when policy allows it, then wait for human merge.
 ```
 
 > **Remember**: Only the main orchestrator session can call `odin.*` tools. Task-spawned sub-agents cannot access MCP — they produce output that the orchestrator persists.
+
+When a project opts into runtime automation policy, the orchestrator must consult the `automation` block returned by `odin.prepare_phase_context` before attempting PR-related actions. `odin.record_pr` and `odin.record_merge` persist facts after external git/GitHub actions; they are not the trusted authorization boundary by themselves.
 
 ### Feature Is the Unit of Execution
 
@@ -138,7 +141,7 @@ Odin executes work at the **feature** level.
 **Implication for orchestrators and agents**:
 - Use `odin.prepare_phase_context`, `odin.record_phase_artifact`, and `odin.record_phase_result` assuming a single feature-level source of truth
 - Update task status serially through the orchestrator as progress tracking
-- Keep human review at the PR boundary for the feature as a whole
+- Keep human review at the PR boundary for the feature as a whole unless the project explicitly opts into `automation.mode: auto_pr`
 
 In short: Odin orchestrates **features**, not concurrent sub-task swarms inside a feature.
 
@@ -596,9 +599,10 @@ The `dev_initials` and `author` parameters in `odin.start_feature` identify the 
 3. Transition to Phase 1 (Product) — all work happens on the feature branch
 4. Each phase: `odin.prepare_phase_context` → agent work → `odin.record_phase_artifact` → `odin.record_phase_result`
 5. `odin.prepare_phase_context` starts the phase invocation timer; `odin.record_phase_result` completes it
-6. Release phase creates PR via `gh pr create`, then records it with `odin.record_pr`
-7. Human reviews and merges the PR (NEVER the agent)
-8. After the human merges the PR, record the merge with `odin.record_merge`
+6. Release phase inspects `context.automation` from `odin.prepare_phase_context`
+7. In `guarded`, prepare the PR handoff for a human; in `auto_pr`, create the PR via `gh pr create` only when policy allows it, then record it with `odin.record_pr`
+8. Human reviews and merges the PR (NEVER the agent)
+9. After the human merges the PR, record the merge with `odin.record_merge`
 
 > **CRITICAL**: Create the git branch BEFORE calling `odin.start_feature`. If branch creation fails (e.g., branch already exists, git error), do NOT create the feature — you would have a dead DB record with no branch. The branch is the real artifact; the DB record is tracking.
 
@@ -707,7 +711,7 @@ Never write implementation code without an approved specification. The spec is t
 
 ### Agents NEVER Merge Branches
 
-Agents can CREATE pull requests but NEVER merge them. PR merging is ALWAYS a human decision.
+Agents may create pull requests only when the release-phase `context.automation` policy allows it. Projects can opt into `automation.mode: auto_pr` for autonomous PR creation/bookkeeping on allowlisted base branches. Agents NEVER merge branches. PR merging is ALWAYS a human decision in the current product.
 
 **What agents CAN do**:
 - `git checkout -b feature/X` - create branch
@@ -718,9 +722,9 @@ Agents can CREATE pull requests but NEVER merge them. PR merging is ALWAYS a hum
 - `git merge` / `git rebase` - NEVER
 - `gh pr merge` - NEVER
 
-### Stop After PR Creation
+### Stop At The Human Boundary
 
-When a PR is created, ALL work stops. The agent waits for the developer to review and merge.
+In the default `guarded` mode, the release flow stops at human PR handoff. If a project explicitly enables `automation.mode: auto_pr`, the orchestrator may create and record the PR when `context.automation.capabilities.can_open_pr` is true, but merge still waits for a human.
 
 ### Bug Fixes Create Learnings
 
@@ -738,7 +742,7 @@ Before Phase 9 release actions, the orchestrator MUST verify that all phases hav
 odin.get_feature_status({ feature_id: "FEAT-001" })
 ```
 
-Check the returned status for invocation coverage across phases 1-8 (before PR) and 1-9 (before completion).
+Check `workflow.invocation_coverage.pre_release_missing` before PR handoff and `workflow.invocation_coverage.pre_completion_missing` before final completion. The Release agent definition also includes the equivalent SQL shape for direct workflow-state inspection.
 
 **Expected phase/agent mapping**:
 
@@ -1031,6 +1035,9 @@ odin.publish_skill_proposal({
 ```
 odin.get_feature_status({ feature_id: "FEAT-001" })
 
+odin.prepare_phase_context({ feature_id: "FEAT-001", phase: "9" })
+// inspect context.automation before any gh/PR action
+
 odin.archive_feature_release({
   feature_id: "FEAT-001",
   summary: "JWT auth implementation",
@@ -1050,6 +1057,7 @@ odin.record_merge({
 ```
 
 > **Precondition**: Agent invocation coverage must pass before completing a feature.
+> In `guarded`, `odin.record_pr(...)` is only called after a human creates the PR. In `auto_pr`, the orchestrator may call it after creating the PR itself, but it must still stop before merge.
 
 ---
 

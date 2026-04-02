@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { SkillAdapter } from '../adapters/skills/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import type { RuntimeConfig } from '../config.js';
 import type { FeatureRecord, PhaseArtifact } from '../types.js';
 import { handlePreparePhaseContext } from './prepare-phase-context.js';
 
@@ -13,9 +14,27 @@ function createFeature(): FeatureRecord {
     current_phase: '5',
     complexity_level: 2,
     severity: 'ROUTINE',
+    base_branch: 'main',
     author: 'Jane Doe',
     created_at: '2026-03-20T00:00:00.000Z',
     updated_at: '2026-03-20T00:00:00.000Z',
+  };
+}
+
+function createConfig(mode: 'guarded' | 'auto_pr'): RuntimeConfig {
+  return {
+    runtime: { mode: 'in_memory' },
+    automation: {
+      mode,
+      allowed_base_branches: ['main'],
+      require_green_checks: true,
+      require_clean_policy_checks: true,
+      require_no_open_blockers: true,
+      require_watched_claims_verified: true,
+      paused: false,
+      kill_switch: false,
+      merge_strategy: 'squash',
+    },
   };
 }
 
@@ -66,6 +85,17 @@ describe('handlePreparePhaseContext', () => {
       ]),
       listOpenFindings: vi.fn(async () => []),
       listPendingClaims: vi.fn(async () => []),
+      listClaimVerificationStatus: vi.fn(async () => [
+        {
+          claim_id: 'claim_1',
+          claim_type: 'CODE_MODIFIED',
+          agent_name: 'builder-agent',
+          risk_level: 'LOW',
+          policy_verdict: 'NEEDS_REVIEW',
+          watcher_verdict: null,
+          final_status: 'NEEDS_REVIEW',
+        },
+      ]),
       listClaimsNeedingReview: vi.fn(async () => [
         {
           claim_id: 'claim_1',
@@ -107,7 +137,7 @@ describe('handlePreparePhaseContext', () => {
       invalidateCaches: vi.fn(),
     };
 
-    const result = await handlePreparePhaseContext(adapter, skillAdapter, {
+    const result = await handlePreparePhaseContext(adapter, skillAdapter, createConfig('auto_pr'), {
       feature_id: 'FEAT-CTX',
       phase: '5',
       include_artifacts: true,
@@ -131,6 +161,12 @@ describe('handlePreparePhaseContext', () => {
             definition_markdown: string | null;
             definition_source: string;
           };
+          automation: {
+            configured_mode: string;
+            next_human_boundary: string;
+            capabilities: { can_open_pr: boolean };
+            blocking_reasons: string[];
+          };
           verification: { required_checks: string[] };
           workflow: { claims_needing_review_count: number };
           development_evals: {
@@ -145,6 +181,13 @@ describe('handlePreparePhaseContext', () => {
     )?.context;
 
     expect(context).toMatchObject({
+      automation: {
+        configured_mode: 'auto_pr',
+        next_human_boundary: 'pr',
+        capabilities: {
+          can_open_pr: false,
+        },
+      },
       development_evals: {
         mode: 'plan_required',
         latest_plan: {
@@ -177,6 +220,8 @@ describe('handlePreparePhaseContext', () => {
     expect(context?.development_evals.harness_prompt_block).toContain(
       'Development Evals are required: the open `eval_readiness` gate is REJECTED. Respect that gate and escalate instead of bypassing it.'
     );
+    expect(context?.automation.blocking_reasons).toContain('2 open quality gate(s) still need resolution');
+    expect(context?.automation.blocking_reasons).toContain('1 claim(s) still require watcher resolution');
     expect(context?.agent.constraints).toContain(
       'Development Evals are required: the open `eval_readiness` gate is REJECTED. Respect that gate and escalate instead of bypassing it.'
     );
@@ -200,6 +245,7 @@ describe('handlePreparePhaseContext', () => {
       listOpenGateRecords: vi.fn(async () => []),
       listOpenFindings: vi.fn(async () => []),
       listPendingClaims: vi.fn(async () => []),
+      listClaimVerificationStatus: vi.fn(async () => []),
       listClaimsNeedingReview: vi.fn(async () => []),
       findOpenAgentInvocation: vi.fn(async () => null),
       startAgentInvocation: vi.fn(async () => ({
@@ -224,7 +270,7 @@ describe('handlePreparePhaseContext', () => {
       invalidateCaches: vi.fn(),
     };
 
-    const result = await handlePreparePhaseContext(adapter, skillAdapter, {
+    const result = await handlePreparePhaseContext(adapter, skillAdapter, createConfig('guarded'), {
       feature_id: 'FEAT-CTX',
       phase: '5',
       include_artifacts: false,
@@ -236,6 +282,10 @@ describe('handlePreparePhaseContext', () => {
       result.structuredContent as {
         context?: {
           artifacts: Record<string, unknown>;
+          automation: {
+            configured_mode: string;
+            blocking_reasons: string[];
+          };
           development_evals: {
             latest_plan: { output_type: string } | null;
             status_summary: string[];
@@ -245,6 +295,10 @@ describe('handlePreparePhaseContext', () => {
     )?.context;
 
     expect(context?.artifacts).toEqual({});
+    expect(context?.automation.configured_mode).toBe('guarded');
+    expect(context?.automation.blocking_reasons).toContain(
+      'automation.mode is guarded; human approval is required before PR creation'
+    );
     expect(context?.development_evals.latest_plan).toMatchObject({ output_type: 'eval_plan' });
     expect(context?.development_evals.status_summary).toContain(
       'Latest eval_plan recorded by agent at 2026-03-20T00:30:00.000Z.'

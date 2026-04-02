@@ -250,7 +250,7 @@ Agents that interact with git should:
 1. **Orchestrator**: Create the feature branch FIRST, then call `odin.start_feature()` — do NOT defer branch creation to Builder
 2. **Builder**: Commit after each task, include commit tracking in State Changes
 3. **Integrator**: Verify build and runtime on the feature branch
-4. **Release**: Create PR via `gh pr create`, request human review — **NEVER merge PRs**
+4. **Release**: Inspect `context.automation`; in `guarded`, prepare human PR handoff, and in `auto_pr`, create PR only when policy allows — **NEVER merge PRs**
 
 ### Developer Identity
 
@@ -284,7 +284,7 @@ The orchestrator records commits via `odin.record_commit()`.
 
 PR merging is ALWAYS a human decision. This applies to ALL agents with git/gh access. No exceptions. No "auto-merge if tests pass." No "merge if approved." NEVER.
 
-- **Release agent**: Creates PR via `gh pr create`, records PR URL via `odin.record_pr()`, then STOPS
+- **Release agent**: Reads `context.automation` first. In `guarded`, it prepares PR handoff for a human. In `auto_pr`, it may create the PR via `gh pr create`, record PR URL via `odin.record_pr()`, then STOP.
 - **Human**: Reviews, approves, and merges the PR
 - **After merge**: Human (or agent on instruction) calls `odin.record_merge()` to update tracking
 

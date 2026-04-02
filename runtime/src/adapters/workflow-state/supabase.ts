@@ -710,6 +710,34 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
     }));
   }
 
+  async listAgentInvocations(feature_id: string): Promise<AgentInvocationRecord[]> {
+    const { data, error } = await this.client
+      .from('agent_invocations')
+      .select('*')
+      .eq('feature_id', feature_id)
+      .order('started_at', { ascending: true });
+
+    if (error != null) {
+      throw new Error(`Failed to list agent invocations from Supabase: ${error.message}`);
+    }
+
+    if (data == null) {
+      return [];
+    }
+
+    return (data as JsonRecord[]).map((row) => ({
+      id: String(row.id),
+      feature_id: String(row.feature_id),
+      phase: String(row.phase) as PhaseId,
+      agent_name: String(row.agent_name),
+      operation: row.operation == null ? null : String(row.operation),
+      skills_used: Array.isArray(row.skills_used) ? row.skills_used.map((value) => String(value)) : [],
+      started_at: String(row.started_at),
+      ended_at: row.ended_at == null ? null : String(row.ended_at),
+      duration_ms: row.duration_ms == null ? null : Number(row.duration_ms),
+    }));
+  }
+
   async findOpenAgentInvocation(
     feature_id: string,
     phase: PhaseId,
@@ -875,6 +903,24 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
     };
   }
 
+  async recordAuditEvent(
+    feature_id: string,
+    operation: string,
+    agent_name: string,
+    details?: Record<string, unknown>
+  ): Promise<void> {
+    const { error } = await this.client.from('audit_log').insert({
+      feature_id,
+      operation,
+      agent_name,
+      details: details ?? {},
+    });
+
+    if (error != null) {
+      throw new Error(`Failed to record audit event ${operation}: ${error.message}`);
+    }
+  }
+
   async recordQualityGate(
     feature_id: string,
     gate_name: string,
@@ -923,20 +969,18 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
     }
 
     const gate_id = Number(data.id);
-    const { error: audit_error } = await this.client.from('audit_log').insert({
-      feature_id,
-      operation: `GATE_${status}`,
-      agent_name: approver,
-      details: {
-        gate_id,
-        gate_name,
-        status,
-        phase: effective_phase,
-      },
-    });
+    const audit_result = await this.recordAuditEvent(feature_id, `GATE_${status}`, approver, {
+      gate_id,
+      gate_name,
+      status,
+      phase: effective_phase,
+    }).then(
+      () => null,
+      (error: unknown) => error,
+    );
 
-    if (audit_error != null) {
-      console.error(`[Odin Runtime] Failed to record audit log for quality gate ${gate_name}: ${audit_error.message}`);
+    if (audit_result instanceof Error) {
+      console.error(`[Odin Runtime] Failed to record audit log for quality gate ${gate_name}: ${audit_result.message}`);
     }
 
     return gate_id;

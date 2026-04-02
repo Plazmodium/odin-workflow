@@ -140,8 +140,8 @@ Your AI agent now has these tools available:
 | `odin.record_phase_artifact` | Register a phase output (PRD, spec, tasks, etc.) |
 | `odin.submit_claim` | Submit a watched-agent claim for policy and watcher verification |
 | `odin.record_commit` | Persist git commit metadata for a feature |
-| `odin.record_pr` | Persist pull request metadata for dashboard/git tracking |
-| `odin.record_merge` | Persist that a human merged the feature PR |
+| `odin.record_pr` | Persist pull request metadata for dashboard/git tracking and return the current automation snapshot |
+| `odin.record_merge` | Persist that a human merged the feature PR and return the current automation snapshot |
 | `odin.record_quality_gate` | Persist an explicit workflow quality gate decision |
 | `odin.record_eval_plan` | Persist a structured Architect `eval_plan` artifact |
 | `odin.record_eval_run` | Persist a structured Reviewer/Integrator `eval_run` artifact |
@@ -156,7 +156,7 @@ Your AI agent now has these tools available:
 | `odin.record_skill_proposal_decision` | Approve or reject a drafted skill proposal |
 | `odin.publish_skill_proposal` | Publish an approved skill proposal into `.odin/skills/generated/` |
 | `odin.sync_skill_proposal_candidates` | Persist the current deterministic proposal queue for later review/approval workflows |
-| `odin.get_feature_status` | Inspect feature state with workflow details |
+| `odin.get_feature_status` | Inspect feature state with workflow details, invocation coverage, and the current automation snapshot |
 | `odin.verify_claims` | Check claim verification status |
 | `odin.get_claims_needing_review` | List claims waiting for watcher review |
 | `odin.record_watcher_review` | Record the watcher verdict for an escalated claim |
@@ -200,6 +200,17 @@ skills:
 review:
   provider: semgrep
 
+automation:
+  mode: guarded
+  allowed_base_branches: []
+  require_green_checks: true
+  require_clean_policy_checks: true
+  require_no_open_blockers: true
+  require_watched_claims_verified: true
+  paused: false
+  kill_switch: false
+  merge_strategy: squash
+
 formal_verification:
   provider: none           # set to "tla-precheck" after installing Java 17+ and `npm install -D tla-precheck`
   timeout_seconds: 120
@@ -226,6 +237,22 @@ SUPABASE_ACCESS_TOKEN=your-management-api-access-token
 - **`in_memory`** — Zero-dependency smoke-test mode. State is lost when the process exits. Useful for testing MCP wiring and prompt flow before provisioning Supabase.
 
 > **Note on `DATABASE_URL`**: today it powers `odin.apply_migrations`, including local PostgreSQL or local Supabase Postgres access. The main Odin workflow runtime still uses the Supabase workflow-state adapter when `runtime.mode: supabase`.
+
+### Automation Modes
+
+- **`guarded`** — default; humans remain the PR creation/review/merge boundary
+- **`auto_pr`** — opt-in; autonomous PR recording is allowed only on allowlisted base branches with clean blockers/gates/policy checks
+- **`auto_merge`** — reserved for future use and intentionally unsupported today; runtime startup fails fast if configured
+
+Notes:
+
+- `allowed_base_branches: []` is intentionally deny-by-default for autonomous PR actions
+- `paused: true` temporarily stops autonomous actions without changing the configured mode
+- `kill_switch: true` hard-stops autonomous actions until a human re-enables them
+- `odin.prepare_phase_context` includes an `automation` block so agents/orchestrators can inspect the effective policy and blocking reasons before attempting PR actions
+- `odin.get_feature_status` also returns the current `automation` snapshot and invocation-coverage summaries for out-of-band orchestration checks or release status reads
+- `odin.record_pr` and `odin.record_merge` return the current `automation` snapshot with the recorded metadata so orchestrators can keep policy state alongside persisted PR/merge facts
+- PR creation and merge execution still happen outside the runtime via git/GitHub tooling, so the trusted enforcement boundary in this release is the orchestrator consulting `context.automation` before it acts; the record tools persist facts after the external action happens
 
 ## Optional: TLA+ Design Verification
 
