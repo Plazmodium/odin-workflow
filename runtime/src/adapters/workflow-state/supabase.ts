@@ -15,6 +15,7 @@ import type {
   FeatureCommitRecord,
   FeatureEvalSummary,
   FeatureRecord,
+  FeatureStatus,
   LearningRecord,
   PolicyCheckResult,
   PersistedTargetType,
@@ -34,6 +35,7 @@ import type {
 } from '../../types.js';
 import type {
   ListAllLearningsFilter,
+  ListFeaturesFilter,
   ListSkillProposalCandidatesFilter,
   ListSkillProposalsFilter,
   WorkflowStateAdapter,
@@ -96,6 +98,10 @@ function toFeatureRecord(row: JsonRecord): FeatureRecord {
     dev_initials: row.dev_initials == null ? undefined : String(row.dev_initials),
     branch_name: row.branch_name == null ? undefined : String(row.branch_name),
     base_branch: row.base_branch == null ? undefined : String(row.base_branch),
+    pr_url: row.pr_url == null ? undefined : String(row.pr_url),
+    pr_number: row.pr_number == null ? undefined : Number(row.pr_number),
+    merged_at: row.merged_at == null ? undefined : String(row.merged_at),
+    completed_at: row.completed_at == null ? undefined : String(row.completed_at),
     author: row.author == null ? undefined : String(row.author),
     created_at: String(row.created_at ?? new Date().toISOString()),
     updated_at: String(row.updated_at ?? new Date().toISOString()),
@@ -130,6 +136,10 @@ function toQualityGateRecord(row: JsonRecord): QualityGateRecord {
 
 export function shouldTransitionPhaseResult(result: PhaseResultRecord): boolean {
   return result.outcome !== 'blocked' && result.next_phase != null && result.next_phase !== result.phase;
+}
+
+export function shouldCompleteFeatureFromPhaseResult(result: PhaseResultRecord): boolean {
+  return result.outcome === 'completed' && result.phase === '9' && result.next_phase === '10';
 }
 
 export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
@@ -196,7 +206,34 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       return null;
     }
 
+    if (Array.isArray(data) && data.length === 0) {
+      return null;
+    }
+
     return toFeatureRecord(getSingleRpcRow(data, 'fetch feature status from Supabase'));
+  }
+
+  async listFeatures(filter?: ListFeaturesFilter): Promise<FeatureRecord[]> {
+    let query = this.client
+      .from('features')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (filter?.statuses != null && filter.statuses.length > 0) {
+      query = query.in('status', filter.statuses as FeatureStatus[]);
+    }
+
+    const { data, error } = await query;
+
+    if (error != null) {
+      throw new Error(`Failed to list features from Supabase: ${error.message}`);
+    }
+
+    if (data == null) {
+      return [];
+    }
+
+    return (data as JsonRecord[]).map(toFeatureRecord);
   }
 
   async recordPhaseArtifact(artifact: PhaseArtifact): Promise<PhaseArtifact> {
@@ -252,6 +289,10 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
   }
 
   async recordPhaseResult(result: PhaseResultRecord): Promise<FeatureRecord | null> {
+    if (shouldCompleteFeatureFromPhaseResult(result)) {
+      return this.completeFeature(result.feature_id, result.created_by);
+    }
+
     if (shouldTransitionPhaseResult(result)) {
       const { error } = await this.client.rpc('transition_phase', {
         p_feature_id: result.feature_id,
@@ -285,6 +326,23 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
     }
 
     return this.getFeature(result.feature_id);
+  }
+
+  async completeFeature(feature_id: string, completed_by: string): Promise<FeatureRecord | null> {
+    const { data, error } = await this.client.rpc('complete_feature', {
+      p_feature_id: feature_id,
+      p_completed_by: completed_by,
+    });
+
+    if (error != null) {
+      throw new Error(`Failed to complete feature in Supabase: ${error.message}`);
+    }
+
+    if (data === false) {
+      return this.getFeature(feature_id);
+    }
+
+    return this.getFeature(feature_id);
   }
 
   async listOpenBlockers(feature_id: string): Promise<string[]> {
@@ -904,7 +962,7 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
   }
 
   async recordAuditEvent(
-    feature_id: string,
+    feature_id: string | null,
     operation: string,
     agent_name: string,
     details?: Record<string, unknown>

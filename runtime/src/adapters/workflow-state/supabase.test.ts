@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { RuntimeConfig } from '../../config.js';
-import { SupabaseWorkflowStateAdapter, shouldTransitionPhaseResult } from './supabase.js';
+import { SupabaseWorkflowStateAdapter, shouldCompleteFeatureFromPhaseResult, shouldTransitionPhaseResult } from './supabase.js';
 
 describe('shouldTransitionPhaseResult', () => {
   it('transitions completed results when next phase differs', () => {
@@ -47,6 +47,38 @@ describe('shouldTransitionPhaseResult', () => {
         next_phase: '7',
         blockers: ['Needs decision'],
         created_by: 'tester',
+        created_at: '2026-03-13T00:00:00.000Z',
+      })
+    ).toBe(false);
+  });
+});
+
+describe('shouldCompleteFeatureFromPhaseResult', () => {
+  it('completes only the merged Release handoff transition to phase 10', () => {
+    expect(
+      shouldCompleteFeatureFromPhaseResult({
+        id: 'result_release',
+        feature_id: 'FEAT-001',
+        phase: '9',
+        outcome: 'completed',
+        summary: 'release done',
+        next_phase: '10',
+        blockers: [],
+        created_by: 'release-agent',
+        created_at: '2026-03-13T00:00:00.000Z',
+      })
+    ).toBe(true);
+
+    expect(
+      shouldCompleteFeatureFromPhaseResult({
+        id: 'result_builder',
+        feature_id: 'FEAT-001',
+        phase: '5',
+        outcome: 'completed',
+        summary: 'builder done',
+        next_phase: '6',
+        blockers: [],
+        created_by: 'builder-agent',
         created_at: '2026-03-13T00:00:00.000Z',
       })
     ).toBe(false);
@@ -107,6 +139,32 @@ describe('SupabaseWorkflowStateAdapter.recordCommit', () => {
   });
 });
 
+describe('SupabaseWorkflowStateAdapter.getFeature', () => {
+  function createAdapterWithRpc(rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: null }>) {
+    const adapter = new SupabaseWorkflowStateAdapter({
+      supabase: {
+        url: 'https://example.supabase.co',
+        secret_key: 'test-secret-key',
+      },
+    } as RuntimeConfig);
+
+    Object.assign(adapter, {
+      client: {
+        rpc,
+      },
+    });
+
+    return adapter;
+  }
+
+  it('returns null when get_feature_status returns no rows', async () => {
+    const rpc = vi.fn(async () => ({ data: [], error: null }));
+    const adapter = createAdapterWithRpc(rpc);
+
+    await expect(adapter.getFeature('MISSING')).resolves.toBeNull();
+  });
+});
+
 describe('SupabaseWorkflowStateAdapter.listAgentInvocations', () => {
   function createAdapterWithClient(client: Record<string, unknown>) {
     const adapter = new SupabaseWorkflowStateAdapter({
@@ -160,6 +218,65 @@ describe('SupabaseWorkflowStateAdapter.listAgentInvocations', () => {
         duration_ms: 600000,
       },
     ]);
+  });
+});
+
+describe('SupabaseWorkflowStateAdapter.completeFeature', () => {
+  function createAdapterWithClient(client: Record<string, unknown>) {
+    const adapter = new SupabaseWorkflowStateAdapter({
+      supabase: {
+        url: 'https://example.supabase.co',
+        secret_key: 'test-secret-key',
+      },
+    } as RuntimeConfig);
+
+    Object.assign(adapter, { client });
+    return adapter;
+  }
+
+  it('calls the completion RPC and returns the refreshed feature record', async () => {
+    const rpc = vi.fn(async (fn: string) => {
+      if (fn === 'complete_feature') {
+        return { data: true, error: null };
+      }
+
+      if (fn === 'get_feature_status') {
+        return {
+          data: {
+            feature_id: 'FEAT-DONE',
+            feature_name: 'Done',
+            status: 'COMPLETED',
+            current_phase: '10',
+            complexity_level: 2,
+            severity: 'ROUTINE',
+            pr_url: 'https://github.com/org/repo/pull/42',
+            pr_number: 42,
+            merged_at: '2026-04-02T00:00:00.000Z',
+            completed_at: '2026-04-02T00:05:00.000Z',
+            created_at: '2026-04-01T00:00:00.000Z',
+            updated_at: '2026-04-02T00:05:00.000Z',
+          },
+          error: null,
+        };
+      }
+
+      throw new Error(`Unexpected RPC ${fn}`);
+    });
+    const adapter = createAdapterWithClient({ rpc });
+
+    const feature = await adapter.completeFeature('FEAT-DONE', 'release-agent');
+
+    expect(rpc).toHaveBeenCalledWith('complete_feature', {
+      p_feature_id: 'FEAT-DONE',
+      p_completed_by: 'release-agent',
+    });
+    expect(feature).toMatchObject({
+      id: 'FEAT-DONE',
+      status: 'COMPLETED',
+      current_phase: '10',
+      merged_at: '2026-04-02T00:00:00.000Z',
+      completed_at: '2026-04-02T00:05:00.000Z',
+    });
   });
 });
 

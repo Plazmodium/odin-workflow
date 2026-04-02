@@ -619,6 +619,15 @@ export interface AuditLogEntry {
   details: Record<string, unknown> | null;
 }
 
+export interface RalphLoopStatus {
+  latest_outcome: 'idle' | 'running' | 'selected' | 'noop' | 'failed' | 'completed';
+  last_tick_at: string | null;
+  last_selected_feature_id: string | null;
+  last_selected_phase: string | null;
+  last_noop_reason: string | null;
+  last_failure_summary: string | null;
+}
+
 // ============================================================
 // RPC function return types
 // ============================================================

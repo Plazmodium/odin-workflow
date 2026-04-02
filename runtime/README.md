@@ -15,7 +15,7 @@ npx -y @plazmodium/odin init --project-root /path/to/your/project --tool opencod
 Maintainer repo-checkout flow:
 
 ```bash
-cd runtime
+cd system/mcp-servers/odin-runtime
 npm install
 npm run build
 ```
@@ -34,8 +34,6 @@ npm run init:project -- --project-root /path/to/your/project --tool codex --dist
 
 This creates:
 - `.odin/config.yaml` — runtime configuration (commit this)
-- `.odin/ODIN.md` — bundled Odin framework guide for the harness to read locally
-- `.odin/agents/definitions/` — bundled phase agent definitions and shared context
 - `.odin/skills/` — project-local skill overrides (commit this)
 - `.env.example` — required environment variables (commit this)
 - Your harness config file (`opencode.json`, `.mcp.json`, or `.codex/config.toml`, depending on tool)
@@ -44,7 +42,7 @@ Important: Odin bootstraps with `runtime.mode: in_memory` by default so MCP wiri
 
 If you are developing Odin from this repo, use the repo-checkout `--distribution source` flow shown above.
 
-If you are the maintainer preparing that publish, use [the npm publish guide](https://github.com/Plazmodium/odin-workflow/blob/dev/docs/guides/NPM-PUBLISH.md).
+If you are the maintainer preparing that publish, use [`docs/guides/NPM-PUBLISH.md`](../../../docs/guides/NPM-PUBLISH.md).
 
 ### Manual MCP wiring
 
@@ -135,6 +133,7 @@ Your AI agent now has these tools available:
 |------|---------|
 | `odin.start_feature` | Create a feature in the workflow |
 | `odin.get_next_phase` | Ask "what should happen next?" |
+| `odin.pick_next_autonomous_phase` | Let Ralph Loop pick the next safe feature/phase and return prepared context |
 | `odin.prepare_phase_context` | Get the full working bundle for a phase |
 | `odin.get_development_eval_status` | Inspect focused development-eval state for a feature |
 | `odin.record_phase_artifact` | Register a phase output (PRD, spec, tasks, etc.) |
@@ -142,7 +141,11 @@ Your AI agent now has these tools available:
 | `odin.record_commit` | Persist git commit metadata for a feature |
 | `odin.record_pr` | Persist pull request metadata for dashboard/git tracking and return the current automation snapshot |
 | `odin.record_merge` | Persist that a human merged the feature PR and return the current automation snapshot |
+| `odin.record_release_handoff` | Close the active Release invocation after PR handoff while keeping the feature in phase 9 |
+| `odin.record_release_handoff_failure` | Close the active Release invocation after a failed PR handoff attempt so Ralph Loop can retry later |
+| `odin.record_release_closeout_failure` | Close the active Release invocation after a failed release closeout attempt so Ralph Loop can retry later |
 | `odin.record_quality_gate` | Persist an explicit workflow quality gate decision |
+| `odin.record_supervisor_event` | Persist Ralph Loop tick/no-op/failure/completion events for operator visibility |
 | `odin.record_eval_plan` | Persist a structured Architect `eval_plan` artifact |
 | `odin.record_eval_run` | Persist a structured Reviewer/Integrator `eval_run` artifact |
 | `odin.record_phase_result` | Record phase completion, blocking, or rework |
@@ -168,10 +171,7 @@ Your AI agent now has these tools available:
 
 `@plazmodium/odin` ships the MCP runtime only. It does **not** bundle the Next.js dashboard.
 
-If you want the dashboard UI for feature health, learnings, claims, and eval visibility, use the full Odin repository:
-
-- Repo: https://github.com/Plazmodium/odin-workflow
-- Dashboard app: https://github.com/Plazmodium/odin-workflow/tree/dev/dashboard
+If you want the dashboard UI for feature health, learnings, claims, and eval visibility, use the full Odin repository and run the dashboard app from `system/dashboard/`.
 
 The dashboard is a separate app and is not included in the npm tarball.
 
@@ -251,8 +251,12 @@ Notes:
 - `kill_switch: true` hard-stops autonomous actions until a human re-enables them
 - `odin.prepare_phase_context` includes an `automation` block so agents/orchestrators can inspect the effective policy and blocking reasons before attempting PR actions
 - `odin.get_feature_status` also returns the current `automation` snapshot and invocation-coverage summaries for out-of-band orchestration checks or release status reads
+- `odin.pick_next_autonomous_phase` gives a queue-safe read path for Ralph Loop style orchestration without inventing a second workflow engine inside the runtime
+- `odin.record_release_handoff` lets an external loop runner archive/create/record a PR, then close the active Release invocation cleanly while waiting for human merge
+- `odin.record_supervisor_event` lets an external loop runner publish operational state into `audit_log` without coupling itself directly to Supabase
 - `odin.record_pr` and `odin.record_merge` return the current `automation` snapshot with the recorded metadata so orchestrators can keep policy state alongside persisted PR/merge facts
 - PR creation and merge execution still happen outside the runtime via git/GitHub tooling, so the trusted enforcement boundary in this release is the orchestrator consulting `context.automation` before it acts; the record tools persist facts after the external action happens
+- after a merge is recorded, `odin.record_phase_result({ phase: '9', outcome: 'completed', next_phase: '10' })` now uses the runtime-owned completion flow instead of a raw status flip
 
 ## Optional: TLA+ Design Verification
 
@@ -308,10 +312,8 @@ Recommended harness behavior:
 ```text
 1. Call odin.prepare_phase_context(...)
 2. Build the agent prompt from:
-   - .odin/ODIN.md (framework-level rules)
    - context.agent.role_summary
    - context.agent.constraints
-   - context.agent.definition_markdown
    - context.development_evals.harness_prompt_block
 3. Keep context.development_evals.status_summary visible to the operator
 4. Do not treat eval instructions as a replacement for formal verification, Semgrep, tests, runtime checks, or watcher checks
@@ -321,16 +323,14 @@ Canonical eval-aware orchestration snippet:
 
 ```text
 When orchestrating Odin phases:
-1. Read `.odin/ODIN.md` once so the harness has the framework-level rules in project context.
-2. Call odin.prepare_phase_context({ feature_id, phase, agent_name }).
-3. Build the active agent prompt from:
+1. Call odin.prepare_phase_context({ feature_id, phase, agent_name }).
+2. Build the active agent prompt from:
    - context.agent.role_summary
    - context.agent.constraints
-   - context.agent.definition_markdown
    - context.development_evals.harness_prompt_block
-4. Use odin.get_development_eval_status({ feature_id }) when you need focused eval state.
-5. Record eval artifacts/gates with odin.record_eval_plan, odin.record_eval_run, and odin.record_quality_gate.
-6. Never let Development Evals override odin.verify_design, odin.run_review_checks, tests, runtime verification, or watcher checks.
+3. Use odin.get_development_eval_status({ feature_id }) when you need focused eval state.
+4. Record eval artifacts/gates with odin.record_eval_plan, odin.record_eval_run, and odin.record_quality_gate.
+5. Never let Development Evals override odin.verify_design, odin.run_review_checks, tests, runtime verification, or watcher checks.
 ```
 
 If the harness wants a focused eval-only read path instead of parsing `odin.get_feature_status`, call:
@@ -354,6 +354,8 @@ Drop skill files into `.odin/skills/` to override or extend built-in skills:
 ```
 
 Odin resolves project-local skills with higher precedence than built-in skills when names match.
+
+Approved generated skills publish into `.odin/skills/generated/` so they are visible to the normal project-local skill resolver without mutating Odin's packaged built-ins.
 
 ## Memory Palace: Semantic Learning Propagation
 

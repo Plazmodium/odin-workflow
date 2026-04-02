@@ -15,6 +15,8 @@ import {
   REVIEW_TOOLS,
   SKILL_PROPOSAL_STATUSES,
   SKILL_PROPOSAL_REVIEW_STATUSES,
+  SUPERVISOR_EVENT_TYPES,
+  AUTONOMY_SELECTION_REASONS,
   WATCHER_REVIEW_VERDICTS,
 } from './types.js';
 
@@ -35,6 +37,24 @@ export const RecordPullRequestInputSchema = z.object({
   feature_id: z.string().min(1),
   pr_url: z.string().url(),
   pr_number: z.int().positive(),
+});
+
+export const RecordReleaseHandoffInputSchema = z.object({
+  feature_id: z.string().min(1),
+  summary: z.string().min(1),
+  created_by: z.string().min(1),
+});
+
+export const RecordReleaseHandoffFailureInputSchema = z.object({
+  feature_id: z.string().min(1),
+  summary: z.string().min(1),
+  created_by: z.string().min(1),
+});
+
+export const RecordReleaseCloseoutFailureInputSchema = z.object({
+  feature_id: z.string().min(1),
+  summary: z.string().min(1),
+  created_by: z.string().min(1),
 });
 
 export const RecordCommitInputSchema = z.object({
@@ -108,6 +128,25 @@ export const GetNextPhaseInputSchema = z.object({
 
 export const GetFeatureStatusInputSchema = z.object({
   feature_id: z.string().min(1),
+});
+
+export const PickNextAutonomousPhaseInputSchema = z.object({
+  supervisor_name: z.string().min(1).default('ralph-loop'),
+  agent_name: z.string().optional(),
+  include_artifacts: z.boolean().default(true),
+  include_skills: z.boolean().default(true),
+  include_learnings: z.boolean().default(true),
+  allowed_phases: z.array(phase_id_schema).optional(),
+  allowed_selection_reasons: z.array(z.enum(AUTONOMY_SELECTION_REASONS)).optional(),
+});
+
+export const RecordSupervisorEventInputSchema = z.object({
+  supervisor_name: z.string().min(1),
+  event_type: z.enum(SUPERVISOR_EVENT_TYPES),
+  summary: z.string().min(1),
+  feature_id: z.string().min(1).nullable().optional(),
+  phase: phase_id_schema.optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const GetDevelopmentEvalStatusInputSchema = z.object({
@@ -259,12 +298,17 @@ export type VerifyDesignInput = z.infer<typeof VerifyDesignInputSchema>;
 export type StartFeatureInput = z.infer<typeof StartFeatureInputSchema>;
 export type RecordPullRequestInput = z.infer<typeof RecordPullRequestInputSchema>;
 export type RecordCommitInput = z.infer<typeof RecordCommitInputSchema>;
+export type RecordReleaseHandoffInput = z.infer<typeof RecordReleaseHandoffInputSchema>;
+export type RecordReleaseHandoffFailureInput = z.infer<typeof RecordReleaseHandoffFailureInputSchema>;
+export type RecordReleaseCloseoutFailureInput = z.infer<typeof RecordReleaseCloseoutFailureInputSchema>;
 export type RecordMergeInput = z.infer<typeof RecordMergeInputSchema>;
 export type RecordQualityGateInput = z.infer<typeof RecordQualityGateInputSchema>;
 export type RecordEvalPlanInput = z.infer<typeof RecordEvalPlanInputSchema>;
 export type RecordEvalRunInput = z.infer<typeof RecordEvalRunInputSchema>;
 export type GetNextPhaseInput = z.infer<typeof GetNextPhaseInputSchema>;
 export type GetFeatureStatusInput = z.infer<typeof GetFeatureStatusInputSchema>;
+export type PickNextAutonomousPhaseInput = z.infer<typeof PickNextAutonomousPhaseInputSchema>;
+export type RecordSupervisorEventInput = z.infer<typeof RecordSupervisorEventInputSchema>;
 export type GetDevelopmentEvalStatusInput = z.infer<typeof GetDevelopmentEvalStatusInputSchema>;
 export type GetSkillProposalQueueInput = z.infer<typeof GetSkillProposalQueueInputSchema>;
 export type SyncSkillProposalCandidatesInput = z.infer<typeof SyncSkillProposalCandidatesInputSchema>;

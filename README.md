@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.3.6--beta-orange" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.3.7--beta-orange" alt="Version">
   <img src="https://img.shields.io/badge/workflow-11_phase-blue" alt="11-phase workflow">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
 </p>
@@ -145,6 +145,23 @@ Important: Odin now bootstraps with `runtime.mode: in_memory` by default so you 
 
 If you are developing Odin itself from this repo, use the repo-checkout `--distribution source` flow shown above.
 
+### 3. Optional: Ralph Loop
+
+Ralph Loop is the external Odin supervisor for bounded autonomous polling.
+
+Current supported paths:
+- Release auto-PR handoff when `automation.mode: auto_pr` allows it
+- Release closeout after a human merge is recorded
+
+From the repo root:
+
+```bash
+npm run ralph:tick -- --project-root /path/to/your/project
+npm run ralph:watch -- --project-root /path/to/your/project --interval-ms 30000
+```
+
+See `loop/README.md` and `docs/guides/RALPH-LOOP.md` for the operator runbook, prerequisites, and smoke steps.
+
 For Claude Code / Amp, use:
 
 ```json
@@ -233,7 +250,7 @@ See [runtime/README.md](runtime/README.md) for full configuration, available too
 
 Maintainers preparing the npm release should use [docs/guides/NPM-PUBLISH.md](docs/guides/NPM-PUBLISH.md).
 
-### 3. Add your database credentials
+### 4. Add your database credentials
 
 ```bash
 cp .env.example .env
@@ -280,7 +297,7 @@ formal_verification:
 
 Typical flow: write a `.machine.ts` file for a stateful design, then call `odin.verify_design` with the file's relative `machine_path` during Architect/Guardian work.
 
-### 4. Apply database migrations
+### 5. Apply database migrations
 
 Odin applies its schema automatically via the runtime:
 
@@ -290,7 +307,7 @@ Use odin.apply_migrations to set up the database schema.
 
 The tool auto-detects existing schemas on first run. Use `dry_run: true` to preview. See [docs/guides/SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) for manual setup or troubleshooting.
 
-### 5. Start using Odin
+### 6. Start using Odin
 
 Point your AI tool at [ODIN.md](ODIN.md) and use it as the framework guide for real feature work.
 

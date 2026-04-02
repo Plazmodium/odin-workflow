@@ -7,6 +7,7 @@ import type {
   AgentInvocationRecord,
   AgentClaimRecord,
   ClaimVerificationSummary,
+  FeatureStatus,
   FeatureCommitRecord,
   FeatureEvalSummary,
   FeatureRecord,
@@ -35,6 +36,10 @@ export interface ListAllLearningsFilter {
   min_confidence?: number;
 }
 
+export interface ListFeaturesFilter {
+  statuses?: FeatureStatus[];
+}
+
 export interface ListSkillProposalCandidatesFilter {
   statuses?: SkillProposalStatus[];
   limit?: number;
@@ -48,9 +53,11 @@ export interface ListSkillProposalsFilter {
 export interface WorkflowStateAdapter {
   startFeature(feature: Omit<FeatureRecord, 'created_at' | 'updated_at' | 'status' | 'current_phase'>): Promise<FeatureRecord>;
   getFeature(feature_id: string): Promise<FeatureRecord | null>;
+  listFeatures(filter?: ListFeaturesFilter): Promise<FeatureRecord[]>;
   recordPhaseArtifact(artifact: PhaseArtifact): Promise<PhaseArtifact>;
   listPhaseArtifacts(feature_id: string): Promise<PhaseArtifact[]>;
   recordPhaseResult(result: PhaseResultRecord): Promise<FeatureRecord | null>;
+  completeFeature(feature_id: string, completed_by: string): Promise<FeatureRecord | null>;
   listOpenBlockers(feature_id: string): Promise<string[]>;
   listOpenGates(feature_id: string): Promise<string[]>;
   listOpenGateRecords(feature_id: string): Promise<QualityGateRecord[]>;
@@ -73,7 +80,7 @@ export interface WorkflowStateAdapter {
   recordCommit(commit: Omit<FeatureCommitRecord, 'committed_at'>): Promise<FeatureCommitRecord>;
   recordPullRequest(feature_id: string, pr_url: string, pr_number: number): Promise<{ feature_id: string; pr_url: string; pr_number: number }>;
   recordMerge(feature_id: string, merged_by: string): Promise<{ feature_id: string; merged_at: string; merged_by: string; pr_url?: string; pr_number?: number }>;
-  recordAuditEvent(feature_id: string, operation: string, agent_name: string, details?: Record<string, unknown>): Promise<void>;
+  recordAuditEvent(feature_id: string | null, operation: string, agent_name: string, details?: Record<string, unknown>): Promise<void>;
   recordQualityGate(
     feature_id: string,
     gate_name: string,

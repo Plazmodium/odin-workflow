@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.7-beta] - 2026-04-02
+
+### Added
+- Ralph Loop as a user-facing supervisor package with `ralph:tick` and `ralph:watch` commands in the full Odin suite.
+- Release-phase autonomous tooling for safe auto-PR handoff, merged release closeout, supervisor audit events, and dashboard loop visibility.
+- Simulation-first verification for Ralph Loop via `loop/src/scenario.test.ts` and `npm run test:simulation`.
+
+### Changed
+- Runtime now exposes release handoff and cleanup tools so external supervisors can archive, record PR handoff, retry safely after failed handoff/closeout attempts, and keep phase-9 invocation telemetry clean.
+- Dashboard health view now shows Ralph Loop last tick, selected feature/phase, no-op reason, and last failure summary from supervisor audit events.
+- Root package version, runtime package version, runtime MCP server version, runtime lockfile, and README badge updated to `0.3.7-beta`.
+
 ## [0.3.6-beta] - 2026-04-01
 
 ### Added

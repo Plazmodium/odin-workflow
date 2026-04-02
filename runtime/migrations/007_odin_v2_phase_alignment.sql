@@ -341,36 +341,35 @@ BEGIN
   WITH expected AS (
     SELECT *
     FROM (VALUES
-      ('1'::phase, 'product-agent'::text),
-      ('2'::phase, 'discovery-agent'::text),
-      ('3'::phase, 'architect-agent'::text),
-      ('4'::phase, 'guardian-agent'::text),
-      ('5'::phase, 'builder-agent'::text),
-      ('6'::phase, 'reviewer-agent'::text),
-      ('7'::phase, 'integrator-agent'::text),
-      ('8'::phase, 'documenter-agent'::text),
-      ('9'::phase, 'release-agent'::text)
-    ) AS t(phase, agent_name)
+      ('1'::phase),
+      ('2'::phase),
+      ('3'::phase),
+      ('4'::phase),
+      ('5'::phase),
+      ('6'::phase),
+      ('7'::phase),
+      ('8'::phase),
+      ('9'::phase)
+    ) AS t(phase)
   ),
   actual AS (
-    SELECT DISTINCT phase, agent_name
+    SELECT DISTINCT phase
     FROM agent_invocations
     WHERE feature_id = p_feature_id
       AND ended_at IS NOT NULL
       AND duration_ms IS NOT NULL
   ),
   missing AS (
-    SELECT e.phase, e.agent_name
+    SELECT e.phase
     FROM expected e
     LEFT JOIN actual a
       ON a.phase = e.phase
-     AND a.agent_name = e.agent_name
     WHERE a.phase IS NULL
   )
   SELECT string_agg(
-    format('phase %s -> %s', m.phase::TEXT, m.agent_name),
+    format('phase %s', m.phase::TEXT),
     ', '
-    ORDER BY m.phase::TEXT, m.agent_name
+    ORDER BY m.phase::TEXT
   )
   INTO v_missing_pairs
   FROM missing m;
