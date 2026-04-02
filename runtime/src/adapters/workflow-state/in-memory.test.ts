@@ -59,6 +59,7 @@ describe('InMemoryWorkflowStateAdapter.recordPhaseResult', () => {
       complexity_level: 1,
       severity: 'ROUTINE',
     });
+    // Advance to phase 5 (Builder) so rework tests make sense
     for (const phase of ['0', '1', '2', '3', '4'] as const) {
       const nextPhase = String(Number(phase) + 1);
       await adapter.recordPhaseResult({
@@ -109,6 +110,54 @@ describe('InMemoryWorkflowStateAdapter.recordPhaseResult', () => {
     expect(updated).not.toBeNull();
     expect(updated!.current_phase).toBe('5');
     expect(updated!.status).toBe('IN_PROGRESS');
+  });
+});
+
+describe('InMemoryWorkflowStateAdapter.completeFeature', () => {
+  it('completes a feature only when release telemetry coverage exists', async () => {
+    const adapter = new InMemoryWorkflowStateAdapter();
+    await adapter.startFeature({
+      id: 'FEAT-COMPLETE',
+      name: 'Complete Me',
+      complexity_level: 1,
+      severity: 'ROUTINE',
+    });
+
+    const blocked = await adapter.completeFeature('FEAT-COMPLETE', 'release-agent');
+    expect(blocked?.status).toBe('BLOCKED');
+
+    for (const phase of ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const) {
+      const invocation = await adapter.startAgentInvocation('FEAT-COMPLETE', phase, `${phase}-agent`, `Phase ${phase}`);
+      await adapter.completeAgentInvocation(invocation.id);
+    }
+
+    const completed = await adapter.completeFeature('FEAT-COMPLETE', 'release-agent');
+    expect(completed?.status).toBe('COMPLETED');
+    expect(completed?.current_phase).toBe('10');
+    expect(completed?.completed_at).toBeTruthy();
+  });
+});
+
+describe('InMemoryWorkflowStateAdapter git release state', () => {
+  it('persists PR and merge metadata on the feature record', async () => {
+    const adapter = new InMemoryWorkflowStateAdapter();
+    await adapter.startFeature({
+      id: 'FEAT-GIT',
+      name: 'Git Feature',
+      complexity_level: 1,
+      severity: 'ROUTINE',
+      base_branch: 'main',
+    });
+
+    await adapter.recordPullRequest('FEAT-GIT', 'https://github.com/org/repo/pull/42', 42);
+    await adapter.recordMerge('FEAT-GIT', 'human');
+
+    const feature = await adapter.getFeature('FEAT-GIT');
+    expect(feature).toMatchObject({
+      pr_url: 'https://github.com/org/repo/pull/42',
+      pr_number: 42,
+    });
+    expect(feature?.merged_at).toBeTruthy();
   });
 });
 

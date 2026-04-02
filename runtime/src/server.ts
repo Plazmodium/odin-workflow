@@ -29,6 +29,7 @@ import {
   GetDevelopmentEvalStatusInputSchema,
   GetFeatureStatusInputSchema,
   GetNextPhaseInputSchema,
+  PickNextAutonomousPhaseInputSchema,
   GetSkillProposalQueueInputSchema,
   GetSkillProposalsInputSchema,
   PreparePhaseContextInputSchema,
@@ -37,10 +38,14 @@ import {
   RecordEvalPlanInputSchema,
   RecordEvalRunInputSchema,
   RecordMergeInputSchema,
+  RecordReleaseCloseoutFailureInputSchema,
+  RecordReleaseHandoffFailureInputSchema,
+  RecordReleaseHandoffInputSchema,
   RecordPhaseArtifactInputSchema,
   RecordQualityGateInputSchema,
   RecordPullRequestInputSchema,
   RecordPhaseResultInputSchema,
+  RecordSupervisorEventInputSchema,
   RecordSkillProposalDecisionInputSchema,
   RecordSkillProposalDraftInputSchema,
   RecordWatcherReviewInputSchema,
@@ -62,16 +67,21 @@ import { handleGetFeatureStatus } from './tools/get-feature-status.js';
 import { handleGetNextPhase } from './tools/get-next-phase.js';
 import { handleGetSkillProposalQueue } from './tools/get-skill-proposal-queue.js';
 import { handleGetSkillProposals } from './tools/get-skill-proposals.js';
+import { handlePickNextAutonomousPhase } from './tools/pick-next-autonomous-phase.js';
 import { handlePreparePhaseContext } from './tools/prepare-phase-context.js';
 import { handlePublishSkillProposal } from './tools/publish-skill-proposal.js';
 import { handleRecordCommit } from './tools/record-commit.js';
 import { handleRecordEvalPlan } from './tools/record-eval-plan.js';
 import { handleRecordEvalRun } from './tools/record-eval-run.js';
 import { handleRecordMerge } from './tools/record-merge.js';
+import { handleRecordReleaseCloseoutFailure } from './tools/record-release-closeout-failure.js';
+import { handleRecordReleaseHandoffFailure } from './tools/record-release-handoff-failure.js';
+import { handleRecordReleaseHandoff } from './tools/record-release-handoff.js';
 import { handleRecordPhaseArtifact } from './tools/record-phase-artifact.js';
 import { handleRecordPullRequest } from './tools/record-pull-request.js';
 import { handleRecordQualityGate } from './tools/record-quality-gate.js';
 import { handleRecordPhaseResult } from './tools/record-phase-result.js';
+import { handleRecordSupervisorEvent } from './tools/record-supervisor-event.js';
 import { handleRecordSkillProposalDecision } from './tools/record-skill-proposal-decision.js';
 import { handleRecordSkillProposalDraft } from './tools/record-skill-proposal-draft.js';
 import { handleRecordWatcherReview } from './tools/record-watcher-review.js';
@@ -179,7 +189,7 @@ const formal_verification_adapter = createFormalVerificationAdapter(project_root
 const server = new McpServer(
   {
     name: 'odin',
-    version: '0.3.6-beta',
+    version: '0.3.7-beta',
   },
   {
     capabilities: {
@@ -236,6 +246,16 @@ server.registerTool(
     inputSchema: GetNextPhaseInputSchema,
   },
   safeToolHandler(async (input) => handleGetNextPhase(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.pick_next_autonomous_phase',
+  {
+    title: 'Pick Next Autonomous Phase',
+    description: 'Select the next feature phase that Ralph Loop can pick up safely and return prepared context.',
+    inputSchema: PickNextAutonomousPhaseInputSchema,
+  },
+  safeToolHandler(async (input) => handlePickNextAutonomousPhase(workflow_state, skill_adapter, runtime_config, input))
 );
 
 server.registerTool(
@@ -299,6 +319,36 @@ server.registerTool(
 );
 
 server.registerTool(
+  'odin.record_release_handoff',
+  {
+    title: 'Record Release Handoff',
+    description: 'Close the active Release invocation after PR handoff while keeping the feature in phase 9.',
+    inputSchema: RecordReleaseHandoffInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordReleaseHandoff(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.record_release_handoff_failure',
+  {
+    title: 'Record Release Handoff Failure',
+    description: 'Close the active Release invocation after a failed PR handoff attempt so Ralph Loop can retry later.',
+    inputSchema: RecordReleaseHandoffFailureInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordReleaseHandoffFailure(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.record_release_closeout_failure',
+  {
+    title: 'Record Release Closeout Failure',
+    description: 'Close the active Release invocation after a failed release closeout attempt so Ralph Loop can retry later.',
+    inputSchema: RecordReleaseCloseoutFailureInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordReleaseCloseoutFailure(workflow_state, input))
+);
+
+server.registerTool(
   'odin.record_quality_gate',
   {
     title: 'Record Quality Gate',
@@ -306,6 +356,16 @@ server.registerTool(
     inputSchema: RecordQualityGateInputSchema,
   },
   safeToolHandler(async (input) => handleRecordQualityGate(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.record_supervisor_event',
+  {
+    title: 'Record Supervisor Event',
+    description: 'Persist Ralph Loop tick/no-op/failure/completion events for operator visibility.',
+    inputSchema: RecordSupervisorEventInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordSupervisorEvent(workflow_state, input))
 );
 
 server.registerTool(

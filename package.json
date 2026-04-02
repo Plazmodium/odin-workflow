@@ -1,6 +1,6 @@
 {
   "name": "odin-workflow",
-  "version": "0.3.6-beta",
+  "version": "0.3.7-beta",
   "description": "Specification-Driven Development framework for AI-assisted coding",
   "keywords": [
     "sdd",
@@ -26,7 +26,9 @@
   "scripts": {
     "dashboard:dev": "cd dashboard && npm run dev",
     "dashboard:build": "cd dashboard && npm run build",
-    "dashboard:start": "cd dashboard && npm start"
+    "dashboard:start": "cd dashboard && npm start",
+    "ralph:tick": "cd loop && npm run tick --",
+    "ralph:watch": "cd loop && npm run watch --"
   },
   "engines": {
     "node": ">=18.0.0"
