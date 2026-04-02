@@ -187,7 +187,7 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
         </Card>
       </div>
 
-      {/* Commits & Archives - side by side */}
+      {/* Commits & Release - side by side */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Commits */}
         <Card>
@@ -203,10 +203,10 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
           </CardContent>
         </Card>
 
-        {/* Archives (only shows content for COMPLETED features) */}
+        {/* Release handoff, merge, and archive status */}
         <ArchivesSection
           featureId={id}
-          featureStatus={feature.status}
+          feature={feature}
           archive={archive}
         />
       </div>
