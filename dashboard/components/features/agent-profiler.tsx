@@ -114,7 +114,7 @@ export function AgentProfiler({ durations, error = null, claimsSummary = null }:
             tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
             axisLine={{ stroke: 'hsl(var(--border))' }}
             tickLine={false}
-            label={{ value: 'seconds', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'hsl(var(--muted-foreground))' } }}
+            label={{ value: 'runtime (s)', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'hsl(var(--muted-foreground))' } }}
           />
           <Tooltip
             contentStyle={{

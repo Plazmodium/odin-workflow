@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0-beta] - 2026-04-08
+
+### Added
+- New `odin start-feature` helper flow in the published package creates or switches the feature branch first, then records the feature through `odin.start_feature`, so the public Odin workflow now matches the documented branch-first contract.
+
+### Fixed
+- Ralph Loop release handoff now fails early with actionable errors when the recorded feature branch is missing locally, the current checkout is on the wrong branch, or the target project is not a git repo.
+- Feature detail UI now distinguishes elapsed phase time from completed agent invocation runtime, reducing the mismatch between the Phase Timeline and Agent Runtime Profiler.
+
+### Changed
+- Root package version, runtime package version, runtime MCP server version, runtime lockfile, and README badge updated to `0.5.0-beta`.
+
 ## [0.4.0-beta] - 2026-04-08
 
 ### Fixed

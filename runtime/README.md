@@ -127,11 +127,26 @@ Odin uses two database paths today:
 
 ### 4. Start using Odin
 
+Recommended feature-start flow:
+
+```bash
+npx -y @plazmodium/odin start-feature \
+  --project-root /path/to/your/project \
+  --id AUTH-001 \
+  --name "Login" \
+  --complexity-level 2 \
+  --severity ROUTINE \
+  --author "Jane Doe" \
+  --dev-initials jd
+```
+
+This command creates or switches to the feature branch first, then calls `odin.start_feature` so the runtime record matches the real git workspace.
+
 Your AI agent now has these tools available:
 
 | Tool | Purpose |
 |------|---------|
-| `odin.start_feature` | Create a feature in the workflow |
+| `odin.start_feature` | Record a feature in the workflow after the branch already exists |
 | `odin.get_next_phase` | Ask "what should happen next?" |
 | `odin.pick_next_autonomous_phase` | Let Ralph Loop pick the next safe feature/phase and return prepared context |
 | `odin.prepare_phase_context` | Get the full working bundle for a phase |

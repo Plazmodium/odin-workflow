@@ -125,6 +125,7 @@ function createRunner(): GitHubCommandRunner {
     });
 
   return {
+    ensureFeatureBranchReady: vi.fn(async () => undefined),
     pushBranch: vi.fn(async () => undefined),
     findPullRequest,
     createPullRequest: vi.fn(async () => undefined),
@@ -183,6 +184,7 @@ describe('Ralph Loop simulated scenarios', () => {
   it('simulates a handoff failure and records cleanup telemetry', async () => {
     const client = new FakeRuntimeToolClient();
     const runner: GitHubCommandRunner = {
+      ensureFeatureBranchReady: vi.fn(async () => undefined),
       pushBranch: vi.fn(async () => undefined),
       findPullRequest: vi.fn(async () => null),
       createPullRequest: vi.fn(async () => {
