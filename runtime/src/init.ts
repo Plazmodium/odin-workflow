@@ -5,11 +5,9 @@
  * Version: 0.1.0
  */
 
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-import { getBundledOdinGuidePath } from './builtin-assets.js';
 
 const PUBLISHED_PACKAGE_NAME = '@plazmodium/odin';
 
@@ -166,68 +164,6 @@ function ensureDir(path: string): void {
   if (!existsSync(path)) {
     mkdirSync(path, { recursive: true });
   }
-}
-
-function getBundledAgentDefinitionsRoot(): string | null {
-  const currentFile = fileURLToPath(import.meta.url);
-  const packageRoot = resolve(dirname(currentFile), '..');
-  const bundledRoot = join(packageRoot, 'builtin', 'agent-definitions');
-
-  return existsSync(bundledRoot) ? bundledRoot : null;
-}
-
-function copyTree(sourceRoot: string, targetRoot: string, force: boolean): boolean {
-  ensureDir(targetRoot);
-  let changed = false;
-
-  for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
-    const sourcePath = join(sourceRoot, entry.name);
-    const targetPath = join(targetRoot, entry.name);
-
-    if (entry.isDirectory()) {
-      if (copyTree(sourcePath, targetPath, force)) {
-        changed = true;
-      }
-      continue;
-    }
-
-    if (!entry.isFile()) {
-      continue;
-    }
-
-    if (!existsSync(targetPath) || force) {
-      copyFileSync(sourcePath, targetPath);
-      changed = true;
-    }
-  }
-
-  return changed;
-}
-
-function ensureBundledGuidance(projectRoot: string, force: boolean): Array<{ path: string; changed: boolean }> {
-  const odinDir = join(projectRoot, '.odin');
-  ensureDir(odinDir);
-
-  const results: Array<{ path: string; changed: boolean }> = [];
-  const bundledGuidePath = getBundledOdinGuidePath();
-  if (bundledGuidePath != null) {
-    const targetGuidePath = join(odinDir, 'ODIN.md');
-    if (!existsSync(targetGuidePath) || force) {
-      copyFileSync(bundledGuidePath, targetGuidePath);
-      results.push({ path: targetGuidePath, changed: true });
-    } else {
-      results.push({ path: targetGuidePath, changed: false });
-    }
-  }
-
-  const bundledDefinitionsRoot = getBundledAgentDefinitionsRoot();
-  if (bundledDefinitionsRoot != null) {
-    const targetDefinitionsRoot = join(odinDir, 'agents', 'definitions');
-    const changed = copyTree(bundledDefinitionsRoot, targetDefinitionsRoot, force);
-    results.push({ path: targetDefinitionsRoot, changed });
-  }
-
-  return results;
 }
 
 function ensureConfig(projectRoot: string, force: boolean): { path: string; changed: boolean } {
@@ -490,12 +426,11 @@ function printHarnessSnippet(projectRoot: string, tool: HarnessTool, distributio
 
   console.log('\nCanonical eval-aware orchestration snippet:');
   console.log([
-    '1. Read `.odin/ODIN.md` once so the harness has the framework-level rules in project context.',
-    '2. Call `odin.prepare_phase_context({ feature_id, phase, agent_name })`.',
-    '3. Build the agent prompt from `context.agent.role_summary`, `context.agent.constraints`, `context.agent.definition_markdown`, and `context.development_evals.harness_prompt_block`.',
-    '4. Use `odin.get_development_eval_status({ feature_id })` when you need focused eval state instead of parsing broad status payloads.',
-    '5. Record structured eval artifacts with `odin.record_eval_plan`, `odin.record_eval_run`, and `odin.record_quality_gate`.',
-    '6. Never treat Development Evals as a replacement for `odin.verify_design`, `odin.run_review_checks`, tests, runtime verification, or watcher checks.',
+    '1. Call `odin.prepare_phase_context({ feature_id, phase, agent_name })`.',
+    '2. Build the agent prompt from `context.agent.role_summary`, `context.agent.constraints`, and `context.development_evals.harness_prompt_block`.',
+    '3. Use `odin.get_development_eval_status({ feature_id })` when you need focused eval state instead of parsing broad status payloads.',
+    '4. Record structured eval artifacts with `odin.record_eval_plan`, `odin.record_eval_run`, and `odin.record_quality_gate`.',
+    '5. Never treat Development Evals as a replacement for `odin.verify_design`, `odin.run_review_checks`, tests, runtime verification, or watcher checks.',
   ].join('\n'));
 }
 
@@ -509,15 +444,11 @@ function main(): void {
 
   const config = ensureConfig(options.projectRoot, options.force);
   const envExample = ensureEnvExample(options.projectRoot, options.force);
-  const bundledGuidance = ensureBundledGuidance(options.projectRoot, options.force);
   const mcpSnippet = createMcpJsonSnippet(options.projectRoot, options.distribution);
 
   console.log('Odin runtime project bootstrap complete.');
   console.log(`- ${config.changed ? 'wrote' : 'kept'} ${config.path}`);
   console.log(`- ${envExample.changed ? 'updated' : 'kept'} ${envExample.path}`);
-  for (const item of bundledGuidance) {
-    console.log(`- ${item.changed ? 'updated' : 'kept'} ${item.path}`);
-  }
   console.log(`- runtime quick-start mode: in_memory`);
   console.log(`- MCP command mode: ${options.distribution}`);
 
@@ -538,15 +469,14 @@ function main(): void {
 
   console.log('\nNext steps:');
   console.log('1. Connect your MCP host and confirm Odin boots in in_memory mode');
-  console.log('2. Have your harness read `.odin/ODIN.md` before running the workflow');
-  console.log('3. Copy .env.example to .env when you are ready for database-backed tools');
-  console.log('4. Switch `.odin/config.yaml` to `runtime.mode: supabase` for persistent workflow state');
+  console.log('2. Copy .env.example to .env when you are ready for database-backed tools');
+  console.log('3. Switch `.odin/config.yaml` to `runtime.mode: supabase` for persistent workflow state');
   if (options.writeMcp) {
-    console.log('5. Review the generated harness config and confirm it matches your local setup');
+    console.log('4. Review the generated harness config and confirm it matches your local setup');
   } else {
-    console.log('5. Add the printed MCP snippet to your harness config');
+    console.log('4. Add the printed MCP snippet to your harness config');
   }
-  console.log('6. Start using Odin — your AI agent now has workflow tools available');
+  console.log('5. Start using Odin — your AI agent now has workflow tools available');
 
   printHarnessSnippet(options.projectRoot, options.tool, options.distribution);
 }

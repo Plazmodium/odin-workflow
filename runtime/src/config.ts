@@ -183,24 +183,26 @@ function normalizeAutomationConfig(
         'automation.require_green_checks',
         source,
       ),
-      require_clean_policy_checks: resolveBooleanField(
-        raw.require_clean_policy_checks,
-        default_automation.require_clean_policy_checks,
-        'automation.require_clean_policy_checks',
-        source,
-      ),
+      require_clean_policy_checks:
+        resolveBooleanField(
+          raw.require_clean_policy_checks,
+          default_automation.require_clean_policy_checks,
+          'automation.require_clean_policy_checks',
+          source,
+        ),
       require_no_open_blockers: resolveBooleanField(
         raw.require_no_open_blockers,
         default_automation.require_no_open_blockers,
         'automation.require_no_open_blockers',
         source,
       ),
-      require_watched_claims_verified: resolveBooleanField(
-        raw.require_watched_claims_verified,
-        default_automation.require_watched_claims_verified,
-        'automation.require_watched_claims_verified',
-        source,
-      ),
+      require_watched_claims_verified:
+        resolveBooleanField(
+          raw.require_watched_claims_verified,
+          default_automation.require_watched_claims_verified,
+          'automation.require_watched_claims_verified',
+          source,
+        ),
       paused: resolveBooleanField(raw.paused, default_automation.paused, 'automation.paused', source),
       kill_switch: resolveBooleanField(
         raw.kill_switch,

@@ -5,11 +5,11 @@
 
 import { readdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import YAML from 'yaml';
 
-import { getBuiltInSkillRoots } from '../../builtin-assets.js';
 import type { RuntimeConfig } from '../../config.js';
 import type { FeatureRecord, KnowledgeDomain, PhaseArtifact, PhaseId, ResolvedSkill } from '../../types.js';
 import type { ResolveSkillsInput, ResolveSkillsResult, SkillAdapter } from './types.js';
@@ -64,6 +64,27 @@ const PHASE_REQUIRED_SKILLS: Partial<Record<PhaseId, string[]>> = {
 };
 
 const TECH_AWARE_PHASES = new Set<PhaseId>(['2', '3', '4', '5', '6', '7']);
+
+function getBuiltInSkillRoots(): string[] {
+  const current_file = fileURLToPath(import.meta.url);
+  const package_root = resolve(dirname(current_file), '..', '..', '..');
+  const candidates: string[] = [];
+
+  let cursor = package_root;
+  for (let depth = 0; depth < 5; depth++) {
+    candidates.push(join(cursor, 'skills'));
+    candidates.push(join(cursor, 'agents', 'skills'));
+
+    const parent = resolve(cursor, '..');
+    if (parent === cursor) {
+      break;
+    }
+
+    cursor = parent;
+  }
+
+  return candidates.filter((path, index, values) => existsSync(path) && values.indexOf(path) === index);
+}
 
 async function collectSkillFiles(root: string): Promise<string[]> {
   if (!existsSync(root)) {

@@ -17,7 +17,6 @@ describe('handleCaptureLearning', () => {
       },
     ],
     resolveSkills: async () => ({ resolved: [], fallback_used: true }),
-    invalidateCaches() {},
   };
 
   it('surfaces proposal candidates for unresolved domain tags', async () => {

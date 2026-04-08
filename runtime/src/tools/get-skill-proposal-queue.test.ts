@@ -17,7 +17,6 @@ describe('handleGetSkillProposalQueue', () => {
       },
     ],
     resolveSkills: async () => ({ resolved: [], fallback_used: true }),
-    invalidateCaches() {},
   };
 
   it('returns deterministic skill proposal candidates from captured learnings', async () => {

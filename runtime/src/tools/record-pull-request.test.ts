@@ -22,7 +22,7 @@ function createConfig(mode: 'guarded' | 'auto_pr'): RuntimeConfig {
 }
 
 describe('handleRecordPullRequest', () => {
-  it('records PR metadata for an existing feature', async () => {
+  it('records PR metadata for an existing feature in manual mode', async () => {
     const adapter: WorkflowStateAdapter = {
       getFeature: vi.fn(async () => ({ id: 'FEAT-PR', base_branch: 'main' })),
       listOpenBlockers: vi.fn(async () => []),

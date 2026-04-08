@@ -1,8 +1,29 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { CONFIG_RESTART_NOTE, type RuntimeConfig } from '../config.js';
 import type { SqlExecutor } from '../adapters/sql-executor/types.js';
 import { bootstrapExistingSchema, createSqlExecutor, describeSupabaseManagementApiUrlIssue } from './apply-migrations.js';
+
+const tools_dir = dirname(fileURLToPath(import.meta.url));
+const bundled_migration_011_path = resolve(tools_dir, '../../migrations/011_complete_feature_phase_coverage.sql');
+
+function resolveCanonicalMigration011Path(): string {
+  const candidates = [
+    resolve(tools_dir, '../../../../database/supabase-migrations/011_complete_feature_phase_coverage.sql'),
+    resolve(tools_dir, '../../../migrations/011_complete_feature_phase_coverage.sql'),
+  ];
+
+  const match = candidates.find((candidate) => existsSync(candidate));
+  if (match == null) {
+    throw new Error(`Could not find canonical migration 011 at any expected path: ${candidates.join(', ')}`);
+  }
+
+  return match;
+}
 
 function createConfig(overrides: Partial<RuntimeConfig> = {}): RuntimeConfig {
   return {
@@ -105,5 +126,15 @@ describe('bootstrapExistingSchema', () => {
       '009_skill_proposal_candidates.sql',
       '010_skill_proposals.sql',
     ]);
+  });
+});
+
+describe('migration 011', () => {
+  it('drops get_feature_status before replacing its row type and stays aligned with the canonical SQL', () => {
+    const bundled_sql = readFileSync(bundled_migration_011_path, 'utf8');
+    const canonical_sql = readFileSync(resolveCanonicalMigration011Path(), 'utf8');
+
+    expect(bundled_sql).toContain('DROP FUNCTION IF EXISTS get_feature_status(TEXT);');
+    expect(bundled_sql).toBe(canonical_sql);
   });
 });

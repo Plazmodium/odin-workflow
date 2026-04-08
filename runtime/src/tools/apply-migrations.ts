@@ -27,6 +27,10 @@ interface MigrationResult {
   error?: string;
 }
 
+// ====================================================================
+// Executor factory
+// ====================================================================
+
 function appendRestartNote(message: string): string {
   return `${message}\n\n${CONFIG_RESTART_NOTE}`;
 }
@@ -93,6 +97,10 @@ export function createSqlExecutor(config: RuntimeConfig): { executor?: SqlExecut
   };
 }
 
+// ====================================================================
+// Migration file discovery
+// ====================================================================
+
 function findMigrationsDir(): string | null {
   const current_file = fileURLToPath(import.meta.url);
   const package_root = resolve(dirname(current_file), '..', '..');
@@ -121,6 +129,10 @@ function loadMigrationFiles(migrations_dir: string): Array<{ name: string; sql: 
   }));
 }
 
+// ====================================================================
+// Tracking table + bootstrap
+// ====================================================================
+
 async function ensureTrackingTable(executor: SqlExecutor): Promise<{ error?: string }> {
   const result = await executor.execute(
     `CREATE TABLE IF NOT EXISTS odin_migrations (
@@ -144,6 +156,12 @@ async function fetchAppliedNames(executor: SqlExecutor): Promise<{ names: Set<st
 /**
  * Bootstrap: detect whether the Odin schema already exists and seed the
  * tracking table with migration names so they are not re-applied.
+ *
+ * Detection heuristic: if the `features` table exists, the core schema is
+ * already in place. If `agent_claims` exists, the current bundled v2 baseline
+ * (`005`-`008`) is also present. If `skill_proposal_candidates` exists,
+ * migration `009` is already present too. If `skill_proposals` exists,
+ * migration `010` is already present too.
  */
 export async function bootstrapExistingSchema(
   executor: SqlExecutor,
@@ -166,6 +184,8 @@ export async function bootstrapExistingSchema(
   const has_skill_proposals = existing_tables.has('skill_proposal_candidates');
   const has_skill_proposal_workflow = existing_tables.has('skill_proposals');
 
+  // Determine which migrations are already represented in the live schema.
+  // Core migrations: 001-004. Current bundled v2 baseline: 005-008. Skill proposal storage: 009. Workflow state: 010.
   const bootstrapped: string[] = [];
   for (const file of migration_files) {
     const prefix = parseInt(file.name.split('_')[0] ?? '', 10);
@@ -186,6 +206,7 @@ export async function bootstrapExistingSchema(
     return { bootstrapped: [] };
   }
 
+  // Seed the tracking table.
   const values = bootstrapped
     .map((name) => `('${name.replace(/'/g, "''")}')`)
     .join(', ');
@@ -204,6 +225,10 @@ export async function bootstrapExistingSchema(
   return { bootstrapped };
 }
 
+// ====================================================================
+// Main handler
+// ====================================================================
+
 export async function handleApplyMigrations(
   config: RuntimeConfig,
   input: ApplyMigrationsInput
@@ -212,7 +237,7 @@ export async function handleApplyMigrations(
   if (migrations_dir == null) {
     return createErrorResult(
       'No migrations directory found. Looked for: ' +
-      'bundled migrations/ in the Odin package, sibling migrations/ next to the runtime package.'
+        'bundled migrations/ in the Odin package, sibling migrations/ next to the runtime package.'
     );
   }
 
@@ -231,8 +256,8 @@ export async function handleApplyMigrations(
     const file_names = migration_files.map((f) => f.name);
     return createTextResult(
       `Dry run: found ${migration_files.length} migration file(s) in ${migrations_dir}.\n` +
-      `Files: ${file_names.join(', ')}\n` +
-      'Run with dry_run=false to apply pending migrations.',
+        `Files: ${file_names.join(', ')}\n` +
+        'Run with dry_run=false to apply pending migrations.',
       {
         dry_run: true,
         migrations_dir,
@@ -242,6 +267,7 @@ export async function handleApplyMigrations(
     );
   }
 
+  // Resolve executor (DATABASE_URL takes priority over Supabase Management API).
   const { executor, error: executor_error } = createSqlExecutor(config);
   if (executor == null) {
     return createErrorResult(executor_error!);
@@ -259,6 +285,7 @@ async function runMigrations(
   migration_files: Array<{ name: string; sql: string }>,
   migrations_dir: string,
 ) {
+  // Ensure the tracking table exists.
   const tracking_result = await ensureTrackingTable(executor);
   if (tracking_result.error != null) {
     return createErrorResult(
@@ -266,11 +293,13 @@ async function runMigrations(
     );
   }
 
+  // Check which migrations are already recorded.
   let { names: applied_names, error: fetch_error } = await fetchAppliedNames(executor);
   if (fetch_error != null) {
     return createErrorResult(`Failed to query applied migrations: ${fetch_error}`);
   }
 
+  // Bootstrap: if no migrations are tracked yet, check for existing schema.
   if (applied_names.size === 0) {
     const { bootstrapped, error: bootstrap_error } = await bootstrapExistingSchema(
       executor,
@@ -286,6 +315,7 @@ async function runMigrations(
     }
   }
 
+  // Apply pending migrations.
   const results: MigrationResult[] = [];
   let had_failure = false;
 

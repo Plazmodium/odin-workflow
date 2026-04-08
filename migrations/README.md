@@ -36,6 +36,9 @@ Run these migrations in order on a fresh Supabase project:
 
 -- 10. Skill proposal workflow
 \i 010_skill_proposals.sql
+
+-- 11. Phase-based completion coverage alignment
+\i 011_complete_feature_phase_coverage.sql
 ```
 
 Or via Supabase MCP:
@@ -59,6 +62,7 @@ Or via Supabase MCP:
 | `008_related_learnings.sql` | related learnings | Cross-feature learning retrieval by shared propagation target |
 | `009_skill_proposal_candidates.sql` | skill proposal pipeline foundation | Relational storage for deterministic generated-skill candidates |
 | `010_skill_proposals.sql` | skill proposal workflow | Draft/approval/publish state for governed generated-skill proposals |
+| `011_complete_feature_phase_coverage.sql` | completion guard alignment | Replaces `complete_feature()` coverage checks with phase-based semantics |
 
 ## Schema Summary
 
@@ -147,9 +151,10 @@ These migrations extend Odin for v2 features. **Run AFTER the base migrations (0
 | `005_odin_v2_schema.sql` | New enums, tables for 11-phase workflow, watchers, security findings |
 | `006_odin_v2_functions.sql` | Functions for claims, policy engine, watcher reviews, security findings |
 | `007_odin_v2_phase_alignment.sql` | Remaps persisted phase values and overrides core workflow functions to use v2 numbering |
+| `008_related_learnings.sql` | `get_related_learnings()` function for cross-feature knowledge retrieval via shared propagation targets (Memory Palace Wave 2) |
 | `009_skill_proposal_candidates.sql` | Relational storage for deterministic skill proposal candidates and recent evidence rows |
 | `010_skill_proposals.sql` | Draft/approval/publish state for governed generated-skill proposals |
-| `008_related_learnings.sql` | `get_related_learnings()` function for cross-feature knowledge retrieval via shared propagation targets (Memory Palace Wave 2) |
+| `011_complete_feature_phase_coverage.sql` | Aligns `complete_feature()` with phase-based invocation coverage so custom actor names do not block release completion |
 
 ### v2 Features
 
@@ -224,5 +229,5 @@ Or via Supabase MCP:
 
 - **Schema Version**: 2.0.0
 - **Created**: 2026-02-16
-- **Last Updated**: 2026-03-31 (Skill proposal workflow foundation)
+- **Last Updated**: 2026-03-31 (Skill proposal candidate persistence foundation)
 - **Consolidated from**: Migrations 001-028

@@ -8,7 +8,7 @@ function createFeature(overrides: Partial<FeatureRecord> = {}): FeatureRecord {
   return {
     id: 'FEAT-100',
     name: 'Test Feature',
-    status: 'PLANNED',
+    status: 'IN_PROGRESS',
     current_phase: '0',
     complexity_level: 1,
     severity: 'ROUTINE',

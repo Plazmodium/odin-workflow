@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.9-beta] - 2026-04-08
+
+### Fixed
+- `011_complete_feature_phase_coverage.sql` now drops the legacy `get_feature_status(TEXT)` signature before recreating it so `odin.apply_migrations` succeeds on databases that still have the older row type.
+- Autonomous pickup now filters only valid persisted feature statuses, fixing Ralph Loop failures against databases whose `feature_status` enum never included the runtime-only `PLANNED` value.
+
+### Changed
+- Synced the public repo with the current framework runtime and migration sources, including the bundled migration regression test and runtime package metadata updated to `0.3.9-beta`.
+
 ## [0.3.7-beta] - 2026-04-02
 
 ### Added

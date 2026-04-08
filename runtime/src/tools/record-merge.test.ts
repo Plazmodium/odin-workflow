@@ -22,7 +22,7 @@ function createConfig(mode: 'guarded' | 'auto_pr'): RuntimeConfig {
 }
 
 describe('handleRecordMerge', () => {
-  it('records merge metadata for an existing feature', async () => {
+  it('records merge metadata for an existing feature in manual mode', async () => {
     const adapter: WorkflowStateAdapter = {
       getFeature: vi.fn(async () => ({ id: 'FEAT-MERGE', base_branch: 'main' })),
       listOpenBlockers: vi.fn(async () => []),

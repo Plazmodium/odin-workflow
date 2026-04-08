@@ -5,7 +5,7 @@
 
 export const PHASE_IDS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] as const;
 
-export const FEATURE_STATUSES = ['PLANNED', 'IN_PROGRESS', 'BLOCKED', 'COMPLETED'] as const;
+export const FEATURE_STATUSES = ['IN_PROGRESS', 'BLOCKED', 'COMPLETED', 'CANCELLED'] as const;
 
 export const PHASE_OUTCOMES = ['completed', 'blocked', 'needs_rework'] as const;
 
@@ -478,9 +478,6 @@ export interface PhaseAgentInstructions {
   name: string;
   role_summary: string;
   constraints: string[];
-  definition_markdown?: string | null;
-  definition_source?: 'built_in' | 'project_local' | 'none';
-  definition_source_path?: string | null;
 }
 
 export interface PhaseContextBundle {

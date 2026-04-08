@@ -30,7 +30,7 @@ npm run ralph:watch -- --project-root /path/to/project --interval-ms 30000
 From this source package directly:
 
 ```bash
-cd system/ralph-loop
+cd loop
 npm install
 npm run tick -- --project-root /path/to/project
 npm run watch -- --project-root /path/to/project --interval-ms 30000
@@ -41,7 +41,7 @@ npm run watch -- --project-root /path/to/project --interval-ms 30000
 If your real project database is stale or not ready for live smoke runs yet, use the simulated scenario suite first:
 
 ```bash
-cd system/ralph-loop
+cd loop
 npm install
 npm run test:simulation
 ```

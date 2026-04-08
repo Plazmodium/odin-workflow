@@ -32,6 +32,7 @@ Canonical order:
 \i 008_related_learnings.sql
 \i 009_skill_proposal_candidates.sql
 \i 010_skill_proposals.sql
+\i 011_complete_feature_phase_coverage.sql
 ```
 
 See `migrations/README.md` for the current authoritative migration inventory.
@@ -121,7 +122,7 @@ Open `http://localhost:3000` and verify the dashboard loads.
 ### "Table does not exist"
 
 - Cause: migrations not fully applied
-- Fix: rerun the full current migration set (`001` -> `010`) in order
+- Fix: rerun the full current migration set (`001` -> `011`) in order
 
 ### "Storage bucket not found"
 
