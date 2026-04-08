@@ -62,7 +62,7 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
     const now = new Date().toISOString();
     const record: FeatureRecord = {
       ...feature,
-      status: 'PLANNED',
+      status: 'IN_PROGRESS',
       current_phase: '0',
       completed_at: undefined,
       created_at: now,

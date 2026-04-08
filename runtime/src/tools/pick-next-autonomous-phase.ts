@@ -71,7 +71,7 @@ export async function handlePickNextAutonomousPhase(
   config: RuntimeConfig,
   input: PickNextAutonomousPhaseInput,
 ) {
-  const features = await adapter.listFeatures({ statuses: ['PLANNED', 'IN_PROGRESS', 'BLOCKED'] });
+  const features = await adapter.listFeatures({ statuses: ['IN_PROGRESS', 'BLOCKED'] });
   const entries = (
     await Promise.all(features.map((feature) => buildQueueEntry(adapter, config, feature.id)))
   ).filter((entry): entry is AutonomousQueueEntry => entry != null);

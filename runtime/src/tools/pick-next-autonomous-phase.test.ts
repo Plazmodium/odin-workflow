@@ -144,6 +144,7 @@ describe('handlePickNextAutonomousPhase', () => {
     };
 
     expect(result.isError).toBeUndefined();
+    expect(adapter.listFeatures).toHaveBeenCalledWith({ statuses: ['IN_PROGRESS', 'BLOCKED'] });
     expect(payload.selection).toMatchObject({
       feature_id: 'FEAT-RUN',
       phase: '5',
