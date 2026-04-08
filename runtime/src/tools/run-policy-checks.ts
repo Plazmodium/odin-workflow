@@ -4,6 +4,7 @@
  */
 
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import { buildWatcherQueueNextActions, buildWatcherQueueText } from '../domain/watcher-queue.js';
 import type { RunPolicyChecksInput } from '../schemas.js';
 import { createErrorResult, createTextResult } from '../utils.js';
 
@@ -30,15 +31,22 @@ export async function handleRunPolicyChecks(
     claims_needing_review.length === 0
       ? []
       : [
-          'Use odin.get_claims_needing_review to inspect the watcher queue.',
-          'Have watcher-agent review each escalated claim and submit verdicts with odin.record_watcher_review.',
-          'Re-run odin.verify_claims after watcher reviews are recorded.',
+          `Claim IDs now needing watcher review: ${claims_needing_review.map((claim) => claim.claim_id).join(', ')}.`,
+          'Call odin.get_claims_needing_review to inspect the full watcher queue and evidence.',
+          ...buildWatcherQueueNextActions(feature.id),
         ];
 
-  return createTextResult(
+  const text =
     claims_needing_review.length === 0
       ? `Ran policy checks for ${counts.total} claim(s) on feature ${input.feature_id}.`
-      : `Ran policy checks for ${counts.total} claim(s) on feature ${input.feature_id}; ${claims_needing_review.length} claim(s) now need watcher review.`,
+      : buildWatcherQueueText(
+          claims_needing_review,
+          feature.id,
+          `Ran policy checks for ${counts.total} claim(s) on feature ${input.feature_id}; ${claims_needing_review.length} claim(s) now need watcher review.`
+        );
+
+  return createTextResult(
+    text,
     {
       feature_id: input.feature_id,
       counts,

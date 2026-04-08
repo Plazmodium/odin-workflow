@@ -39,14 +39,17 @@ describe('handleVerifyClaims', () => {
 
     expect(result.isError).toBeUndefined();
     expect(result.content[0]?.text).toContain('still await watcher review');
+    expect(result.content[0]?.text).toContain('claim_1');
+    expect(result.content[0]?.text).toContain('odin.record_watcher_review');
     expect(result.structuredContent).toMatchObject({
       counts: {
         needs_review: 1,
       },
       next_actions: [
-        'Claims are still awaiting LLM watcher review.',
-        'Call odin.get_claims_needing_review to fetch the queue for the watcher-agent.',
-        'Record each watcher decision with odin.record_watcher_review, then run odin.verify_claims again.',
+        'Claim IDs awaiting watcher review: claim_1.',
+        'Have watcher-agent review each claim_id listed above.',
+        'Record each verdict with odin.record_watcher_review({ claim_id: "<claim_id>", verdict: "PASS" | "FAIL", reasoning: "...", watcher_agent: "watcher-agent", confidence: 0.8 }).',
+        'Re-run odin.verify_claims({ feature_id: "FEAT-VERIFY" }) after all watcher reviews are recorded.',
       ],
     });
   });

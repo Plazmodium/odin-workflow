@@ -4,6 +4,7 @@
  */
 
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import { buildWatcherQueueText } from '../domain/watcher-queue.js';
 import type { GetClaimsNeedingReviewInput } from '../schemas.js';
 import { createErrorResult, createTextResult } from '../utils.js';
 
@@ -22,8 +23,17 @@ export async function handleGetClaimsNeedingReview(
 
   const claims = await adapter.listClaimsNeedingReview(input.feature_id);
 
+  const text =
+    claims.length === 0
+      ? `No claims need watcher review${input.feature_id == null ? '' : ` for feature ${input.feature_id}`}.`
+      : buildWatcherQueueText(
+          claims,
+          input.feature_id ?? null,
+          `Found ${claims.length} claim(s) needing watcher review${input.feature_id == null ? '' : ` for feature ${input.feature_id}`}.`
+        );
+
   return createTextResult(
-    `Found ${claims.length} claim(s) needing watcher review${input.feature_id == null ? '' : ` for feature ${input.feature_id}`}. The watcher-agent should review each claim and record verdicts with odin.record_watcher_review.`,
+    text,
     {
       feature_id: input.feature_id ?? null,
       claims,
