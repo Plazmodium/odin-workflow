@@ -478,9 +478,6 @@ export interface PhaseAgentInstructions {
   name: string;
   role_summary: string;
   constraints: string[];
-  definition_markdown?: string | null;
-  definition_source?: 'built_in' | 'project_local' | 'none';
-  definition_source_path?: string | null;
 }
 
 export interface PhaseContextBundle {

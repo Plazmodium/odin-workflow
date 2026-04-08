@@ -17,7 +17,7 @@ Use this guide when configuring Supabase for Odin's persistent workflow state, a
 
 ## 2. Run Database Migrations
 
-For a fresh install, run the **full current migration set** from `migrations/`.
+For a fresh install, run the **full current migration set** from `system/database/supabase-migrations/`.
 
 Canonical order:
 
@@ -34,7 +34,7 @@ Canonical order:
 \i 010_skill_proposals.sql
 ```
 
-See `migrations/README.md` for the current authoritative migration inventory.
+See `system/database/supabase-migrations/README.md` for the current authoritative migration inventory.
 
 If using Supabase MCP, use the filename without `.sql` as the migration name (for example `001_schema`, `010_skill_proposals`).
 
@@ -97,7 +97,7 @@ WHERE id = 'feature-archives';
 ### Dashboard Check
 
 ```bash
-cd dashboard
+cd system/dashboard
 npm install
 npm run dev
 ```
@@ -147,5 +147,5 @@ Open `http://localhost:3000` and verify the dashboard loads.
 | [ODIN.md](../../ODIN.md) | Framework overview |
 | [docs/framework/multi-agent-protocol.md](../framework/multi-agent-protocol.md) | Legacy protocol history + current orchestration notes |
 | [docs/reference/SKILLS-SYSTEM.md](../reference/SKILLS-SYSTEM.md) | Composable skills |
-| [migrations/README.md](../../migrations/README.md) | Migration details |
-| [runtime/README.md](../../runtime/README.md) | Runtime setup and adapter behavior |
+| [system/database/supabase-migrations/README.md](../../system/database/supabase-migrations/README.md) | Migration details |
+| [system/mcp-servers/odin-runtime/README.md](../../system/mcp-servers/odin-runtime/README.md) | Runtime setup and adapter behavior |

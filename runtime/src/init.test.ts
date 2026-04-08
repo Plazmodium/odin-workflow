@@ -31,30 +31,23 @@ describe('odin-runtime-init', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('creates .odin/config.yaml, .odin/skills/.gitkeep, packaged guidance, and .env.example', () => {
+  it('creates .odin/config.yaml, .odin/skills/.gitkeep, and .env.example', () => {
     const output = runInit(`--project-root ${tmpDir}`);
 
     expect(existsSync(join(tmpDir, '.odin', 'config.yaml'))).toBe(true);
     expect(existsSync(join(tmpDir, '.odin', 'skills', '.gitkeep'))).toBe(true);
-    expect(existsSync(join(tmpDir, '.odin', 'ODIN.md'))).toBe(true);
-    expect(existsSync(join(tmpDir, '.odin', 'agents', 'definitions', '_shared-context.md'))).toBe(true);
-    expect(existsSync(join(tmpDir, '.odin', 'agents', 'definitions', 'builder.md'))).toBe(true);
     expect(existsSync(join(tmpDir, '.env.example'))).toBe(true);
     expect(output).toContain('Odin runtime project bootstrap complete');
     expect(output).toContain('runtime quick-start mode: in_memory');
     expect(output).toContain('odin.get_development_eval_status');
     expect(output).toContain('Canonical eval-aware orchestration snippet');
     expect(output).toContain('odin.record_eval_plan');
-    expect(output).toContain('.odin/ODIN.md');
 
     const config = readFileSync(join(tmpDir, '.odin', 'config.yaml'), 'utf8');
     expect(config).toContain('mode: in_memory');
     expect(config).toContain('provider: none');
     expect(config).toContain('automation:');
     expect(config).toContain('mode: guarded');
-
-    const odinGuide = readFileSync(join(tmpDir, '.odin', 'ODIN.md'), 'utf8');
-    expect(odinGuide).toContain('# Odin');
   });
 
   it('does not overwrite existing config without --force', () => {

@@ -17,7 +17,6 @@ describe('handleSyncSkillProposalCandidates', () => {
       },
     ],
     resolveSkills: async () => ({ resolved: [], fallback_used: true }),
-    invalidateCaches() {},
   };
 
   it('persists deterministic skill proposal candidates into workflow state', async () => {

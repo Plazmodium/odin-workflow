@@ -156,11 +156,7 @@ describe('handlePreparePhaseContext', () => {
     const context = (
       result.structuredContent as {
         context?: {
-          agent: {
-            constraints: string[];
-            definition_markdown: string | null;
-            definition_source: string;
-          };
+          agent: { constraints: string[] };
           automation: {
             configured_mode: string;
             next_human_boundary: string;
@@ -228,9 +224,6 @@ describe('handlePreparePhaseContext', () => {
     expect(context?.agent.constraints).toContain(
       'Outstanding claims need watcher review: call odin.get_claims_needing_review, have watcher-agent review each claim, record results with odin.record_watcher_review, then re-run odin.verify_claims before closing the watched phase.'
     );
-    expect(context?.agent.definition_source).toBe('built_in');
-    expect(context?.agent.definition_markdown).toContain('# Shared Agent Context');
-    expect(context?.agent.definition_markdown).toContain('# BUILDER AGENT (Phase 5: Implementation)');
   });
 
   it('retains development eval artifact context even when include_artifacts is false', async () => {
