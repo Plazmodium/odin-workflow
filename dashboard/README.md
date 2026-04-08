@@ -34,12 +34,12 @@ Web-based dashboard for the Odin SDD Framework. Visualizes system health, featur
 ### 1. Prerequisites
 
 - Node.js 18+
-- A Supabase project with Odin migrations applied (see `system/database/supabase-migrations/`)
+- A Supabase project with Odin migrations applied (see `migrations/`)
 
 ### 2. Install Dependencies
 
 ```bash
-cd system/dashboard
+cd dashboard
 npm install
 ```
 
