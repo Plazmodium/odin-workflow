@@ -17,7 +17,7 @@ Use this guide when configuring Supabase for Odin's persistent workflow state, a
 
 ## 2. Run Database Migrations
 
-For a fresh install, run the **full current migration set** from `system/database/supabase-migrations/`.
+For a fresh install, run the **full current migration set** from `migrations/`.
 
 Canonical order:
 
@@ -32,9 +32,10 @@ Canonical order:
 \i 008_related_learnings.sql
 \i 009_skill_proposal_candidates.sql
 \i 010_skill_proposals.sql
+\i 011_complete_feature_phase_coverage.sql
 ```
 
-See `system/database/supabase-migrations/README.md` for the current authoritative migration inventory.
+See `migrations/README.md` for the current authoritative migration inventory.
 
 If using Supabase MCP, use the filename without `.sql` as the migration name (for example `001_schema`, `010_skill_proposals`).
 
@@ -97,7 +98,7 @@ WHERE id = 'feature-archives';
 ### Dashboard Check
 
 ```bash
-cd system/dashboard
+cd dashboard
 npm install
 npm run dev
 ```
@@ -121,7 +122,7 @@ Open `http://localhost:3000` and verify the dashboard loads.
 ### "Table does not exist"
 
 - Cause: migrations not fully applied
-- Fix: rerun the full current migration set (`001` -> `010`) in order
+- Fix: rerun the full current migration set (`001` -> `011`) in order
 
 ### "Storage bucket not found"
 
@@ -147,5 +148,5 @@ Open `http://localhost:3000` and verify the dashboard loads.
 | [ODIN.md](../../ODIN.md) | Framework overview |
 | [docs/framework/multi-agent-protocol.md](../framework/multi-agent-protocol.md) | Legacy protocol history + current orchestration notes |
 | [docs/reference/SKILLS-SYSTEM.md](../reference/SKILLS-SYSTEM.md) | Composable skills |
-| [system/database/supabase-migrations/README.md](../../system/database/supabase-migrations/README.md) | Migration details |
-| [system/mcp-servers/odin-runtime/README.md](../../system/mcp-servers/odin-runtime/README.md) | Runtime setup and adapter behavior |
+| [migrations/README.md](../../migrations/README.md) | Migration details |
+| [runtime/README.md](../../runtime/README.md) | Runtime setup and adapter behavior |

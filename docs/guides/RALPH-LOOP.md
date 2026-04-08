@@ -32,7 +32,7 @@ npm run ralph:watch -- --project-root /path/to/project --interval-ms 30000
 If your real project is not ready for a live smoke run yet (for example because it still needs fresh Odin migrations), start with the simulated scenario suite:
 
 ```bash
-cd system/ralph-loop
+cd loop
 npm install
 npm run test:simulation
 ```
