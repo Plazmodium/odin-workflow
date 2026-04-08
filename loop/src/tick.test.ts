@@ -24,6 +24,7 @@ function createClient(overrides: Partial<RuntimeToolClient> = {}): RuntimeToolCl
 
 function createRunner(): GitHubCommandRunner {
   return {
+    ensureFeatureBranchReady: vi.fn(async () => undefined),
     pushBranch: vi.fn(async () => undefined),
     findPullRequest: vi.fn(async () => ({
       url: 'https://github.com/org/repo/pull/42',

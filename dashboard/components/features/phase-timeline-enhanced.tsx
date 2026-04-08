@@ -266,14 +266,19 @@ export function PhaseTimelineEnhanced({
       {expandedPhase && (
         <div className="border border-border rounded-lg p-4 bg-surface/50 space-y-4 animate-in slide-in-from-top-2 duration-200">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium">
-              {phaseName(expandedPhase)} Phase
-              {phaseMap.get(expandedPhase) && (
-                <span className="text-muted-foreground ml-2">
-                  ({formatMinutes(phaseMap.get(expandedPhase)!.duration_minutes)})
+              <h4 className="text-sm font-medium">
+                {phaseName(expandedPhase)} Phase
+                {phaseMap.get(expandedPhase) && (
+                  <span className="text-muted-foreground ml-2">
+                    ({formatMinutes(phaseMap.get(expandedPhase)!.duration_minutes)} elapsed)
+                  </span>
+                )}
+              </h4>
+              {phaseMap.get(expandedPhase) && phaseMap.get(expandedPhase)!.total_agent_duration_ms > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  Agent runtime {formatDuration(phaseMap.get(expandedPhase)!.total_agent_duration_ms)}
                 </span>
               )}
-            </h4>
             {backwardPhases.has(expandedPhase) && (
               <Badge variant="outline" className="text-orange-400 border-orange-500/30 text-[10px]">
                 Rework

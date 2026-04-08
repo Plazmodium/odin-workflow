@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-type OdinCommand = 'mcp' | 'init';
+type OdinCommand = 'mcp' | 'init' | 'start-feature';
 
 function printHelp(): void {
   console.log([
@@ -12,7 +12,8 @@ function printHelp(): void {
     '',
     'Commands:',
     '  mcp     Start the Odin MCP server',
-    '  init    Bootstrap .odin config and MCP wiring for a project',
+    '  init           Bootstrap .odin config and MCP wiring for a project',
+    '  start-feature  Create/switch the feature branch, then record the feature in Odin',
     '',
     'Examples:',
     '  odin mcp',
@@ -27,6 +28,10 @@ function resolveCommandTarget(command: OdinCommand): string {
 
   if (command === 'mcp') {
     return join(distDir, 'server.js');
+  }
+
+  if (command === 'start-feature') {
+    return join(distDir, 'feature-start.js');
   }
 
   return join(distDir, 'init.js');
@@ -56,7 +61,7 @@ if (command == null || command === '--help' || command === '-h') {
   process.exit(0);
 }
 
-if (command !== 'mcp' && command !== 'init') {
+if (command !== 'mcp' && command !== 'init' && command !== 'start-feature') {
   console.error(`Unknown odin command: ${command}`);
   console.error('Run `odin --help` for usage.');
   process.exit(1);

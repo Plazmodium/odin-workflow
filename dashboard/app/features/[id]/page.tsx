@@ -35,7 +35,7 @@ import { SecurityFindingsPanel } from '@/components/features/security-findings-p
 import { DevelopmentEvalsPanel } from '@/components/features/development-evals-panel';
 import { RefreshEvalsButton } from '@/components/shared/refresh-evals-button';
 import { PollingSubscription } from '@/components/realtime/realtime-page';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatConfidence } from '@/lib/utils';
 import Link from 'next/link';
@@ -86,10 +86,13 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
       <FeatureHeader feature={feature} healthStatus={eval_?.health_status} />
 
       {/* Phase Timeline (Enhanced - clickable, expandable) */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Phase Timeline</CardTitle>
-        </CardHeader>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Phase Timeline</CardTitle>
+            <CardDescription>
+              Elapsed phase windows, including waiting, handoff, and review time.
+            </CardDescription>
+          </CardHeader>
         <CardContent>
           <PhaseTimelineEnhanced
             phases={phases}
@@ -109,7 +112,10 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
         {/* Agent Profiler */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Agent Duration Profiler</CardTitle>
+            <CardTitle className="text-sm">Agent Runtime Profiler</CardTitle>
+            <CardDescription>
+              Completed agent invocation runtime only; excludes idle time inside a phase.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <AgentProfiler durations={agentDurationsResult.durations} error={agentDurationsResult.error} claimsSummary={claimsSummary} />

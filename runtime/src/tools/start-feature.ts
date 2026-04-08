@@ -5,6 +5,7 @@
 
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
 import { validateHumanAuthor } from '../domain/actors.js';
+import { deriveFeatureBranchName } from '../domain/feature-branch.js';
 import type { StartFeatureInput } from '../schemas.js';
 import { createErrorResult, createTextResult } from '../utils.js';
 
@@ -20,8 +21,7 @@ export async function handleStartFeature(
     });
   }
 
-  const branch_name =
-    input.dev_initials == null ? undefined : `${input.dev_initials}/feature/${input.id}`;
+  const branch_name = deriveFeatureBranchName(input.id, input.dev_initials);
 
   const feature = await adapter.startFeature({
     id: input.id,
@@ -36,9 +36,10 @@ export async function handleStartFeature(
   });
 
   return createTextResult(
-    `Feature ${feature.id} started at phase ${feature.current_phase} (${feature.status}).`,
+    `Feature ${feature.id} started at phase ${feature.current_phase} (${feature.status}). Recorded branch: ${feature.branch_name ?? branch_name}.`,
     {
       feature,
+      branch_name: feature.branch_name ?? branch_name,
       next_phase: '1',
       next_phase_name: 'Product',
     }

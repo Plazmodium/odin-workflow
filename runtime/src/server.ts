@@ -189,7 +189,7 @@ const formal_verification_adapter = createFormalVerificationAdapter(project_root
 const server = new McpServer(
   {
     name: 'odin',
-    version: '0.4.0-beta',
+    version: '0.5.0-beta',
   },
   {
     capabilities: {
@@ -212,7 +212,7 @@ server.registerTool(
   'odin.start_feature',
   {
     title: 'Start Feature',
-    description: 'Create a feature inside the Odin runtime control plane.',
+    description: 'Record a feature inside the Odin runtime after the feature branch already exists locally.',
     inputSchema: StartFeatureInputSchema,
   },
   safeToolHandler(async (input) => handleStartFeature(workflow_state, input))
