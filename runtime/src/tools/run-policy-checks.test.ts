@@ -39,11 +39,14 @@ describe('handleRunPolicyChecks', () => {
         needs_review: 1,
       },
       next_actions: [
-        'Use odin.get_claims_needing_review to inspect the watcher queue.',
-        'Have watcher-agent review each escalated claim and submit verdicts with odin.record_watcher_review.',
-        'Re-run odin.verify_claims after watcher reviews are recorded.',
+        'Claim IDs now needing watcher review: c2.',
+        'Call odin.get_claims_needing_review to inspect the full watcher queue and evidence.',
+        'Have watcher-agent review each claim_id listed above.',
+        'Record each verdict with odin.record_watcher_review({ claim_id: "<claim_id>", verdict: "PASS" | "FAIL", reasoning: "...", watcher_agent: "watcher-agent", confidence: 0.8 }).',
+        'Re-run odin.verify_claims({ feature_id: "FEAT-POLICY" }) after all watcher reviews are recorded.',
       ],
     });
     expect(result.content[0]?.text).toContain('1 claim(s) now need watcher review');
+    expect(result.content[0]?.text).toContain('c2');
   });
 });

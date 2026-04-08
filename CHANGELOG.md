@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.4.0-beta] - 2026-04-08
+
+### Fixed
+- `odin.get_claims_needing_review`, `odin.verify_claims`, and `odin.run_policy_checks` now print the pending watcher `claim_id` values directly in text output, along with exact follow-up calls for `odin.record_watcher_review` and `odin.verify_claims`, so text-only clients can clear the watcher queue without direct database access.
+
+### Changed
+- Root package version, runtime package version, runtime MCP server version, runtime lockfile, and README badge updated to `0.4.0-beta`.
+
 ## [0.3.9-beta] - 2026-04-08
 
 ### Fixed

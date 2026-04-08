@@ -4,6 +4,7 @@
  */
 
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import { buildWatcherQueueNextActions, buildWatcherQueueText } from '../domain/watcher-queue.js';
 import type { VerifyClaimsInput } from '../schemas.js';
 import { createErrorResult, createTextResult } from '../utils.js';
 
@@ -31,15 +32,21 @@ export async function handleVerifyClaims(
     claims_needing_review.length === 0
       ? []
       : [
-          'Claims are still awaiting LLM watcher review.',
-          'Call odin.get_claims_needing_review to fetch the queue for the watcher-agent.',
-          'Record each watcher decision with odin.record_watcher_review, then run odin.verify_claims again.',
+          `Claim IDs awaiting watcher review: ${claims_needing_review.map((claim) => claim.claim_id).join(', ')}.`,
+          ...buildWatcherQueueNextActions(feature.id),
         ];
 
-  return createTextResult(
+  const text =
     claims_needing_review.length === 0
       ? `Verified ${counts.total} claim(s) for feature ${feature.id}.`
-      : `Verified ${counts.total} claim(s) for feature ${feature.id}; ${claims_needing_review.length} claim(s) still await watcher review.`,
+      : buildWatcherQueueText(
+          claims_needing_review,
+          feature.id,
+          `Verified ${counts.total} claim(s) for feature ${feature.id}; ${claims_needing_review.length} claim(s) still await watcher review.`
+        );
+
+  return createTextResult(
+    text,
     {
       feature_id: feature.id,
       counts,

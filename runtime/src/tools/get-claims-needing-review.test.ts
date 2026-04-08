@@ -27,6 +27,19 @@ describe('handleGetClaimsNeedingReview', () => {
     const result = await handleGetClaimsNeedingReview(adapter, { feature_id: 'FEAT-WATCH' });
 
     expect(result.isError).toBeUndefined();
+    expect(result.content[0]?.text).toContain('claim_1');
+    expect(result.content[0]?.text).toContain('odin.record_watcher_review');
     expect(result.structuredContent?.claims).toHaveLength(1);
+  });
+
+  it('reports an empty watcher queue clearly', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => ({ id: 'FEAT-WATCH' })),
+      listClaimsNeedingReview: vi.fn(async () => []),
+    } as unknown as WorkflowStateAdapter;
+
+    const result = await handleGetClaimsNeedingReview(adapter, { feature_id: 'FEAT-WATCH' });
+
+    expect(result.content[0]?.text).toBe('No claims need watcher review for feature FEAT-WATCH.');
   });
 });
