@@ -8,7 +8,12 @@ import type {
   ArchiveFeatureReleaseInput,
   PickNextAutonomousPhaseResult,
   PickNextAutonomousPhaseOptions,
+  PhaseChildStateStrategy,
+  PhaseExecutionMode,
   PhaseId,
+  PhasePromptSection,
+  PreparedPhaseContext,
+  RecordPhaseArtifactInput,
   RecordPhaseResultInput,
   RecordPullRequestInput,
   RecordReleaseCloseoutFailureInput,
@@ -34,6 +39,61 @@ function asString(value: unknown): string | null {
 
 function asPhaseId(value: unknown): PhaseId | null {
   return typeof value === 'string' ? value : null;
+}
+
+function parseStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const parsed = value.flatMap((entry) => (typeof entry === 'string' ? [entry] : []));
+  return parsed.length === value.length ? parsed : null;
+}
+
+function asExecutionMode(value: unknown): PhaseExecutionMode | null {
+  return value === 'inline' || value === 'subagent' ? value : null;
+}
+
+function parseExecutionModeArray(value: unknown): PhaseExecutionMode[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const parsed = value.flatMap((entry) => {
+    const mode = asExecutionMode(entry);
+    return mode == null ? [] : [mode];
+  });
+  return parsed.length === value.length ? parsed : null;
+}
+
+function asChildStateStrategy(value: unknown): PhaseChildStateStrategy | null {
+  return value === 'direct_odin_tools_if_available' || value === 'return_intent_to_parent'
+    ? value
+    : null;
+}
+
+function parsePromptSectionArray(value: unknown): PhasePromptSection[] | null {
+  const allowed = new Set<PhasePromptSection>([
+    'phase',
+    'role_summary',
+    'constraints',
+    'development_evals',
+    'automation',
+    'verification',
+    'workflow',
+    'artifacts',
+    'skills',
+    'learnings',
+  ]);
+
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const parsed = value.flatMap((entry) => (typeof entry === 'string' && allowed.has(entry as PhasePromptSection)
+    ? [entry as PhasePromptSection]
+    : []));
+  return parsed.length === value.length ? parsed : null;
 }
 
 function asReleaseNotes(value: unknown): string | null {
@@ -70,6 +130,75 @@ function asSkippedSummary(value: unknown): SkippedSummaryItem[] {
 
     return [{ feature_id, feature_name, current_phase, status, detail }];
   });
+}
+
+function extractPreparedContext(context: Record<string, unknown> | null): PreparedPhaseContext {
+  if (context == null) {
+    throw new Error('Autonomous selection did not include a prepared phase context.');
+  }
+
+  const phase = isRecord(context.phase) ? context.phase : null;
+  const agent = isRecord(context.agent) ? context.agent : null;
+  const execution = isRecord(context.execution) ? context.execution : null;
+
+  const phase_id = phase == null ? null : asPhaseId(phase.id);
+  const phase_name = phase == null ? null : asString(phase.name);
+  const phase_purpose = phase == null ? null : asString(phase.purpose);
+  const definition_of_done = phase == null ? null : parseStringArray(phase.definition_of_done);
+  const agent_name = agent == null ? null : asString(agent.name);
+  const role_summary = agent == null ? null : asString(agent.role_summary);
+  const constraints = agent == null ? null : parseStringArray(agent.constraints);
+  const phase_role_name = execution == null ? null : asString(execution.phase_role_name);
+  const acting_agent_name = execution == null ? null : asString(execution.acting_agent_name);
+  const supported_modes = execution == null ? null : parseExecutionModeArray(execution.supported_modes);
+  const recommended_mode = execution == null ? null : asExecutionMode(execution.recommended_mode);
+  const child_state_strategy = execution == null ? null : asChildStateStrategy(execution.child_state_strategy);
+  const prompt_sections = execution == null ? null : parsePromptSectionArray(execution.prompt_sections);
+
+  if (
+    phase_id == null ||
+    phase_name == null ||
+    agent_name == null ||
+    role_summary == null ||
+    definition_of_done == null ||
+    constraints == null ||
+    phase_role_name == null ||
+    acting_agent_name == null ||
+    supported_modes == null ||
+    recommended_mode == null ||
+    child_state_strategy == null ||
+    prompt_sections == null ||
+    supported_modes.length === 0
+  ) {
+    throw new Error('Prepared phase context was incomplete for autonomous execution.');
+  }
+
+  if (!supported_modes.includes(recommended_mode)) {
+    throw new Error('Prepared phase context had an invalid execution contract.');
+  }
+
+  return {
+    raw: context,
+    phase: {
+      id: phase_id,
+      name: phase_name,
+      purpose: phase_purpose,
+      definition_of_done,
+    },
+    agent: {
+      name: agent_name,
+      role_summary,
+      constraints,
+    },
+    execution: {
+      phase_role_name,
+      acting_agent_name,
+      supported_modes,
+      recommended_mode,
+      child_state_strategy,
+      prompt_sections,
+    },
+  };
 }
 
 async function resolveRuntimeServerPath(cwd: string): Promise<string> {
@@ -174,9 +303,14 @@ class McpRuntimeToolClient implements RuntimeToolClient {
       context_artifacts != null && isRecord(context_artifacts.release_notes) ? context_artifacts.release_notes : null;
     const release_notes =
       release_notes_artifact == null ? null : asReleaseNotes(release_notes_artifact.content);
+    const prepared_context = extractPreparedContext(context);
 
     if (feature_id == null || feature_name == null || phase == null) {
       throw new Error('Autonomous selection payload was incomplete.');
+    }
+
+    if (prepared_context.phase.id !== phase) {
+      throw new Error('Autonomous selection phase did not match the prepared phase context.');
     }
 
     return {
@@ -188,6 +322,7 @@ class McpRuntimeToolClient implements RuntimeToolClient {
         branch_name,
         base_branch,
         release_notes,
+        prepared_context,
       },
       skipped_summary,
     };
@@ -212,16 +347,35 @@ class McpRuntimeToolClient implements RuntimeToolClient {
     }
   }
 
+  async recordPhaseArtifact(input: RecordPhaseArtifactInput): Promise<void> {
+    const result = await this.client.callTool({
+      name: 'odin.record_phase_artifact',
+      arguments: {
+        feature_id: input.feature_id,
+        phase: input.phase,
+        output_type: input.output_type,
+        content: input.content,
+        created_by: input.created_by,
+      },
+    });
+    const error = extractError(result);
+    if (error != null) {
+      throw new Error(error);
+    }
+  }
+
   async recordPhaseResult(input: RecordPhaseResultInput): Promise<void> {
     const args: Record<string, unknown> = {
       feature_id: input.feature_id,
       phase: input.phase,
       outcome: input.outcome,
-      next_phase: input.next_phase,
       summary: input.summary,
       created_by: input.created_by,
       blockers: input.blockers,
     };
+    if (input.next_phase != null) {
+      args.next_phase = input.next_phase;
+    }
     const result = await this.client.callTool({
       name: 'odin.record_phase_result',
       arguments: args,
@@ -328,7 +482,7 @@ export async function connectRuntimeClient(options: RuntimeClientOptions): Promi
   });
   const client = new Client({
     name: 'ralph-loop',
-    version: '0.1.0',
+    version: '0.2.0',
   });
   await client.connect(transport);
   return new McpRuntimeToolClient(client, transport);

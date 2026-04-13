@@ -474,16 +474,53 @@ export interface MergeRecord {
   pr_number?: number;
 }
 
+export type PhaseExecutionMode = 'inline' | 'subagent';
+
+export type PhaseChildStateStrategy =
+  | 'direct_odin_tools_if_available'
+  | 'return_intent_to_parent';
+
+export type PhasePromptSection =
+  | 'phase'
+  | 'role_summary'
+  | 'constraints'
+  | 'development_evals'
+  | 'automation'
+  | 'verification'
+  | 'workflow'
+  | 'artifacts'
+  | 'skills'
+  | 'learnings';
+
+/**
+ * Logical phase-role instructions returned by the runtime.
+ * The harness may realize this role inline or via a spawned child agent.
+ * The runtime does not launch or own that execution vehicle.
+ */
 export interface PhaseAgentInstructions {
   name: string;
   role_summary: string;
   constraints: string[];
 }
 
+export interface PhaseExecutionContract {
+  actor_model: 'logical_role';
+  execution_owner: 'harness';
+  phase_role_name: string;
+  acting_agent_name: string;
+  child_agent_role: 'acts_as_phase_role';
+  supported_modes: PhaseExecutionMode[];
+  recommended_mode: PhaseExecutionMode;
+  state_recording_owner: 'orchestrator';
+  child_state_strategy: PhaseChildStateStrategy;
+  prompt_sections: PhasePromptSection[];
+}
+
 export interface PhaseContextBundle {
   feature: FeatureRecord;
   phase: PhaseContract;
   agent: PhaseAgentInstructions;
+  execution: PhaseExecutionContract;
   automation: AutomationDecision;
   invocation: {
     id: string;

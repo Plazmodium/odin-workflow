@@ -1,8 +1,8 @@
 # Hybrid Orchestration Pattern for Odin
 
-**Architecture**: Agents create artifacts, Main session manages state
+**Architecture**: Child agents create artifacts, parent session manages workflow state
 **Database**: Supabase (remote PostgreSQL via MCP)
-**State Access**: Main session only (via Supabase MCP)
+**State Access**: Parent session always; child agents only when the harness gives them direct `odin.*` access
 
 ---
 
@@ -11,10 +11,12 @@
 Odin uses a **hybrid orchestration** model where:
 
 1. **Agents** (stateless workers) create artifacts (specs, reviews, code)
-2. **Main Session** (orchestrator) manages workflow state via Supabase MCP
+2. **Main Session** (orchestrator) manages workflow state by proxying `odin.*` calls
 3. **Supabase** (remote database) stores state accessible to dashboard
 
-This architecture works within the constraint that sub-agents spawned via task/agent tools cannot access MCP servers. Read the examples below using the current 11-phase order (Planning → Product → Discovery → Architect → Guardian → Builder → Reviewer → Integrator → Documenter → Release → Complete).
+This document now describes the **fallback pattern** for harnesses where spawned child agents cannot call `odin.*` directly. If your harness gives the child direct Odin runtime access, use `system/mcp-servers/odin-runtime/README.md#harness-execution-modes` as the canonical contract and treat this doc as the parent-session proxy pattern only.
+
+Read the examples below using the current 11-phase order (Planning → Product → Discovery → Architect → Guardian → Builder → Reviewer → Integrator → Documenter → Release → Complete).
 
 ---
 
@@ -41,20 +43,20 @@ At the end of each artifact, agents document what state changes the orchestrator
 
 After completing this requirements document, the orchestrator should:
 
-1. **Register Feature**:
-   - Feature ID: AUTH-001-jwt-login
-   - Name: JWT Login Flow
-   - Complexity: Level 2
+1. **Proxy `odin.record_phase_artifact`**:
+   - `feature_id`: `AUTH-001-jwt-login`
+   - `phase`: `2`
+   - `output_type`: `requirements`
+   - `created_by`: `context.execution.acting_agent_name`
 
-2. **Track Duration**:
-   - Phase: 2 (Discovery)
-   - Agent: Discovery
-   - Operation: Requirements gathering
-
-3. **Transition Phase**:
-   - From: Phase 2 (Discovery)
-   - To: Phase 3 (Architect)
-   - Next Agent: Architect
+2. **Proxy `odin.record_phase_result`**:
+   - `feature_id`: `AUTH-001-jwt-login`
+   - `phase`: `2`
+   - `outcome`: `completed`
+   - `summary`: `Requirements complete`
+   - `created_by`: `context.execution.acting_agent_name`
+   - `next_phase`: `3`
+   - `blockers`: `[]`
 ```
 
 ### ✅ Follow Workflow Patterns
@@ -64,7 +66,7 @@ Agents follow established patterns for file structure, naming, and templates.
 ### ❌ Do NOT Attempt State Management
 
 Agents should NOT:
-- Try to call MCP tools (they don't have access)
+- Try to call workflow-state tools when the harness did not give them direct `odin.*` access
 - Create Bash scripts to access databases (breaks remote DB model)
 - Attempt to write state directly
 - Worry about phase transitions or duration tracking
@@ -86,7 +88,11 @@ const discoveryResult = await Task({
 
 ### ✅ Execute State Changes
 
-After agent completes, orchestrator reads the "State Changes Required" section and executes via Supabase MCP:
+After agent completes, orchestrator reads the "State Changes Required" section and proxies the required `odin.*` calls.
+
+In the packaged Odin runtime, the same proxy rule applies when a child agent lacks direct `odin.*` access: the parent session performs the `odin.*` calls on the child's behalf and should pass `context.execution.acting_agent_name` through to fields such as `agent_name` and `created_by` so invocation tracking stays aligned.
+
+Historical Supabase MCP example:
 
 ```typescript
 // 1. Register feature
@@ -244,39 +250,40 @@ Discovery agent creates `requirements/AUTH-001-jwt-login/requirements.md`:
 ---
 ## State Changes Required
 
-1. **Register Feature**:
-   - ID: AUTH-001-jwt-login
-   - Name: JWT Login Flow
-   - Complexity: 2
-
-2. **End Agent Invocation**:
-   - Phase: 2, Agent: Discovery
-   - Operation: Requirements gathering
-
-3. **Transition Phase**: 2 → 3 (Architect)
+1. **Record requirements artifact**
+2. **Complete phase 2 (Discovery) to phase 3 (Architect)**
+3. **Use the child's acting agent name for proxied Odin calls**
 ```
 
 ### Step 3: Main Session Executes State Changes
 
 ```typescript
+// Feature already exists in Odin via `odin.start_feature` or `odin start-feature`
+
 // Read agent output
 const reqDoc = await Read({
-  file_path: "requirements/AUTH-001-jwt-login/requirements.md"
+  filePath: "requirements/AUTH-001-jwt-login/requirements.md"
 });
 
 // Parse "State Changes Required" section
-// Execute via Supabase MCP
+// Proxy via Odin runtime tools, preserving the child's acting name
 
-await mcp_supabase_execute_sql({
-  query: "SELECT * FROM create_feature('AUTH-001-jwt-login', 'JWT Login Flow', 2, 'ROUTINE', NULL, NULL, 'discovery-agent')"
+await odin.record_phase_artifact({
+  feature_id: 'AUTH-001-jwt-login',
+  phase: '2',
+  output_type: 'requirements',
+  content: reqDoc,
+  created_by: context.execution.acting_agent_name,
 });
 
-await mcp_supabase_execute_sql({
-  query: "SELECT * FROM end_agent_invocation(<invocation_id>)"
-});
-
-await mcp_supabase_execute_sql({
-  query: "SELECT * FROM transition_phase('AUTH-001-jwt-login', '1'::phase, 'discovery-agent', 'Requirements complete')"
+await odin.record_phase_result({
+  feature_id: 'AUTH-001-jwt-login',
+  phase: '2',
+  outcome: 'completed',
+  summary: 'Requirements complete',
+  created_by: context.execution.acting_agent_name,
+  next_phase: '3',
+  blockers: [],
 });
 ```
 
@@ -290,7 +297,7 @@ const specResult = await Task({
 
     Requirements document: requirements/AUTH-001-jwt-login/requirements.md
 
-    Follow Phase 2 Specification Drafting process.
+    Follow the current Phase 3 Architect contract.
   `,
   description: "Spec drafting for AUTH-001"
 });
@@ -307,20 +314,19 @@ Main session spawns Guardian agent.
 
 ## Agent Artifact Template
 
-Every agent artifact should end with this section:
+Every agent artifact should end with this section when the parent session needs to proxy `odin.*` calls:
 
 ```markdown
 ---
 ## State Changes Required
 
-<!-- Document what state changes the orchestrator should make -->
+<!-- Document which odin.* calls the parent session should proxy -->
 
 ### 1. [State Change Name]
-- **Operation**: [insert/update/delete]
-- **Table**: [table_name]
-- **Data**:
-  - field1: value1
-  - field2: value2
+- **Tool**: `odin.[tool_name]`
+- **Arguments**:
+  - arg1: value1
+  - arg2: value2
 
 ### 2. [Next State Change]
 ...
@@ -329,7 +335,7 @@ Every agent artifact should end with this section:
 ## Next Steps
 
 The orchestrator should:
-1. Execute state changes above via Supabase MCP
+1. Execute the proxied `odin.*` calls above
 2. Spawn [NextAgent] agent with [context]
 3. Monitor [constraints/budgets]
 ```
@@ -339,8 +345,8 @@ The orchestrator should:
 ## Benefits of This Pattern
 
 ### ✅ Works Within Constraints
-- Agents don't need MCP access
-- Main session uses its native MCP capability
+- Works even when child agents do not have direct `odin.*` or MCP access
+- Parent session keeps workflow-state authority
 
 ### ✅ Clean Separation of Concerns
 - Agents: Content creation (stateless)
@@ -366,7 +372,7 @@ The orchestrator should:
 
 ## Migration from Old Pattern
 
-### Old Pattern (Doesn't Work)
+### Old Pattern (Pre-Runtime History)
 ```markdown
 # Agent Instructions
 
@@ -374,30 +380,34 @@ The orchestrator should:
 
 **CRITICAL**: You MUST call MCP tools directly.
 
-[Agents cannot call MCP tools - this never worked]
+[Historical note: this was only true for older harness setups where child agents had no direct runtime access]
 ```
 
-### New Pattern (Works)
+### Current Fallback Pattern (Works Without Child `odin.*` Access)
 ```markdown
 # Agent Instructions
 
 ### Step 6: Complete Artifact
 
-Create your artifact (spec.md, review.md, etc.) and include a "State Changes Required" section documenting what state changes the orchestrator should make.
+Create your artifact (spec.md, review.md, etc.) and include a "State Changes Required" section documenting which `odin.*` calls the parent session should proxy on your behalf.
 
 **Example**:
 ```markdown
 ---
 ## State Changes Required
 
-### End Agent Invocation
-- Phase: 1 (Specification)
-- Agent: Architect
-- Operation: Spec draft v1
+### Record Spec Artifact
+- Tool: `odin.record_phase_artifact`
+- Phase: 3 (Architect)
+- Output type: `spec`
+- created_by: `context.execution.acting_agent_name`
 
-### Transition Phase
-- To: Phase 2 (Iteration)
-- Next Agent: Guardian
+### Close Phase
+- Tool: `odin.record_phase_result`
+- Phase: 3 (Architect)
+- Outcome: `completed`
+- Next phase: 4 (Guardian)
+- created_by: `context.execution.acting_agent_name`
 ```
 ```
 
@@ -407,38 +417,56 @@ Create your artifact (spec.md, review.md, etc.) and include a "State Changes Req
 
 ### Recommended Pattern
 
-Create helper functions in main session for common operations:
+Create helper functions in the parent session for proxied `odin.*` calls. Avoid raw SQL/Supabase writes for normal workflow progression because Odin runtime owns actor normalization, invocation lifecycle, and phase-completion guards.
 
 ```typescript
-async function registerFeature(featureId, name, complexity, severity = "ROUTINE") {
-  await mcp_supabase_execute_sql({
-    query: `SELECT * FROM create_feature(
-      '${featureId}', '${name}', ${complexity}, '${severity}',
-      NULL, NULL, 'orchestrator'
-    )`
+async function recordArtifactFromChild(featureId, phase, outputType, content, actingAgentName) {
+  await odin.record_phase_artifact({
+    feature_id: featureId,
+    phase,
+    output_type: outputType,
+    content,
+    created_by: actingAgentName,
   });
 }
 
-async function startAgentInvocation(featureId, phase, agentName, operation) {
-  const result = await mcp_supabase_execute_sql({
-    query: `SELECT * FROM start_agent_invocation(
-      '${featureId}', '${phase}'::phase, '${agentName}', '${operation}'
-    )`
-  });
-  return result.id; // invocation_id for later end_agent_invocation
-}
-
-async function endAgentInvocation(invocationId) {
-  await mcp_supabase_execute_sql({
-    query: `SELECT * FROM end_agent_invocation(${invocationId})`
+async function completePhaseFromChild(featureId, phase, summary, actingAgentName, nextPhase) {
+  await odin.record_phase_result({
+    feature_id: featureId,
+    phase,
+    outcome: 'completed',
+    summary,
+    created_by: actingAgentName,
+    next_phase: nextPhase,
+    blockers: [],
   });
 }
 
-async function transitionPhase(featureId, toPhase, agentName, notes) {
-  await mcp_supabase_execute_sql({
-    query: `SELECT * FROM transition_phase(
-      '${featureId}', '${toPhase}'::phase, '${agentName}', '${notes}'
-    )`
+async function proxyStateChangesFromChild(context, artifactContent) {
+  await recordArtifactFromChild(
+    context.feature.id,
+    context.phase.id,
+    'spec',
+    artifactContent,
+    context.execution.acting_agent_name
+  );
+
+  await completePhaseFromChild(
+    context.feature.id,
+    context.phase.id,
+    'Spec draft complete',
+    context.execution.acting_agent_name,
+    '4'
+  );
+}
+
+async function startFeature(featureId, name, complexityLevel, severity, author) {
+  await odin.start_feature({
+    id: featureId,
+    name,
+    complexity_level: complexityLevel,
+    severity,
+    author,
   });
 }
 ```

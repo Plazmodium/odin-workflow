@@ -427,10 +427,12 @@ function printHarnessSnippet(projectRoot: string, tool: HarnessTool, distributio
   console.log('\nCanonical eval-aware orchestration snippet:');
   console.log([
     '1. Call `odin.prepare_phase_context({ feature_id, phase, agent_name })`.',
-    '2. Build the agent prompt from `context.agent.role_summary`, `context.agent.constraints`, and `context.development_evals.harness_prompt_block`.',
-    '3. Use `odin.get_development_eval_status({ feature_id })` when you need focused eval state instead of parsing broad status payloads.',
-    '4. Record structured eval artifacts with `odin.record_eval_plan`, `odin.record_eval_run`, and `odin.record_quality_gate`.',
-    '5. Never treat Development Evals as a replacement for `odin.verify_design`, `odin.run_review_checks`, tests, runtime verification, or watcher checks.',
+    '2. Build the agent prompt from `context.agent.name`, `context.agent.role_summary`, and `context.agent.constraints`.',
+    '3. Use `context.execution.recommended_mode` as the default inline/subagent choice.',
+    '4. If the child cannot call `odin.*` directly, proxy those calls from the parent session and pass `context.execution.acting_agent_name` through to fields like `agent_name` and `created_by`.',
+    '5. Use `odin.get_development_eval_status({ feature_id })` when you need focused eval state instead of parsing broad status payloads.',
+    '6. Record structured eval artifacts with `odin.record_eval_plan`, `odin.record_eval_run`, and `odin.record_quality_gate`.',
+    '7. Never treat Development Evals as a replacement for `odin.verify_design`, `odin.run_review_checks`, tests, runtime verification, or watcher checks.',
   ].join('\n'));
 }
 

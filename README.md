@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.5.0--beta-orange" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.6.0--beta-orange" alt="Version">
   <img src="https://img.shields.io/badge/workflow-11_phase-blue" alt="11-phase workflow">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
 </p>
@@ -152,6 +152,7 @@ Ralph Loop is the external Odin supervisor for bounded autonomous polling.
 Current supported paths:
 - Release auto-PR handoff when `automation.mode: auto_pr` allows it
 - Release closeout after a human merge is recorded
+- Optional child-command execution for phases 5-8 when `--subagent-command-json` / `RALPH_SUBAGENT_COMMAND_JSON` is configured
 
 From the repo root:
 
@@ -160,7 +161,7 @@ npm run ralph:tick -- --project-root /path/to/your/project
 npm run ralph:watch -- --project-root /path/to/your/project --interval-ms 30000
 ```
 
-See `loop/README.md` and `docs/guides/RALPH-LOOP.md` for the operator runbook, prerequisites, and smoke steps.
+See `loop/README.md` and `docs/guides/RALPH-LOOP.md` for the operator runbook, child-command protocol, prerequisites, and smoke steps.
 
 For Claude Code / Amp, use:
 

@@ -15,8 +15,13 @@ Current supported execution paths:
 2. **Release closeout after human merge**
    - waits for `odin.record_merge`
    - completes phase 9 -> 10 via `odin.record_phase_result`
+3. **Optional child-command execution for phases 5-8**
+   - enabled with `RALPH_SUBAGENT_COMMAND_JSON` or `--subagent-command-json`
+   - Ralph Loop spawns the configured child command
+   - the child returns artifacts and a final phase outcome on stdout
+   - Ralph Loop proxies `odin.record_phase_artifact` / `odin.record_phase_result` from the parent session using `context.execution.acting_agent_name`
 
-Anything outside those Release actions is out of scope for this tracer-bullet slice.
+Without a child command configured, Ralph Loop keeps its earlier Release-only behavior.
 
 ## Commands
 
@@ -25,6 +30,7 @@ In the public Odin suite repo:
 ```bash
 npm run ralph:tick -- --project-root /path/to/project
 npm run ralph:watch -- --project-root /path/to/project --interval-ms 30000
+npm run ralph:tick -- --project-root /path/to/project --subagent-command-json '["node","./child-runner.js"]'
 ```
 
 ## Simulated verification first
@@ -32,7 +38,7 @@ npm run ralph:watch -- --project-root /path/to/project --interval-ms 30000
 If your real project is not ready for a live smoke run yet (for example because it still needs fresh Odin migrations), start with the simulated scenario suite:
 
 ```bash
-cd loop
+cd system/ralph-loop
 npm install
 npm run test:simulation
 ```
@@ -42,6 +48,8 @@ The simulation suite covers:
 - Release auto-PR handoff
 - Release closeout after human merge
 - failure cleanup for retryable handoff errors
+- child-command protocol parsing
+- parent-proxied artifact/result recording for subagent phases
 
 ## Environment and prerequisites
 
@@ -55,6 +63,55 @@ Optional:
 
 - `RALPH_LOOP_NAME=my-loop-name` to change the emitted supervisor identity
 - `RALPH_LOOP_INTERVAL_MS=15000` for watch mode if you do not pass `--interval-ms`
+- `RALPH_SUBAGENT_COMMAND_JSON='["node","./child-runner.js"]'` to let Ralph Loop pick phases 5-8 and execute them through a child command
+
+## Child command protocol
+
+When `RALPH_SUBAGENT_COMMAND_JSON` or `--subagent-command-json` is set, Ralph Loop widens pickup from phase `9` only to phases `5`, `6`, `7`, `8`, and `9`.
+
+The child command receives JSON on stdin:
+
+```json
+{
+  "schema_version": "1",
+  "request": {
+    "project_root": "/path/to/project",
+    "supervisor_name": "ralph-loop",
+    "selection": {
+      "feature_id": "FEAT-123",
+      "phase": "5",
+      "prepared_context": {
+        "execution": {
+          "acting_agent_name": "builder-agent",
+          "recommended_mode": "subagent"
+        }
+      }
+    },
+    "prompt": "..."
+  }
+}
+```
+
+It must return JSON on stdout:
+
+```json
+{
+  "summary": "Builder implementation finished.",
+  "outcome": "completed",
+  "next_phase": "6",
+  "blockers": [],
+  "artifacts": [
+    {
+      "output_type": "documentation",
+      "content": {
+        "note": "done"
+      }
+    }
+  ]
+}
+```
+
+Ralph Loop then proxies the returned artifacts and phase result through `odin.*` using `selection.prepared_context.execution.acting_agent_name` for `created_by`.
 
 ## What the dashboard shows
 
@@ -129,6 +186,7 @@ Watch mode is single-worker and intentionally simple for now.
 Use it when:
 
 - you want repeated release handoff/closeout polling locally
+- you want optional child-command execution for phases 5-8
 - you are testing supervisor observability on the dashboard
 
-Do not use it yet as a generic multi-phase daemon.
+Do not treat it as a fully general multi-phase daemon yet; this slice only adds a bounded child-command hook for phases 5-8 plus the existing Release inline paths.

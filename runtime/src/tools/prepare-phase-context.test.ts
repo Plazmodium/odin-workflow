@@ -156,12 +156,24 @@ describe('handlePreparePhaseContext', () => {
     const context = (
       result.structuredContent as {
         context?: {
-          agent: { constraints: string[] };
+          agent: { name: string; constraints: string[] };
           automation: {
             configured_mode: string;
             next_human_boundary: string;
             capabilities: { can_open_pr: boolean };
             blocking_reasons: string[];
+          };
+          execution: {
+            actor_model: string;
+            execution_owner: string;
+            phase_role_name: string;
+            acting_agent_name: string;
+            child_agent_role: string;
+            supported_modes: string[];
+            recommended_mode: string;
+            state_recording_owner: string;
+            child_state_strategy: string;
+            prompt_sections: string[];
           };
           verification: { required_checks: string[] };
           workflow: { claims_needing_review_count: number };
@@ -177,12 +189,26 @@ describe('handlePreparePhaseContext', () => {
     )?.context;
 
     expect(context).toMatchObject({
+      agent: {
+        name: 'builder-agent',
+      },
       automation: {
         configured_mode: 'auto_pr',
         next_human_boundary: 'pr',
         capabilities: {
           can_open_pr: false,
         },
+      },
+      execution: {
+        actor_model: 'logical_role',
+        execution_owner: 'harness',
+        phase_role_name: 'builder-agent',
+        acting_agent_name: 'builder-agent',
+        child_agent_role: 'acts_as_phase_role',
+        supported_modes: ['inline', 'subagent'],
+        recommended_mode: 'subagent',
+        state_recording_owner: 'orchestrator',
+        child_state_strategy: 'direct_odin_tools_if_available',
       },
       development_evals: {
         mode: 'plan_required',
@@ -224,6 +250,18 @@ describe('handlePreparePhaseContext', () => {
     expect(context?.agent.constraints).toContain(
       'Outstanding claims need watcher review: call odin.get_claims_needing_review, have watcher-agent review each claim, record results with odin.record_watcher_review, then re-run odin.verify_claims before closing the watched phase.'
     );
+    expect(context?.execution.prompt_sections).toEqual([
+      'phase',
+      'role_summary',
+      'constraints',
+      'development_evals',
+      'automation',
+      'verification',
+      'workflow',
+      'artifacts',
+      'skills',
+      'learnings',
+    ]);
   });
 
   it('retains development eval artifact context even when include_artifacts is false', async () => {
@@ -296,5 +334,77 @@ describe('handlePreparePhaseContext', () => {
     expect(context?.development_evals.status_summary).toContain(
       'Latest eval_plan recorded by agent at 2026-03-20T00:30:00.000Z.'
     );
+  });
+
+  it('keeps the canonical phase role stable when a custom acting agent name is provided', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => createFeature()),
+      listPhaseArtifacts: vi.fn(async () => []),
+      listLearnings: vi.fn(async () => []),
+      listRelatedLearnings: vi.fn(async () => []),
+      listOpenBlockers: vi.fn(async () => []),
+      listOpenGateRecords: vi.fn(async () => []),
+      listOpenFindings: vi.fn(async () => []),
+      listPendingClaims: vi.fn(async () => []),
+      listClaimVerificationStatus: vi.fn(async () => []),
+      listClaimsNeedingReview: vi.fn(async () => []),
+      findOpenAgentInvocation: vi.fn(async () => null),
+      startAgentInvocation: vi.fn(async () => ({
+        id: 'inv_custom',
+        feature_id: 'FEAT-CTX',
+        phase: '5',
+        agent_name: 'senior-builder',
+        operation: 'Phase 5: Builder',
+        skills_used: [],
+        started_at: '2026-03-20T01:20:00.000Z',
+        ended_at: null,
+        duration_ms: null,
+      })),
+    } as unknown as WorkflowStateAdapter;
+
+    const skillAdapter: SkillAdapter = {
+      resolveSkills: vi.fn(async () => ({
+        resolved: [],
+        fallback_used: false,
+      })),
+      listKnowledgeDomains: vi.fn(async () => []),
+      invalidateCaches: vi.fn(),
+    };
+
+    const result = await handlePreparePhaseContext(adapter, skillAdapter, createConfig('guarded'), {
+      feature_id: 'FEAT-CTX',
+      phase: '5',
+      agent_name: 'senior-builder',
+      include_artifacts: false,
+      include_skills: true,
+      include_learnings: false,
+    });
+
+    const context = (
+      result.structuredContent as {
+        context?: {
+          agent: { name: string };
+          execution: {
+            phase_role_name: string;
+            acting_agent_name: string;
+            recommended_mode: string;
+          };
+          invocation: { agent_name: string } | null;
+        };
+      }
+    )?.context;
+
+    expect(adapter.startAgentInvocation).toHaveBeenCalledWith(
+      'FEAT-CTX',
+      '5',
+      'senior-builder',
+      'Phase 5: Builder',
+      undefined
+    );
+    expect(context?.agent.name).toBe('builder-agent');
+    expect(context?.execution.phase_role_name).toBe('builder-agent');
+    expect(context?.execution.acting_agent_name).toBe('senior-builder');
+    expect(context?.execution.recommended_mode).toBe('subagent');
+    expect(context?.invocation?.agent_name).toBe('senior-builder');
   });
 });

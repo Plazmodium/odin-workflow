@@ -41,6 +41,9 @@ describe('odin-runtime-init', () => {
     expect(output).toContain('runtime quick-start mode: in_memory');
     expect(output).toContain('odin.get_development_eval_status');
     expect(output).toContain('Canonical eval-aware orchestration snippet');
+    expect(output).toContain('context.agent.name');
+    expect(output).toContain('context.execution.recommended_mode');
+    expect(output).toContain('context.execution.acting_agent_name');
     expect(output).toContain('odin.record_eval_plan');
 
     const config = readFileSync(join(tmpDir, '.odin', 'config.yaml'), 'utf8');

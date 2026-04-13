@@ -92,7 +92,7 @@ All features: PLANNING -> PRODUCT -> DISCOVERY -> ARCHITECT -> GUARDIAN -> BUILD
 
 > **Watched agents** (Builder, Integrator, Release) emit structured claims that are verified by the Policy Engine and optionally the LLM Watcher. See [Watcher Verification](#watcher-verification).
 
-> **Detailed Documentation**: See `agents/definitions/` for phase prompts and [runtime/README.md](runtime/README.md) for runtime setup.
+> **Detailed Documentation**: See `agents/definitions/` for phase prompts and [system/mcp-servers/odin-runtime/README.md](system/mcp-servers/odin-runtime/README.md) for runtime setup.
 
 ### Orchestrator Loop
 
@@ -778,7 +778,7 @@ Current runtime contract:
   - `DATABASE_URL` for direct PostgreSQL migrations
   - `SUPABASE_URL` + `SUPABASE_ACCESS_TOKEN` for Supabase Management API migrations
 
-Database schema is applied via `odin.apply_migrations`, which auto-detects existing schemas and tracks applied migrations. See [runtime/README.md](runtime/README.md) for full configuration.
+Database schema is applied via `odin.apply_migrations`, which auto-detects existing schemas and tracks applied migrations. See [system/mcp-servers/odin-runtime/README.md](system/mcp-servers/odin-runtime/README.md) for full configuration.
 
 ### MCP Limitation
 
@@ -835,7 +835,7 @@ Keep only Context & Goals and Acceptance Criteria.
 | `filesystem` | Direct file access | Recommended |
 | `github` | Pull issues, PRs, tickets | Optional |
 
-The `odin` server is the Odin MCP Runtime. It provides all `odin.*` tools, manages persistent workflow state through Supabase in `runtime.mode: supabase`, and supports migration-only direct PostgreSQL access through `odin.apply_migrations`. See [runtime/README.md](runtime/README.md) for setup.
+The `odin` server is the Odin MCP Runtime. It provides all `odin.*` tools, manages persistent workflow state through Supabase in `runtime.mode: supabase`, and supports migration-only direct PostgreSQL access through `odin.apply_migrations`. See [system/mcp-servers/odin-runtime/README.md](system/mcp-servers/odin-runtime/README.md) for setup.
 
 **Docker Gateway Toolkit:**
 
@@ -1089,7 +1089,7 @@ odin.record_phase_result({
 ## Getting Started
 
 1. **Read the framework**: [SDD-framework.md](docs/framework/SDD-framework.md)
-2. **Set up the runtime**: [runtime/README.md](runtime/README.md)
+2. **Set up the runtime**: [system/mcp-servers/odin-runtime/README.md](system/mcp-servers/odin-runtime/README.md)
 3. **Understand agents**: `agents/definitions/`
 4. **See an example**: [example-workflow.md](docs/guides/example-workflow.md)
 5. **Database setup**: [SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md)
