@@ -50,6 +50,12 @@ function createRequest(): SubagentExecutionRequest {
 }
 
 describe('createCommandSubagentExecutor', () => {
+  it('fails fast when the command array is empty', () => {
+    expect(() => createCommandSubagentExecutor([])).toThrow(
+      'Subagent executor command must be a non-empty array with a valid executable.',
+    );
+  });
+
   it('parses a successful child result from stdout', async () => {
     const script = [
       process.execPath,

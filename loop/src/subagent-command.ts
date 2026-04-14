@@ -97,9 +97,14 @@ function commandError(command: string[], result: CommandResult): Error {
 }
 
 export function createCommandSubagentExecutor(command: string[]): SubagentExecutor {
+  const executable = command[0];
+  if (executable == null || executable.trim().length === 0) {
+    throw new Error('Subagent executor command must be a non-empty array with a valid executable.');
+  }
+
   return {
     async execute(request: SubagentExecutionRequest): Promise<SubagentExecutionResult> {
-      const child = spawn(command[0] ?? '', command.slice(1), {
+      const child = spawn(executable, command.slice(1), {
         cwd: request.project_root,
         env: process.env,
         stdio: ['pipe', 'pipe', 'pipe'],
