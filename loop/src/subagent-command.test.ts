@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createCommandSubagentExecutor } from './subagent-command.js';
 import type { AutonomousSelection, SubagentExecutionRequest } from './types.js';
@@ -88,6 +88,18 @@ describe('createCommandSubagentExecutor', () => {
     });
   });
 
+  it('rejects when the child exits before consuming stdin', async () => {
+    const executor = createCommandSubagentExecutor([
+      process.execPath,
+      '-e',
+      'process.exit(0);',
+    ]);
+
+    await expect(executor.execute(createRequest())).rejects.toThrow(
+      `Subagent executor ${process.execPath} produced no stdout result.`
+    );
+  });
+
   it('rejects malformed stdout payloads', async () => {
     const executor = createCommandSubagentExecutor([
       process.execPath,
@@ -112,6 +124,18 @@ describe('createCommandSubagentExecutor', () => {
     );
   });
 
+  it('rejects blank phase identifiers in child payloads', async () => {
+    const executor = createCommandSubagentExecutor([
+      process.execPath,
+      '-e',
+      "process.stdout.write(JSON.stringify({ summary: 'ok', outcome: 'completed', next_phase: '   ', artifacts: [{ phase: '   ', output_type: 'documentation', content: {} }] }));",
+    ]);
+
+    await expect(executor.execute(createRequest())).rejects.toThrow(
+      'Subagent executor returned an incomplete result payload.',
+    );
+  });
+
   it('surfaces child-process failures with stderr', async () => {
     const executor = createCommandSubagentExecutor([
       process.execPath,
@@ -122,5 +146,25 @@ describe('createCommandSubagentExecutor', () => {
     await expect(executor.execute(createRequest())).rejects.toThrow(
       'child failed',
     );
+  });
+
+  it('times out a hung child process', async () => {
+    vi.useFakeTimers();
+    const executor = createCommandSubagentExecutor([
+      process.execPath,
+      '-e',
+      'setInterval(() => {}, 1000);',
+    ]);
+
+    try {
+      const pending = executor.execute(createRequest());
+      const assertion = expect(pending).rejects.toThrow(
+        `Subagent executor ${process.execPath} timed out after 120000ms.`
+      );
+      await vi.advanceTimersByTimeAsync(120000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

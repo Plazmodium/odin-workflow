@@ -6,9 +6,14 @@ interface CommandResult {
   code: number | null;
   stdout: string;
   stderr: string;
+  stdin_closed_early: boolean;
 }
 
 const SUBAGENT_EXECUTOR_TIMEOUT_MS = 120_000;
+
+function formatCommand(command: string[]): string {
+  return command[0] ?? '<command>';
+}
 
 function parseOutcome(value: unknown): PhaseOutcome | null {
   return value === 'completed' || value === 'blocked' || value === 'needs_rework' ? value : null;
@@ -29,8 +34,13 @@ function parseArtifacts(value: unknown): SubagentExecutionArtifact[] | null {
     }
 
     const output_type = typeof entry.output_type === 'string' ? entry.output_type : null;
-    const phase = typeof entry.phase === 'string' ? entry.phase : undefined;
-    if (output_type == null || output_type.trim().length === 0) {
+    const phase =
+      entry.phase == null
+        ? undefined
+        : typeof entry.phase === 'string' && entry.phase.trim().length > 0
+          ? entry.phase.trim()
+          : null;
+    if (output_type == null || output_type.trim().length === 0 || phase === null) {
       return [];
     }
 
@@ -72,11 +82,16 @@ function parseResult(stdout: string): SubagentExecutionResult {
 
   const summary = typeof record.summary === 'string' ? record.summary : null;
   const outcome = parseOutcome(record.outcome);
-  const next_phase = typeof record.next_phase === 'string' ? record.next_phase : undefined;
+  const next_phase =
+    record.next_phase == null
+      ? undefined
+      : typeof record.next_phase === 'string' && record.next_phase.trim().length > 0
+        ? record.next_phase.trim()
+        : null;
   const blockers = parseBlockers(record.blockers);
   const artifacts = parseArtifacts(record.artifacts);
 
-  if (summary == null || summary.trim().length === 0 || outcome == null || blockers == null || artifacts == null) {
+  if (summary == null || summary.trim().length === 0 || outcome == null || next_phase === null || blockers == null || artifacts == null) {
     throw new Error('Subagent executor returned an incomplete result payload.');
   }
 
@@ -93,7 +108,7 @@ function commandError(command: string[], result: CommandResult): Error {
   const stderr = result.stderr.trim();
   const stdout = result.stdout.trim();
   const detail = stderr.length > 0 ? stderr : stdout.length > 0 ? stdout : `exit code ${result.code ?? 'unknown'}`;
-  return new Error(`Subagent executor ${command.join(' ')} failed: ${detail}`);
+  return new Error(`Subagent executor ${formatCommand(command)} failed: ${detail}`);
 }
 
 export function createCommandSubagentExecutor(command: string[]): SubagentExecutor {
@@ -114,6 +129,7 @@ export function createCommandSubagentExecutor(command: string[]): SubagentExecut
         let stdout = '';
         let stderr = '';
         let settled = false;
+        let stdin_closed_early = false;
 
         const cleanup = (timeout: ReturnType<typeof setTimeout>) => {
           clearTimeout(timeout);
@@ -144,6 +160,7 @@ export function createCommandSubagentExecutor(command: string[]): SubagentExecut
 
         const onStdinError = (error: Error & { code?: string }) => {
           if (error.code === 'EPIPE') {
+            stdin_closed_early = true;
             return;
           }
 
@@ -155,7 +172,7 @@ export function createCommandSubagentExecutor(command: string[]): SubagentExecut
         };
 
         const onClose = (code: number | null) => {
-          settle(timeout, () => resolve({ code, stdout, stderr }));
+          settle(timeout, () => resolve({ code, stdout, stderr, stdin_closed_early }));
         };
 
         const timeout = setTimeout(() => {
@@ -163,7 +180,7 @@ export function createCommandSubagentExecutor(command: string[]): SubagentExecut
             child.stdout.destroy();
             child.stderr.destroy();
             child.kill();
-            reject(new Error(`Subagent executor ${command.join(' ')} timed out after ${SUBAGENT_EXECUTOR_TIMEOUT_MS}ms.`));
+            reject(new Error(`Subagent executor ${formatCommand(command)} timed out after ${SUBAGENT_EXECUTOR_TIMEOUT_MS}ms.`));
           });
         }, SUBAGENT_EXECUTOR_TIMEOUT_MS);
 
@@ -186,6 +203,14 @@ export function createCommandSubagentExecutor(command: string[]): SubagentExecut
 
       if (result.code !== 0) {
         throw commandError(command, result);
+      }
+
+      if (result.stdout.trim().length === 0 && result.stderr.trim().length === 0) {
+        throw new Error(
+          result.stdin_closed_early
+            ? `Subagent executor ${formatCommand(command)} closed stdin before consuming the request.`
+            : `Subagent executor ${formatCommand(command)} produced no stdout result.`
+        );
       }
 
       return parseResult(result.stdout);
