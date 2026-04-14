@@ -1,6 +1,6 @@
 import { executeReleaseHandoff, type GitHubCommandRunner } from './executors/release-handoff.js';
 import { executeReleaseCloseout } from './executors/release-closeout.js';
-import type { AutonomousSelection, RuntimeToolClient, SubagentExecutor, TickOutcome } from './types.js';
+import type { AutonomousSelection, RuntimeToolClient, SubagentExecutionArtifact, SubagentExecutor, TickOutcome } from './types.js';
 
 function deriveNoopReason(skipped_summary: Array<{ detail: string }>): string {
   return skipped_summary[0]?.detail ?? 'No autonomous phase is eligible right now.';
@@ -89,6 +89,23 @@ function buildSubagentPrompt(selection: AutonomousSelection): string {
   return lines.join('\n');
 }
 
+function collapseArtifactsForProxy(
+  selection: AutonomousSelection,
+  artifacts: SubagentExecutionArtifact[],
+): Array<SubagentExecutionArtifact & { phase: string }> {
+  const latest_by_slot = new Map<string, SubagentExecutionArtifact & { phase: string }>();
+
+  for (const artifact of artifacts) {
+    const phase = artifact.phase ?? selection.phase;
+    latest_by_slot.set(`${phase}:${artifact.output_type}`, {
+      ...artifact,
+      phase,
+    });
+  }
+
+  return [...latest_by_slot.values()];
+}
+
 async function executeInlineSelection(
   client: RuntimeToolClient,
   selection: AutonomousSelection,
@@ -129,11 +146,12 @@ async function executeSubagentSelection(
     prompt: buildSubagentPrompt(selection),
   });
   const created_by = selection.prepared_context.execution.acting_agent_name;
+  const artifacts = collapseArtifactsForProxy(selection, result.artifacts ?? []);
 
-  for (const artifact of result.artifacts ?? []) {
+  for (const artifact of artifacts) {
     await client.recordPhaseArtifact({
       feature_id: selection.feature_id,
-      phase: artifact.phase ?? selection.phase,
+      phase: artifact.phase,
       output_type: artifact.output_type,
       content: artifact.content,
       created_by,

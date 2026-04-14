@@ -155,6 +155,8 @@ export function createCommandSubagentExecutor(command: string[]): SubagentExecut
 
         const timeout = setTimeout(() => {
           settle(timeout, () => {
+            child.stdout.destroy();
+            child.stderr.destroy();
             child.kill();
             reject(new Error(`Subagent executor ${command.join(' ')} timed out after ${SUBAGENT_EXECUTOR_TIMEOUT_MS}ms.`));
           });

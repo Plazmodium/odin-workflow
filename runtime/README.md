@@ -287,7 +287,7 @@ If a harness spawns a child agent, that child is acting as the current Odin phas
 
 - `supported_modes` - currently `inline` and `subagent`
 - `recommended_mode` - guidance only; not enforcement
-- `child_state_strategy` - whether the harness should prefer direct `odin.*` calls from the child when available or have the child return intent back to the parent session
+- `child_state_strategy` - whether the harness should prefer direct `odin.*` calls from the child when available or have the child return intent to the parent session
 - `prompt_sections` - the fields the harness should keep in the active prompt
 
 `context.agent.constraints` already includes `context.development_evals.harness_prompt_block`. Keep the dedicated eval block visible if you want a separate eval section, but do not append both verbatim or the same instructions will appear twice.

@@ -51,7 +51,7 @@ function createSelection(
     feature_id: 'FEAT-BASE',
     feature_name: 'Base Feature',
     phase,
-    reason: phase === '9' ? 'ready_for_phase' : 'ready_for_phase',
+    reason: 'ready_for_phase',
     branch_name: phase === '9' ? 'gr/feature/FEAT-BASE' : null,
     base_branch: 'main',
     release_notes: phase === '9' ? 'Release notes' : null,
@@ -357,6 +357,43 @@ describe('runTick', () => {
       summary: 'Builder implementation finished.',
       created_by: 'builder-agent',
       blockers: [],
+    });
+  });
+
+  it('collapses duplicate artifact slots before proxying them to the runtime', async () => {
+    const subagent_executor: SubagentExecutor = {
+      execute: vi.fn(async () => ({
+        summary: 'Builder implementation finished.',
+        outcome: 'completed',
+        next_phase: '6',
+        blockers: [],
+        artifacts: [
+          { output_type: 'documentation', content: { note: 'first' } },
+          { output_type: 'documentation', content: { note: 'latest' } },
+        ],
+      })),
+    };
+    const client = createClient({
+      pickNextAutonomousPhase: vi.fn(async () => ({
+        selection: createSelection('5', 'subagent', {
+          feature_id: 'FEAT-7B',
+          feature_name: 'Feature 7B',
+          branch_name: null,
+          release_notes: null,
+        }),
+        skipped_summary: [],
+      })),
+    });
+
+    await runTick(client, 'ralph-loop', '/tmp/project', undefined, subagent_executor);
+
+    expect(client.recordPhaseArtifact).toHaveBeenCalledTimes(1);
+    expect(client.recordPhaseArtifact).toHaveBeenCalledWith({
+      feature_id: 'FEAT-7B',
+      phase: '5',
+      output_type: 'documentation',
+      content: { note: 'latest' },
+      created_by: 'builder-agent',
     });
   });
 
