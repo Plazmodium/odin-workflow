@@ -511,7 +511,6 @@ export interface PhaseExecutionContract {
   child_agent_role: 'acts_as_phase_role';
   supported_modes: PhaseExecutionMode[];
   recommended_mode: PhaseExecutionMode;
-  state_recording_owner: 'orchestrator';
   child_state_strategy: PhaseChildStateStrategy;
   prompt_sections: PhasePromptSection[];
 }

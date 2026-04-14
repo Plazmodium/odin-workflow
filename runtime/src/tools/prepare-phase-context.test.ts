@@ -171,7 +171,6 @@ describe('handlePreparePhaseContext', () => {
             child_agent_role: string;
             supported_modes: string[];
             recommended_mode: string;
-            state_recording_owner: string;
             child_state_strategy: string;
             prompt_sections: string[];
           };
@@ -207,7 +206,6 @@ describe('handlePreparePhaseContext', () => {
         child_agent_role: 'acts_as_phase_role',
         supported_modes: ['inline', 'subagent'],
         recommended_mode: 'subagent',
-        state_recording_owner: 'orchestrator',
         child_state_strategy: 'direct_odin_tools_if_available',
       },
       development_evals: {

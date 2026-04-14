@@ -278,7 +278,7 @@ Builder: "I'll create a Server Component using App Router conventions with Tailw
 
 ## Duration Considerations
 
-Skills are loaded as context for agents. Keep skills concise (500-3000 tokens) to leave room for feature-specific context. The orchestrator tracks agent duration automatically via `start_agent_invocation` / `end_agent_invocation`.
+Skills are loaded as context for agents. Keep skills concise (500-3000 tokens) to leave room for feature-specific context. Runtime-managed invocation tracking now opens through `odin.prepare_phase_context(...)` and closes through `odin.record_phase_result(...)`; agents do not need to manage that lifecycle directly.
 
 ## Skill Dependencies
 

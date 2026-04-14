@@ -6,8 +6,65 @@ function deriveNoopReason(skipped_summary: Array<{ detail: string }>): string {
   return skipped_summary[0]?.detail ?? 'No autonomous phase is eligible right now.';
 }
 
+function buildPromptSectionContext(selection: AutonomousSelection): Record<string, unknown> {
+  const { prepared_context } = selection;
+  const entries: Array<[string, unknown]> = [];
+
+  for (const section of prepared_context.execution.prompt_sections) {
+    switch (section) {
+      case 'phase':
+        entries.push(['phase', prepared_context.raw.phase]);
+        break;
+      case 'role_summary':
+        entries.push(['role_summary', prepared_context.agent.role_summary]);
+        break;
+      case 'constraints':
+        entries.push(['constraints', prepared_context.agent.constraints]);
+        break;
+      case 'development_evals':
+        if (prepared_context.raw.development_evals !== undefined) {
+          entries.push(['development_evals', prepared_context.raw.development_evals]);
+        }
+        break;
+      case 'automation':
+        if (prepared_context.raw.automation !== undefined) {
+          entries.push(['automation', prepared_context.raw.automation]);
+        }
+        break;
+      case 'verification':
+        if (prepared_context.raw.verification !== undefined) {
+          entries.push(['verification', prepared_context.raw.verification]);
+        }
+        break;
+      case 'workflow':
+        if (prepared_context.raw.workflow !== undefined) {
+          entries.push(['workflow', prepared_context.raw.workflow]);
+        }
+        break;
+      case 'artifacts':
+        if (prepared_context.raw.artifacts !== undefined) {
+          entries.push(['artifacts', prepared_context.raw.artifacts]);
+        }
+        break;
+      case 'skills':
+        if (prepared_context.raw.skills !== undefined) {
+          entries.push(['skills', prepared_context.raw.skills]);
+        }
+        break;
+      case 'learnings':
+        if (prepared_context.raw.learnings !== undefined) {
+          entries.push(['learnings', prepared_context.raw.learnings]);
+        }
+        break;
+    }
+  }
+
+  return Object.fromEntries(entries);
+}
+
 function buildSubagentPrompt(selection: AutonomousSelection): string {
   const { prepared_context } = selection;
+  const prompt_context = buildPromptSectionContext(selection);
   const lines = [
     `You are acting as ${prepared_context.agent.name} for Odin phase ${prepared_context.phase.id}: ${prepared_context.phase.name}.`,
     '',
@@ -26,7 +83,7 @@ function buildSubagentPrompt(selection: AutonomousSelection): string {
     `- Prompt sections: ${prepared_context.execution.prompt_sections.join(', ')}`,
     '',
     'Structured context JSON:',
-    JSON.stringify(prepared_context.raw, null, 2),
+    JSON.stringify(prompt_context, null, 2),
   ];
 
   return lines.join('\n');

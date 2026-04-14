@@ -7,10 +7,12 @@ All notable changes to this project are documented in this file.
 ## [0.6.0-beta] - 2026-04-13
 
 ### Added
+
 - `odin.prepare_phase_context` now returns explicit harness execution guidance, including logical phase-role metadata, acting-agent attribution, supported execution modes, and recommended inline vs subagent routing.
 - Ralph Loop now supports an optional child-command execution hook for phases 5-8, including a documented stdin/stdout protocol and parent-proxied artifact/result recording through `odin.*`.
 
 ### Changed
+
 - Public runtime and orchestration docs now define the canonical harness contract for inline execution, true harness-spawned subagents, and MCP-less child-agent proxy flows.
 - Root package version, runtime package version, runtime MCP server version, runtime lockfile, root README badge, and Ralph Loop package version were updated for this release.
 

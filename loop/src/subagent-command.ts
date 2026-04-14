@@ -8,6 +8,8 @@ interface CommandResult {
   stderr: string;
 }
 
+const SUBAGENT_EXECUTOR_TIMEOUT_MS = 120_000;
+
 function parseOutcome(value: unknown): PhaseOutcome | null {
   return value === 'completed' || value === 'blocked' || value === 'needs_rework' ? value : null;
 }
@@ -106,23 +108,73 @@ export function createCommandSubagentExecutor(command: string[]): SubagentExecut
       const result = await new Promise<CommandResult>((resolve, reject) => {
         let stdout = '';
         let stderr = '';
+        let settled = false;
 
-        child.stdout.on('data', (chunk) => {
+        const cleanup = (timeout: ReturnType<typeof setTimeout>) => {
+          clearTimeout(timeout);
+          child.stdout.off('data', onStdout);
+          child.stderr.off('data', onStderr);
+          child.stdin.off('error', onStdinError);
+          child.off('error', onError);
+          child.off('close', onClose);
+        };
+
+        const settle = (timeout: ReturnType<typeof setTimeout>, cb: () => void) => {
+          if (settled) {
+            return;
+          }
+
+          settled = true;
+          cleanup(timeout);
+          cb();
+        };
+
+        const onStdout = (chunk: Buffer | string) => {
           stdout += String(chunk);
-        });
+        };
 
-        child.stderr.on('data', (chunk) => {
+        const onStderr = (chunk: Buffer | string) => {
           stderr += String(chunk);
-        });
+        };
 
-        child.on('error', reject);
-        child.on('close', (code) => resolve({ code, stdout, stderr }));
+        const onStdinError = (error: Error & { code?: string }) => {
+          if (error.code === 'EPIPE') {
+            return;
+          }
 
-        child.stdin.write(JSON.stringify({
-          schema_version: '1',
-          request,
-        }));
-        child.stdin.end();
+          settle(timeout, () => reject(error));
+        };
+
+        const onError = (error: Error) => {
+          settle(timeout, () => reject(error));
+        };
+
+        const onClose = (code: number | null) => {
+          settle(timeout, () => resolve({ code, stdout, stderr }));
+        };
+
+        const timeout = setTimeout(() => {
+          settle(timeout, () => {
+            child.kill();
+            reject(new Error(`Subagent executor ${command.join(' ')} timed out after ${SUBAGENT_EXECUTOR_TIMEOUT_MS}ms.`));
+          });
+        }, SUBAGENT_EXECUTOR_TIMEOUT_MS);
+
+        child.stdout.on('data', onStdout);
+        child.stderr.on('data', onStderr);
+        child.stdin.on('error', onStdinError);
+        child.on('error', onError);
+        child.on('close', onClose);
+
+        try {
+          child.stdin.write(JSON.stringify({
+            schema_version: '1',
+            request,
+          }));
+          child.stdin.end();
+        } catch (error) {
+          settle(timeout, () => reject(error));
+        }
       });
 
       if (result.code !== 0) {

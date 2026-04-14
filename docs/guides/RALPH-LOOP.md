@@ -38,7 +38,7 @@ npm run ralph:tick -- --project-root /path/to/project --subagent-command-json '[
 If your real project is not ready for a live smoke run yet (for example because it still needs fresh Odin migrations), start with the simulated scenario suite:
 
 ```bash
-cd system/ralph-loop
+cd loop
 npm install
 npm run test:simulation
 ```

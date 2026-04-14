@@ -14,7 +14,7 @@ Odin uses a **hybrid orchestration** model where:
 2. **Main Session** (orchestrator) manages workflow state by proxying `odin.*` calls
 3. **Supabase** (remote database) stores state accessible to dashboard
 
-This document now describes the **fallback pattern** for harnesses where spawned child agents cannot call `odin.*` directly. If your harness gives the child direct Odin runtime access, use `system/mcp-servers/odin-runtime/README.md#harness-execution-modes` as the canonical contract and treat this doc as the parent-session proxy pattern only.
+This document now describes the **fallback pattern** for harnesses where spawned child agents cannot call `odin.*` directly. If your harness gives the child direct Odin runtime access, use [`../../runtime/README.md#harness-execution-modes`](../../runtime/README.md#harness-execution-modes) as the canonical contract and treat this doc as the parent-session proxy pattern only.
 
 Read the examples below using the current 11-phase order (Planning → Product → Discovery → Architect → Guardian → Builder → Reviewer → Integrator → Documenter → Release → Complete).
 
@@ -90,47 +90,11 @@ const discoveryResult = await Task({
 
 After agent completes, orchestrator reads the "State Changes Required" section and proxies the required `odin.*` calls.
 
-In the packaged Odin runtime, the same proxy rule applies when a child agent lacks direct `odin.*` access: the parent session performs the `odin.*` calls on the child's behalf and should pass `context.execution.acting_agent_name` through to fields such as `agent_name` and `created_by` so invocation tracking stays aligned.
-
-Historical Supabase MCP example:
-
-```typescript
-// 1. Register feature
-await mcp_supabase_execute_sql({
-  query: `SELECT * FROM create_feature(
-    'AUTH-001-jwt-login',
-    'JWT Login Flow',
-    2,
-    'ROUTINE',
-    NULL, NULL,
-    'discovery-agent'
-  )`
-});
-
-// 2. Track agent duration
-await mcp_supabase_execute_sql({
-  query: `SELECT * FROM start_agent_invocation(
-    'AUTH-001-jwt-login',
-    '0'::phase,
-    'discovery-agent',
-    'Requirements gathering'
-  )`
-});
-
-// 3. Transition phase
-await mcp_supabase_execute_sql({
-  query: `SELECT * FROM transition_phase(
-    'AUTH-001-jwt-login',
-    '1'::phase,
-    'discovery-agent',
-    'Requirements complete'
-  )`
-});
-```
+In the packaged Odin runtime, the same proxy rule applies when a child agent lacks direct `odin.*` access: the parent session performs the `odin.*` calls on the child's behalf and should pass `context.execution.acting_agent_name` through to fields such as `agent_name` and `created_by` so runtime-managed invocation tracking stays aligned. Child agents should not call `start_agent_invocation` or `end_agent_invocation` directly; the runtime owns that lifecycle through `odin.prepare_phase_context(...)` and `odin.record_phase_result(...)`.
 
 ### ✅ Enforce Workflow Rules
 
-- Track agent durations via `start_agent_invocation` / `end_agent_invocation`
+- Let the runtime own invocation lifecycle via `odin.prepare_phase_context(...)` and `odin.record_phase_result(...)`
 - Validate quality gates before phase transitions
 - Manage feature locks for parallel work
 - Handle escalations and blockers
@@ -373,7 +337,8 @@ The orchestrator should:
 ## Migration from Old Pattern
 
 ### Old Pattern (Pre-Runtime History)
-```markdown
+
+````markdown
 # Agent Instructions
 
 ### Step 6: Track State
@@ -381,10 +346,12 @@ The orchestrator should:
 **CRITICAL**: You MUST call MCP tools directly.
 
 [Historical note: this was only true for older harness setups where child agents had no direct runtime access]
-```
+````
+
 
 ### Current Fallback Pattern (Works Without Child `odin.*` Access)
-```markdown
+
+````markdown
 # Agent Instructions
 
 ### Step 6: Complete Artifact
@@ -408,7 +375,8 @@ Create your artifact (spec.md, review.md, etc.) and include a "State Changes Req
 - Outcome: `completed`
 - Next phase: 4 (Guardian)
 - created_by: `context.execution.acting_agent_name`
-```
+````
+
 ```
 
 ---

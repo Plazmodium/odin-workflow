@@ -15,7 +15,7 @@ npx -y @plazmodium/odin init --project-root /path/to/your/project --tool opencod
 Maintainer repo-checkout flow:
 
 ```bash
-cd system/mcp-servers/odin-runtime
+cd runtime
 npm install
 npm run build
 ```
@@ -42,7 +42,7 @@ Important: Odin bootstraps with `runtime.mode: in_memory` by default so MCP wiri
 
 If you are developing Odin from this repo, use the repo-checkout `--distribution source` flow shown above.
 
-If you are the maintainer preparing that publish, use [`docs/guides/NPM-PUBLISH.md`](../../../docs/guides/NPM-PUBLISH.md).
+If you are the maintainer preparing that publish, use [`../docs/guides/NPM-PUBLISH.md`](../docs/guides/NPM-PUBLISH.md).
 
 ### Manual MCP wiring
 
@@ -186,7 +186,7 @@ Your AI agent now has these tools available:
 
 `@plazmodium/odin` ships the MCP runtime only. It does **not** bundle the Next.js dashboard.
 
-If you want the dashboard UI for feature health, learnings, claims, and eval visibility, use the full Odin repository and run the dashboard app from `system/dashboard/`.
+If you want the dashboard UI for feature health, learnings, claims, and eval visibility, use the full Odin repository and run the dashboard app from `dashboard/`.
 
 The dashboard is a separate app and is not included in the npm tarball.
 

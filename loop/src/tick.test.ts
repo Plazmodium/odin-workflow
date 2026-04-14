@@ -293,14 +293,15 @@ describe('runTick', () => {
   });
 
   it('routes subagent phases through the child executor and proxies artifacts/results with acting attribution', async () => {
+    const execute = vi.fn(async () => ({
+      summary: 'Builder implementation finished.',
+      outcome: 'completed' as const,
+      next_phase: '6',
+      blockers: [],
+      artifacts: [{ output_type: 'documentation', content: { note: 'done' } }],
+    }));
     const subagent_executor: SubagentExecutor = {
-      execute: vi.fn(async () => ({
-        summary: 'Builder implementation finished.',
-        outcome: 'completed',
-        next_phase: '6',
-        blockers: [],
-        artifacts: [{ output_type: 'documentation', content: { note: 'done' } }],
-      })),
+      execute,
     };
     const client = createClient({
       pickNextAutonomousPhase: vi.fn(async () => ({
@@ -341,6 +342,12 @@ describe('runTick', () => {
         }),
         prompt: expect.stringContaining('You are acting as builder-agent for Odin phase 5: Builder.'),
       }),
+    );
+    expect(execute.mock.calls[0]?.[0]?.prompt).toContain(
+      '"role_summary": "Role summary for Builder."'
+    );
+    expect(execute.mock.calls[0]?.[0]?.prompt).not.toContain(
+      '"agent": {'
     );
     expect(client.recordPhaseResult).toHaveBeenCalledWith({
       feature_id: 'FEAT-7',

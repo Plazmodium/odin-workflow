@@ -215,7 +215,6 @@ export function getPhaseExecutionContract(phase: PhaseId, acting_agent_name: str
     child_agent_role: 'acts_as_phase_role',
     supported_modes: ['inline', 'subagent'],
     recommended_mode: PHASE_RECOMMENDED_EXECUTION_MODES[phase],
-    state_recording_owner: 'orchestrator',
     child_state_strategy: PHASE_CHILD_STATE_STRATEGIES[phase],
     prompt_sections: [...PHASE_PROMPT_SECTIONS],
   };
