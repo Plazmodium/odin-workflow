@@ -74,6 +74,21 @@ function buildPromptSectionContext(selection: AutonomousSelection): Record<strin
   return Object.fromEntries(entries);
 }
 
+function buildResponseStyleInstructions(selection: AutonomousSelection): string[] {
+  if (selection.prepared_context.execution.response_style !== 'terse_execution') {
+    return [];
+  }
+
+  return [
+    'Use terse execution style for operational chatter and summaries:',
+    '- no pleasantries',
+    '- no question restatement',
+    '- short, direct technical wording',
+    '- preserve exact code, commands, identifiers, and evidence',
+    '- when producing final workflow artifacts, follow the normal template and readable prose expected by the phase',
+  ];
+}
+
 /**
  * Constructs the text prompt sent to a subagent for executing an autonomous phase.
  *
@@ -83,6 +98,7 @@ function buildPromptSectionContext(selection: AutonomousSelection): Record<strin
 function buildSubagentPrompt(selection: AutonomousSelection): string {
   const { prepared_context } = selection;
   const prompt_context = buildPromptSectionContext(selection);
+  const response_style_instructions = buildResponseStyleInstructions(selection);
   const lines = [
     `You are acting as ${prepared_context.agent.name} for Odin phase ${prepared_context.phase.id}: ${prepared_context.phase.name}.`,
     '',
@@ -98,7 +114,9 @@ function buildSubagentPrompt(selection: AutonomousSelection): string {
     'Execution guidance:',
     `- Recommended mode: ${prepared_context.execution.recommended_mode}`,
     `- Acting agent name for proxied odin.* calls: ${prepared_context.execution.acting_agent_name}`,
+    `- Response style: ${prepared_context.execution.response_style}`,
     `- Prompt sections: ${prepared_context.execution.prompt_sections.join(', ')}`,
+    ...(response_style_instructions.length === 0 ? [] : ['', ...response_style_instructions]),
     '',
     'Structured context JSON:',
     JSON.stringify(prompt_context, null, 2),

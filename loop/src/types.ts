@@ -2,6 +2,8 @@ export type PhaseId = string;
 
 export type PhaseExecutionMode = 'inline' | 'subagent';
 
+export type PhaseResponseStyle = 'normal' | 'terse_execution';
+
 export type PhaseChildStateStrategy = 'direct_odin_tools_if_available' | 'return_intent_to_parent';
 
 export type PhasePromptSection =
@@ -50,6 +52,7 @@ export interface PreparedPhaseContext {
     supported_modes: PhaseExecutionMode[];
     recommended_mode: PhaseExecutionMode;
     child_state_strategy: PhaseChildStateStrategy;
+    response_style: PhaseResponseStyle;
     prompt_sections: PhasePromptSection[];
   };
 }

@@ -20,6 +20,7 @@ Current supported execution paths:
    - Ralph Loop spawns the configured child command
    - the child returns artifacts and a final phase outcome on stdout
    - Ralph Loop proxies `odin.record_phase_artifact` / `odin.record_phase_result` from the parent session using `context.execution.acting_agent_name`
+   - Ralph Loop also respects `context.execution.response_style` so internal execution chatter can be terse without changing final artifact templates
 
 Without a child command configured, Ralph Loop keeps its earlier Release-only behavior.
 
@@ -112,6 +113,8 @@ It must return JSON on stdout:
 ```
 
 Ralph Loop then proxies the returned artifacts and phase result through `odin.*` using `selection.prepared_context.execution.acting_agent_name` for `created_by`.
+
+When `selection.prepared_context.execution.response_style = terse_execution`, Ralph Loop adds terse operational-style instructions to the child prompt. This applies to execution chatter and summaries only. Final artifacts are still expected to follow the normal human-readable templates for the phase.
 
 ## What the dashboard shows
 

@@ -48,6 +48,7 @@ function buildArtifactLineage(artifacts: PhaseArtifact[]): PhaseContextBundle['a
  *
  * @param input - Parameters controlling which feature/phase to prepare and which optional data to include (e.g., `feature_id`, `phase`, `agent_name`, `include_artifacts`, `include_learnings`, `include_skills`).
  * @returns A text result whose payload `context` is the assembled `PhaseContextBundle` for the requested feature and phase, or an error result if the specified feature cannot be found.
+ */
 export async function handlePreparePhaseContext(
   adapter: WorkflowStateAdapter,
   skill_adapter: SkillAdapter,

@@ -12,6 +12,7 @@ import type {
   PhaseExecutionMode,
   PhaseId,
   PhasePromptSection,
+  PhaseResponseStyle,
   PreparedPhaseContext,
   RecordPhaseArtifactInput,
   RecordPhaseResultInput,
@@ -100,6 +101,10 @@ function asChildStateStrategy(value: unknown): PhaseChildStateStrategy | null {
   return value === 'direct_odin_tools_if_available' || value === 'return_intent_to_parent'
     ? value
     : null;
+}
+
+function asResponseStyle(value: unknown): PhaseResponseStyle | null {
+  return value === 'normal' || value === 'terse_execution' ? value : null;
 }
 
 /**
@@ -213,6 +218,7 @@ function extractPreparedContext(context: Record<string, unknown> | null): Prepar
   const supported_modes = execution == null ? null : parseExecutionModeArray(execution.supported_modes);
   const recommended_mode = execution == null ? null : asExecutionMode(execution.recommended_mode);
   const child_state_strategy = execution == null ? null : asChildStateStrategy(execution.child_state_strategy);
+  const response_style = execution == null ? null : asResponseStyle(execution.response_style);
   const prompt_sections = execution == null ? null : parsePromptSectionArray(execution.prompt_sections);
 
   if (
@@ -227,6 +233,7 @@ function extractPreparedContext(context: Record<string, unknown> | null): Prepar
     supported_modes == null ||
     recommended_mode == null ||
     child_state_strategy == null ||
+    response_style == null ||
     prompt_sections == null ||
     supported_modes.length === 0
   ) {
@@ -256,6 +263,7 @@ function extractPreparedContext(context: Record<string, unknown> | null): Prepar
       supported_modes,
       recommended_mode,
       child_state_strategy,
+      response_style,
       prompt_sections,
     },
   };
@@ -555,7 +563,7 @@ export async function connectRuntimeClient(options: RuntimeClientOptions): Promi
   });
   const client = new Client({
     name: 'ralph-loop',
-    version: '0.2.0',
+    version: '0.2.1',
   });
   await client.connect(transport);
   return new McpRuntimeToolClient(client, transport);

@@ -288,6 +288,7 @@ If a harness spawns a child agent, that child is acting as the current Odin phas
 - `supported_modes` - currently `inline` and `subagent`
 - `recommended_mode` - guidance only; not enforcement
 - `child_state_strategy` - whether the harness should prefer direct `odin.*` calls from the child when available or have the child return intent to the parent session
+- `response_style` - whether internal execution chatter should stay `normal` or use `terse_execution`
 - `prompt_sections` - the fields the harness should keep in the active prompt
 
 `context.agent.constraints` already includes `context.development_evals.harness_prompt_block`. Keep the dedicated eval block visible if you want a separate eval section, but do not append both verbatim or the same instructions will appear twice.
@@ -314,6 +315,12 @@ Canonical harness flow:
 ```
 
 If the child agent cannot call `odin.*` directly, keep the same flow but have the child return a clear `State Changes Required` section and the parent session performs those calls on the child's behalf. When proxying, pass `context.execution.acting_agent_name` through to tool fields such as `agent_name` and `created_by` so attribution and invocation tracking stay aligned with the prepared phase context.
+
+`response_style` is a bounded internal execution hint, not a global constitution change:
+
+- use it for harness/child operational chatter and short execution summaries
+- do not silently apply it to direct user chat by default
+- do not use it as a reason to rewrite durable human-facing artifacts like PRDs, specs, tasks, docs, changelogs, or release notes into compressed prose
 
 ## Optional: TLA+ Design Verification
 
