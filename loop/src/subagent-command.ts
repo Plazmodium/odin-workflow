@@ -12,14 +12,34 @@ interface CommandResult {
 const SUBAGENT_EXECUTOR_TIMEOUT_MS = 120_000;
 const SUBAGENT_EXECUTOR_MAX_OUTPUT_BYTES = 1_000_000;
 
+/**
+ * Get the executable name from a command array.
+ *
+ * @param command - The command split into executable and arguments (executable expected at index 0)
+ * @returns The first element of `command` if present, otherwise `'<command>'`
+ */
 function formatCommand(command: string[]): string {
   return command[0] ?? '<command>';
 }
 
+/**
+ * Validate a raw value as one of the allowed phase outcomes.
+ *
+ * @param value - The value to validate
+ * @returns `PhaseOutcome` if `value` is `'completed'`, `'blocked'`, or `'needs_rework'`, `null` otherwise
+ */
 function parseOutcome(value: unknown): PhaseOutcome | null {
   return value === 'completed' || value === 'blocked' || value === 'needs_rework' ? value : null;
 }
 
+/**
+ * Parses a JSON-like value into an array of SubagentExecutionArtifact when well-formed.
+ *
+ * Accepts null/undefined and returns an empty array. Expects an array where each entry is an object with a non-empty `output_type` string and an optional `phase` that, when present, is a non-empty trimmed string; each artifact's `content` is preserved. If `value` is not an array or any entry is malformed, returns `null`.
+ *
+ * @param value - The input to parse (typically parsed JSON from a subagent executor)
+ * @returns The parsed artifact list, or `null` if the input is malformed
+ */
 function parseArtifacts(value: unknown): SubagentExecutionArtifact[] | null {
   if (value == null) {
     return [];
@@ -59,6 +79,12 @@ function parseArtifacts(value: unknown): SubagentExecutionArtifact[] | null {
   return parsed.length === value.length ? parsed : null;
 }
 
+/**
+ * Parse a potentially unknown `blockers` payload into an array of strings.
+ *
+ * @param value - The raw value to parse (typically a decoded JSON field)
+ * @returns An empty `string[]` if `value` is `null` or `undefined`; the string array if `value` is an array consisting only of strings; otherwise `null` when `value` is not an array or contains any non-string entries
+ */
 function parseBlockers(value: unknown): string[] | null {
   if (value == null) {
     return [];
@@ -72,6 +98,15 @@ function parseBlockers(value: unknown): string[] | null {
   return blockers.length === value.length ? blockers : null;
 }
 
+/**
+ * Parse and validate a subagent executor's JSON result from stdout.
+ *
+ * @param stdout - The raw stdout string produced by the subagent executor
+ * @returns The validated SubagentExecutionResult containing `summary`, `outcome`, optional `next_phase`, `blockers`, and `artifacts`
+ * @throws Error('Subagent executor returned invalid JSON on stdout.') if `stdout` is not valid JSON
+ * @throws Error('Subagent executor returned a malformed result payload.') if the parsed value is not a non-array object
+ * @throws Error('Subagent executor returned an incomplete result payload.') if required fields are missing or invalid
+ */
 function parseResult(stdout: string): SubagentExecutionResult {
   let parsed: unknown;
   try {
@@ -110,6 +145,16 @@ function parseResult(stdout: string): SubagentExecutionResult {
   };
 }
 
+/**
+ * Create an Error describing a failed subagent executor invocation.
+ *
+ * Prefers a trimmed `stderr` message as the failure detail, falls back to a trimmed
+ * `stdout` message, and otherwise uses `exit code <code|unknown>`.
+ *
+ * @param command - The command array used to run the subagent (executable and args)
+ * @param result - Collected process result containing `code`, `stdout`, `stderr`, and `stdin_closed_early`
+ * @returns An Error whose message is `Subagent executor <formatted command> failed: <detail>`
+ */
 function commandError(command: string[], result: CommandResult): Error {
   const stderr = result.stderr.trim();
   const stdout = result.stdout.trim();
@@ -117,6 +162,16 @@ function commandError(command: string[], result: CommandResult): Error {
   return new Error(`Subagent executor ${formatCommand(command)} failed: ${detail}`);
 }
 
+/**
+ * Creates a SubagentExecutor that runs the specified command as a child process to execute subagent requests.
+ *
+ * The returned executor writes a JSON request to the child process's stdin, captures stdout/stderr, enforces a fixed timeout,
+ * requires a zero exit code, and parses/validates the child's JSON stdout into a SubagentExecutionResult.
+ *
+ * @param command - Array where index 0 is the executable and remaining entries are its arguments; the executable must be a non-empty string
+ * @returns A SubagentExecutor whose `execute` method sends the request to the command and returns a validated SubagentExecutionResult
+ * @throws Error if `command[0]` is missing or an empty string
+ */
 export function createCommandSubagentExecutor(command: string[]): SubagentExecutor {
   const executable = command[0];
   if (executable == null || executable.trim().length === 0) {

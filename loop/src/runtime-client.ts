@@ -37,10 +37,22 @@ function asString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+/**
+ * Validate and coerce an arbitrary value to a PhaseId.
+ *
+ * @param value - The input to coerce into a phase identifier.
+ * @returns The input as a `PhaseId` if it is a string, `null` otherwise.
+ */
 function asPhaseId(value: unknown): PhaseId | null {
   return typeof value === 'string' ? value : null;
 }
 
+/**
+ * Validate and coerce a value into an array of strings.
+ *
+ * @param value - The value to validate as an array of strings
+ * @returns `string[]` if `value` is an array where every element is a string, `null` otherwise
+ */
 function parseStringArray(value: unknown): string[] | null {
   if (!Array.isArray(value)) {
     return null;
@@ -50,10 +62,22 @@ function parseStringArray(value: unknown): string[] | null {
   return parsed.length === value.length ? parsed : null;
 }
 
+/**
+ * Coerces an arbitrary value to a PhaseExecutionMode when it matches an allowed mode.
+ *
+ * @param value - The value to test for a valid execution mode.
+ * @returns `'inline'` or `'subagent'` if `value` is one of those strings, `null` otherwise.
+ */
 function asExecutionMode(value: unknown): PhaseExecutionMode | null {
   return value === 'inline' || value === 'subagent' ? value : null;
 }
 
+/**
+ * Parse an unknown input into an array of phase execution modes.
+ *
+ * @param value - The value to parse (expected to be an array of execution mode entries)
+ * @returns An array of `PhaseExecutionMode` when `value` is an array and every entry is a valid execution mode (`'inline'` or `'subagent'`), `null` otherwise
+ */
 function parseExecutionModeArray(value: unknown): PhaseExecutionMode[] | null {
   if (!Array.isArray(value)) {
     return null;
@@ -66,12 +90,24 @@ function parseExecutionModeArray(value: unknown): PhaseExecutionMode[] | null {
   return parsed.length === value.length ? parsed : null;
 }
 
+/**
+ * Coerces an input into a valid child-state strategy key if it matches an allowed value.
+ *
+ * @param value - The value to validate; accepted string values are 'direct_odin_tools_if_available' and 'return_intent_to_parent'
+ * @returns The matching strategy string, or `null` if the input is not one of the allowed keys
+ */
 function asChildStateStrategy(value: unknown): PhaseChildStateStrategy | null {
   return value === 'direct_odin_tools_if_available' || value === 'return_intent_to_parent'
     ? value
     : null;
 }
 
+/**
+ * Parse and validate an array of prompt section keys.
+ *
+ * @param value - The input to parse; expected to be an array of strings representing prompt section keys.
+ * @returns An array of `PhasePromptSection` values when `value` is an array and every element is one of the allowed prompt section keys, `null` otherwise.
+ */
 function parsePromptSectionArray(value: unknown): PhasePromptSection[] | null {
   const allowed = new Set<PhasePromptSection>([
     'phase',
@@ -96,6 +132,12 @@ function parsePromptSectionArray(value: unknown): PhasePromptSection[] | null {
   return parsed.length === value.length ? parsed : null;
 }
 
+/**
+ * Normalize a release-notes value to a string representation.
+ *
+ * @param value - The release notes input, which may be `null`/`undefined`, a string, or any serializable value.
+ * @returns `null` if `value` is `null` or `undefined`; the original string if `value` is a string; otherwise a pretty-printed JSON string of `value`
+ */
 function asReleaseNotes(value: unknown): string | null {
   if (value == null) {
     return null;
@@ -108,6 +150,12 @@ function asReleaseNotes(value: unknown): string | null {
   return JSON.stringify(value, null, 2);
 }
 
+/**
+ * Parse an input into an array of normalized skipped-summary items.
+ *
+ * @param value - The raw value expected to be an array of records each containing `feature_id`, `feature_name`, `current_phase`, `status`, and `detail`. Other shapes are ignored.
+ * @returns An array of `SkippedSummaryItem` objects for entries that provided all required string fields; returns an empty array if `value` is not an array or if no entries were valid.
+ */
 function asSkippedSummary(value: unknown): SkippedSummaryItem[] {
   if (!Array.isArray(value)) {
     return [];
@@ -132,6 +180,18 @@ function asSkippedSummary(value: unknown): SkippedSummaryItem[] {
   });
 }
 
+/**
+ * Validate and normalize a prepared phase execution context for autonomous execution.
+ *
+ * Parses and coerces the raw `context` into a structured PreparedPhaseContext with
+ * `phase`, `agent`, and `execution` sections containing validated fields.
+ *
+ * @param context - The raw prepared phase context object produced by the runtime, or `null`.
+ * @returns A normalized PreparedPhaseContext containing `raw`, `phase`, `agent`, and `execution` properties.
+ * @throws Error if `context` is `null`.
+ * @throws Error if any required field is missing or `supported_modes` is empty.
+ * @throws Error if `recommended_mode` is not included in `supported_modes`.
+ */
 function extractPreparedContext(context: Record<string, unknown> | null): PreparedPhaseContext {
   if (context == null) {
     throw new Error('Autonomous selection did not include a prepared phase context.');
@@ -201,6 +261,13 @@ function extractPreparedContext(context: Record<string, unknown> | null): Prepar
   };
 }
 
+/**
+ * Locate the built Odin runtime server file under a given working directory.
+ *
+ * @param cwd - Base directory from which candidate runtime paths are resolved
+ * @returns The filesystem path to the first existing runtime server candidate
+ * @throws Error if no runtime server file is found among the expected candidates
+ */
 async function resolveRuntimeServerPath(cwd: string): Promise<string> {
   const candidates = [
     resolve(cwd, '../runtime/dist/server.js'),
@@ -468,6 +535,12 @@ class McpRuntimeToolClient implements RuntimeToolClient {
   }
 }
 
+/**
+ * Create and connect a RuntimeToolClient to the local runtime server.
+ *
+ * @param options - Connection options. `project_root` is the required project root used to locate and run the runtime server; `cwd` if provided overrides the current working directory for locating the built runtime server.
+ * @returns A connected RuntimeToolClient instance
+ */
 export async function connectRuntimeClient(options: RuntimeClientOptions): Promise<RuntimeToolClient> {
   const cwd = options.cwd ?? process.cwd();
   const runtime_server_path = await resolveRuntimeServerPath(cwd);
