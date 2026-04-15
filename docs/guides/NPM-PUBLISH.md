@@ -24,6 +24,7 @@ This guide is for maintainers publishing the Odin runtime from `odin-workflow/ru
 
 ```bash
 npm publish --access public --tag beta
+npm dist-tag add @plazmodium/odin@<x-x-x>-beta beta
 ```
 
 - Only publish to `latest` when you intentionally want `npx -y @plazmodium/odin ...` to resolve to a non-beta release.
@@ -40,6 +41,7 @@ npm pack --dry-run
 ```
 
 Confirm the package includes:
+
 - `dist/cli.js`
 - `dist/server.js`
 - `dist/init.js`
@@ -50,6 +52,7 @@ Confirm the package includes:
 - `README.md`
 
 Confirm the package does not include:
+
 - local `.env` files
 - editor files
 - unrelated repo content
