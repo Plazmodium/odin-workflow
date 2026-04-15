@@ -8,6 +8,7 @@ function createPreparedContext(
   phase: string,
   recommended_mode: 'inline' | 'subagent',
   acting_agent_name: string,
+  response_style: 'normal' | 'terse_execution',
 ) {
   const phase_name = phase === '9' ? 'Release' : phase === '5' ? 'Builder' : `Phase ${phase}`;
   const role_name = phase === '9' ? 'release-agent' : phase === '5' ? 'builder-agent' : `${phase_name.toLowerCase()}-agent`;
@@ -35,6 +36,7 @@ function createPreparedContext(
       supported_modes: ['inline', 'subagent'] as const,
       recommended_mode,
       child_state_strategy: recommended_mode === 'subagent' ? 'direct_odin_tools_if_available' as const : 'return_intent_to_parent' as const,
+      response_style,
       prompt_sections: ['phase', 'role_summary', 'constraints'] as const,
     },
   };
@@ -46,6 +48,9 @@ function createSelection(
   overrides: Partial<AutonomousSelection> = {},
 ): AutonomousSelection {
   const acting_agent_name = recommended_mode === 'subagent' ? 'builder-agent' : 'ralph-loop';
+  const response_style = phase === '5' || phase === '6' || phase === '7' || phase === '9'
+    ? 'terse_execution'
+    : 'normal';
 
   return {
     feature_id: 'FEAT-BASE',
@@ -55,7 +60,7 @@ function createSelection(
     branch_name: phase === '9' ? 'gr/feature/FEAT-BASE' : null,
     base_branch: 'main',
     release_notes: phase === '9' ? 'Release notes' : null,
-    prepared_context: createPreparedContext(phase, recommended_mode, acting_agent_name),
+    prepared_context: createPreparedContext(phase, recommended_mode, acting_agent_name, response_style),
     ...overrides,
   };
 }
@@ -344,6 +349,9 @@ describe('runTick', () => {
       }),
     );
     expect(execute.mock.calls[0]?.[0]?.prompt).toContain(
+      'Use terse execution style for operational chatter and summaries:'
+    );
+    expect(execute.mock.calls[0]?.[0]?.prompt).toContain(
       '"role_summary": "Role summary for Builder."'
     );
     expect(execute.mock.calls[0]?.[0]?.prompt).not.toContain(
@@ -358,6 +366,37 @@ describe('runTick', () => {
       created_by: 'builder-agent',
       blockers: [],
     });
+  });
+
+  it('does not inject terse-style instructions for normal-style subagent phases', async () => {
+    const subagent_executor: SubagentExecutor = {
+      execute: vi.fn(async () => ({
+        summary: 'Documentation completed.',
+        outcome: 'completed',
+        next_phase: '9',
+        blockers: [],
+      })),
+    };
+    const client = createClient({
+      pickNextAutonomousPhase: vi.fn(async () => ({
+        selection: createSelection('8', 'subagent', {
+          feature_id: 'FEAT-8A',
+          feature_name: 'Feature 8A',
+          branch_name: null,
+          release_notes: null,
+        }),
+        skipped_summary: [],
+      })),
+    });
+
+    await runTick(client, 'ralph-loop', '/tmp/project', undefined, subagent_executor);
+
+    expect((subagent_executor.execute as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.prompt).not.toContain(
+      'Use terse execution style for operational chatter and summaries:'
+    );
+    expect((subagent_executor.execute as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.prompt).toContain(
+      'Response style: normal'
+    );
   });
 
   it('collapses duplicate artifact slots before proxying them to the runtime', async () => {

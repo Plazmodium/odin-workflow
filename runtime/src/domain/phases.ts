@@ -3,7 +3,14 @@
  * Version: 0.1.0
  */
 
-import type { PhaseAgentInstructions, PhaseContract, PhaseExecutionContract, PhaseExecutionMode, PhaseId } from '../types.js';
+import type {
+  PhaseAgentInstructions,
+  PhaseContract,
+  PhaseExecutionContract,
+  PhaseExecutionMode,
+  PhaseId,
+  PhaseResponseStyle,
+} from '../types.js';
 
 const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
   '0': {
@@ -185,6 +192,20 @@ const PHASE_CHILD_STATE_STRATEGIES: Record<PhaseId, PhaseExecutionContract['chil
   '10': 'return_intent_to_parent',
 };
 
+const PHASE_RESPONSE_STYLES: Record<PhaseId, PhaseResponseStyle> = {
+  '0': 'normal',
+  '1': 'normal',
+  '2': 'normal',
+  '3': 'normal',
+  '4': 'normal',
+  '5': 'terse_execution',
+  '6': 'terse_execution',
+  '7': 'terse_execution',
+  '8': 'normal',
+  '9': 'terse_execution',
+  '10': 'normal',
+};
+
 const PHASE_PROMPT_SECTIONS: PhaseExecutionContract['prompt_sections'] = [
   'phase',
   'role_summary',
@@ -235,6 +256,7 @@ export function getPhaseExecutionContract(phase: PhaseId, acting_agent_name: str
     supported_modes: ['inline', 'subagent'],
     recommended_mode: PHASE_RECOMMENDED_EXECUTION_MODES[phase],
     child_state_strategy: PHASE_CHILD_STATE_STRATEGIES[phase],
+    response_style: PHASE_RESPONSE_STYLES[phase],
     prompt_sections: [...PHASE_PROMPT_SECTIONS],
   };
 }

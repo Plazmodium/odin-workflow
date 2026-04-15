@@ -172,6 +172,7 @@ describe('handlePreparePhaseContext', () => {
             supported_modes: string[];
             recommended_mode: string;
             child_state_strategy: string;
+            response_style: string;
             prompt_sections: string[];
           };
           verification: { required_checks: string[] };
@@ -207,6 +208,7 @@ describe('handlePreparePhaseContext', () => {
         supported_modes: ['inline', 'subagent'],
         recommended_mode: 'subagent',
         child_state_strategy: 'direct_odin_tools_if_available',
+        response_style: 'terse_execution',
       },
       development_evals: {
         mode: 'plan_required',
@@ -386,6 +388,7 @@ describe('handlePreparePhaseContext', () => {
             phase_role_name: string;
             acting_agent_name: string;
             recommended_mode: string;
+            response_style: string;
           };
           invocation: { agent_name: string } | null;
         };
@@ -403,6 +406,7 @@ describe('handlePreparePhaseContext', () => {
     expect(context?.execution.phase_role_name).toBe('builder-agent');
     expect(context?.execution.acting_agent_name).toBe('senior-builder');
     expect(context?.execution.recommended_mode).toBe('subagent');
+    expect(context?.execution.response_style).toBe('terse_execution');
     expect(context?.invocation?.agent_name).toBe('senior-builder');
   });
 });

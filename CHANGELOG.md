@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.6.1-beta] - 2026-04-15
+
+### Added
+
+- `odin.prepare_phase_context` now exposes a phase-specific `execution.response_style` so harnesses can distinguish normal artifact-writing phases from terse internal execution phases.
+- Ralph Loop now injects bounded terse-style instructions for phases that opt into `terse_execution`, while keeping final artifact templates and human-readable prose unchanged.
+
+### Changed
+
+- Builder, Reviewer, Integrator, and Release now default to `terse_execution` for internal execution chatter; Product, Architect, Documenter, and other durable artifact phases remain `normal`.
+- Runtime, shared agent guidance, and Ralph Loop docs now state explicitly that terse execution is an internal optimization and not a global caveman mode for user chat or long-lived artifacts.
+- Root package version, runtime package version, runtime MCP server version, root README badge, loop package version, and lockfiles updated for this release.
+
 ## [0.6.0-beta] - 2026-04-13
 
 ### Added

@@ -17,7 +17,7 @@ This tracer-bullet slice supports:
 2. **Release closeout** after a human merge is recorded
 3. **Optional child-command execution for phases 5-8** when a subagent command is configured
 
-Release stays inline inside Ralph Loop. Phases 5-8 only become eligible when a child command is configured; Ralph Loop then spawns that command and proxies the returned artifacts and final phase result from the parent session.
+Release stays inline inside Ralph Loop. Phases 5-8 only become eligible when a child command is configured; Ralph Loop then spawns that command and proxies the returned artifacts and final phase result from the parent session. Ralph Loop also respects `context.execution.response_style`, so terse operational chatter can be requested without changing the normal human-readable templates for final artifacts.
 
 ## Commands
 
@@ -123,6 +123,8 @@ Ralph Loop then proxies:
 - `odin.record_phase_result(...)` for the returned outcome
 
 using `selection.prepared_context.execution.acting_agent_name` as the proxied `created_by` value.
+
+When `selection.prepared_context.execution.response_style = terse_execution`, Ralph Loop adds terse operational-style instructions to the child prompt. This applies to execution chatter and summaries only. Final artifacts are still expected to follow the normal phase templates.
 
 ## Operational notes
 
