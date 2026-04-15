@@ -2,10 +2,22 @@ import { executeReleaseHandoff, type GitHubCommandRunner } from './executors/rel
 import { executeReleaseCloseout } from './executors/release-closeout.js';
 import type { AutonomousSelection, RuntimeToolClient, SubagentExecutionArtifact, SubagentExecutor, TickOutcome } from './types.js';
 
+/**
+ * Selects the explanation to report when no autonomous phase was chosen.
+ *
+ * @param skipped_summary - An ordered list of skip entries, each containing a `detail` message to explain why a phase was skipped.
+ * @returns The `detail` from the first entry in `skipped_summary` if present, otherwise the default message "No autonomous phase is eligible right now."
+ */
 function deriveNoopReason(skipped_summary: Array<{ detail: string }>): string {
   return skipped_summary[0]?.detail ?? 'No autonomous phase is eligible right now.';
 }
 
+/**
+ * Builds a structured context object containing the requested prompt sections from a selection's prepared_context.
+ *
+ * @param selection - The autonomous selection whose `prepared_context.execution.prompt_sections` and `prepared_context.raw` supply the requested data
+ * @returns An object mapping each requested prompt section name to its corresponding value. Optional sections (e.g., `development_evals`, `automation`, `verification`, `workflow`, `artifacts`, `skills`, `learnings`) are included only when their `prepared_context.raw` values are defined.
+ */
 function buildPromptSectionContext(selection: AutonomousSelection): Record<string, unknown> {
   const { prepared_context } = selection;
   const entries: Array<[string, unknown]> = [];
@@ -62,6 +74,12 @@ function buildPromptSectionContext(selection: AutonomousSelection): Record<strin
   return Object.fromEntries(entries);
 }
 
+/**
+ * Constructs the text prompt sent to a subagent for executing an autonomous phase.
+ *
+ * @param selection - The selected autonomous decision, including `prepared_context` (agent info, phase details, execution guidance, and prompt sections) used to populate the prompt.
+ * @returns The multi-line prompt string containing the acting identity, role summary, definition of done, constraints, execution guidance (recommended mode, acting agent name, and prompt sections), and a formatted JSON block of structured context.
+ */
 function buildSubagentPrompt(selection: AutonomousSelection): string {
   const { prepared_context } = selection;
   const prompt_context = buildPromptSectionContext(selection);
@@ -89,6 +107,13 @@ function buildSubagentPrompt(selection: AutonomousSelection): string {
   return lines.join('\n');
 }
 
+/**
+ * Deduplicates a list of subagent artifacts, keeping the latest artifact for each (phase, output_type) slot.
+ *
+ * @param selection - The autonomous selection whose `phase` is used when an artifact lacks its own `phase`
+ * @param artifacts - Artifacts to collapse; later items in the array overwrite earlier ones for the same slot
+ * @returns An array of artifacts where each element is the most recent artifact for a given `phase` and `output_type`; each returned artifact always includes a `phase` property
+ */
 function collapseArtifactsForProxy(
   selection: AutonomousSelection,
   artifacts: SubagentExecutionArtifact[],
@@ -106,6 +131,15 @@ function collapseArtifactsForProxy(
   return [...latest_by_slot.values()];
 }
 
+/**
+ * Performs inline execution for release-related autonomous selections (phase '9').
+ *
+ * Executes a release closeout when `selection.reason` is `'merged_and_ready_to_close_release'`; otherwise prepares a release handoff and records the pull request.
+ *
+ * @param selection - The autonomous selection to execute; must have `phase === '9'`.
+ * @returns An object with `phase_outcome: 'completed'` and a `summary` describing the performed action.
+ * @throws Error if `selection.phase` is not `'9'`.
+ */
 async function executeInlineSelection(
   client: RuntimeToolClient,
   selection: AutonomousSelection,
@@ -132,6 +166,16 @@ async function executeInlineSelection(
   };
 }
 
+/**
+ * Execute an autonomous selection by running a subagent, persist any returned artifacts, and record the phase result.
+ *
+ * This delegates execution to the provided subagent executor using a generated prompt, collapses and records returned artifacts, and records the phase result (including outcome, next phase, summary, created_by, and blockers).
+ *
+ * @param selection - The autonomous selection to execute
+ * @param supervisor_name - The supervisor identity used for the subagent execution context
+ * @param project_root - Filesystem path of the project workspace passed to the subagent
+ * @returns An object containing `phase_outcome` (`'completed'`, `'blocked'`, or `'needs_rework'`) and the phase `summary`
+ */
 async function executeSubagentSelection(
   client: RuntimeToolClient,
   selection: AutonomousSelection,
@@ -174,6 +218,21 @@ async function executeSubagentSelection(
   };
 }
 
+/**
+ * Runs a single supervisor tick: selects the next eligible autonomous phase, executes it
+ * (either inline or via a configured subagent), persists execution artifacts and results,
+ * records supervisor events, and returns the tick outcome.
+ *
+ * @param client - Runtime tool client used to pick phases and record events/results
+ * @param supervisor_name - Identifier of the supervisor performing the tick
+ * @param project_root - Filesystem path to the project root used for executions
+ * @param runner - Optional GitHub command runner used for inline release handoff execution
+ * @param subagent_executor - Optional executor used to run recommended subagent executions
+ * @returns An object describing the tick result:
+ *          - `outcome`: one of `'noop'`, `'completed'`, `'blocked'`, `'needs_rework'`, or `'failed'`
+ *          - `summary`: human-readable summary of what happened
+ *          - `selection`: the phase selection that was executed, or `null` when no selection was processed
+ */
 export async function runTick(
   client: RuntimeToolClient,
   supervisor_name: string,

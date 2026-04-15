@@ -198,14 +198,33 @@ const PHASE_PROMPT_SECTIONS: PhaseExecutionContract['prompt_sections'] = [
   'learnings',
 ];
 
+/**
+ * Retrieve the PhaseContract for a given phase identifier.
+ *
+ * @param phase - The phase identifier ('0'–'10') whose contract to fetch
+ * @returns The PhaseContract corresponding to `phase`
+ */
 export function getPhaseContract(phase: PhaseId): PhaseContract {
   return PHASE_CONTRACTS[phase];
 }
 
+/**
+ * Retrieve the agent instructions configured for a phase.
+ *
+ * @param phase - The phase identifier ('0' … '10')
+ * @returns The `PhaseAgentInstructions` object associated with `phase`
+ */
 export function getPhaseAgentInstructions(phase: PhaseId): PhaseAgentInstructions {
   return PHASE_AGENT_INSTRUCTIONS[phase];
 }
 
+/**
+ * Build a PhaseExecutionContract for a specific phase and acting agent.
+ *
+ * @param phase - The phase id (`'0'`…`'10'`) to derive phase-specific execution settings from
+ * @param acting_agent_name - The name of the agent that will act under the returned contract
+ * @returns A PhaseExecutionContract populated with standardized execution fields and phase-derived values (phase role name, recommended execution mode, child-state strategy, and a copied `prompt_sections` array)
+ */
 export function getPhaseExecutionContract(phase: PhaseId, acting_agent_name: string): PhaseExecutionContract {
   return {
     actor_model: 'logical_role',
@@ -220,6 +239,11 @@ export function getPhaseExecutionContract(phase: PhaseId, acting_agent_name: str
   };
 }
 
+/**
+ * Get the primary next phase id for a given phase.
+ *
+ * @returns The first allowed next phase id for `phase`, or `null` if none is permitted.
+ */
 export function getNextPhaseId(phase: PhaseId): PhaseId | null {
   const allowed_next_phases = PHASE_CONTRACTS[phase].allowed_next_phases;
   return allowed_next_phases[0] ?? null;
