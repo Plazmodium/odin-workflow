@@ -10,6 +10,7 @@ interface CommandResult {
 }
 
 const SUBAGENT_EXECUTOR_TIMEOUT_MS = 120_000;
+const SUBAGENT_EXECUTOR_MAX_OUTPUT_BYTES = 1_000_000;
 
 function formatCommand(command: string[]): string {
   return command[0] ?? '<command>';
@@ -33,21 +34,26 @@ function parseArtifacts(value: unknown): SubagentExecutionArtifact[] | null {
       return [];
     }
 
-    const output_type = typeof entry.output_type === 'string' ? entry.output_type : null;
+    const record = entry as Record<string, unknown>;
+    const output_type =
+      typeof record.output_type === 'string' && record.output_type.trim().length > 0
+        ? record.output_type.trim()
+        : null;
     const phase =
-      entry.phase == null
+      record.phase == null
         ? undefined
-        : typeof entry.phase === 'string' && entry.phase.trim().length > 0
-          ? entry.phase.trim()
+        : typeof record.phase === 'string' && record.phase.trim().length > 0
+          ? record.phase.trim()
           : null;
-    if (output_type == null || output_type.trim().length === 0 || phase === null) {
+    const has_content = Object.prototype.hasOwnProperty.call(record, 'content') && record.content != null;
+    if (output_type == null || phase === null || !has_content) {
       return [];
     }
 
     return [{
       phase,
       output_type,
-      content: entry.content,
+      content: record.content,
     }];
   });
   return parsed.length === value.length ? parsed : null;
@@ -128,6 +134,7 @@ export function createCommandSubagentExecutor(command: string[]): SubagentExecut
       const result = await new Promise<CommandResult>((resolve, reject) => {
         let stdout = '';
         let stderr = '';
+        let output_bytes = 0;
         let settled = false;
         let stdin_closed_early = false;
 
@@ -150,12 +157,38 @@ export function createCommandSubagentExecutor(command: string[]): SubagentExecut
           cb();
         };
 
+        const appendOutput = (chunk: Buffer | string, sink: 'stdout' | 'stderr') => {
+          const chunk_bytes = Buffer.isBuffer(chunk) ? chunk.byteLength : Buffer.byteLength(chunk);
+          if (output_bytes + chunk_bytes > SUBAGENT_EXECUTOR_MAX_OUTPUT_BYTES) {
+            settle(timeout, () => {
+              child.stdout.destroy();
+              child.stderr.destroy();
+              child.kill();
+              reject(
+                new Error(
+                  `Subagent executor ${formatCommand(command)} output exceeded ${SUBAGENT_EXECUTOR_MAX_OUTPUT_BYTES} bytes.`
+                )
+              );
+            });
+            return;
+          }
+
+          output_bytes += chunk_bytes;
+          const text = String(chunk);
+          if (sink === 'stdout') {
+            stdout += text;
+            return;
+          }
+
+          stderr += text;
+        };
+
         const onStdout = (chunk: Buffer | string) => {
-          stdout += String(chunk);
+          appendOutput(chunk, 'stdout');
         };
 
         const onStderr = (chunk: Buffer | string) => {
-          stderr += String(chunk);
+          appendOutput(chunk, 'stderr');
         };
 
         const onStdinError = (error: Error & { code?: string }) => {

@@ -92,11 +92,16 @@ describe('createCommandSubagentExecutor', () => {
     const executor = createCommandSubagentExecutor([
       process.execPath,
       '-e',
-      'process.exit(0);',
+      "process.stdin.resume(); process.stdin.once('data', () => process.exit(0));",
     ]);
 
-    await expect(executor.execute(createRequest())).rejects.toThrow(
-      `Subagent executor ${process.execPath} produced no stdout result.`
+    await expect(
+      executor.execute({
+        ...createRequest(),
+        prompt: 'x'.repeat(2_000_000),
+      })
+    ).rejects.toThrow(
+      `Subagent executor ${process.execPath} closed stdin before consuming the request.`
     );
   });
 
@@ -133,6 +138,18 @@ describe('createCommandSubagentExecutor', () => {
 
     await expect(executor.execute(createRequest())).rejects.toThrow(
       'Subagent executor returned an incomplete result payload.',
+    );
+  });
+
+  it('rejects when child output exceeds the configured cap', async () => {
+    const executor = createCommandSubagentExecutor([
+      process.execPath,
+      '-e',
+      "process.stdout.write('x'.repeat(1_000_001)); setInterval(() => {}, 1000);",
+    ]);
+
+    await expect(executor.execute(createRequest())).rejects.toThrow(
+      `Subagent executor ${process.execPath} output exceeded 1000000 bytes.`
     );
   });
 
