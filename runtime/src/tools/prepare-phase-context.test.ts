@@ -409,4 +409,59 @@ describe('handlePreparePhaseContext', () => {
     expect(context?.execution.response_style).toBe('terse_execution');
     expect(context?.invocation?.agent_name).toBe('senior-builder');
   });
+
+  it('returns normal response style for durable artifact phases', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => createFeature()),
+      listPhaseArtifacts: vi.fn(async () => []),
+      listLearnings: vi.fn(async () => []),
+      listRelatedLearnings: vi.fn(async () => []),
+      listOpenBlockers: vi.fn(async () => []),
+      listOpenGateRecords: vi.fn(async () => []),
+      listOpenFindings: vi.fn(async () => []),
+      listPendingClaims: vi.fn(async () => []),
+      listClaimVerificationStatus: vi.fn(async () => []),
+      listClaimsNeedingReview: vi.fn(async () => []),
+      findOpenAgentInvocation: vi.fn(async () => null),
+      startAgentInvocation: vi.fn(async () => ({
+        id: 'inv_doc',
+        feature_id: 'FEAT-CTX',
+        phase: '8',
+        agent_name: 'documenter-agent',
+        operation: 'Phase 8: Documenter',
+        skills_used: [],
+        started_at: '2026-03-20T01:20:00.000Z',
+        ended_at: null,
+        duration_ms: null,
+      })),
+    } as unknown as WorkflowStateAdapter;
+
+    const skillAdapter: SkillAdapter = {
+      resolveSkills: vi.fn(async () => ({
+        resolved: [],
+        fallback_used: false,
+      })),
+      listKnowledgeDomains: vi.fn(async () => []),
+      invalidateCaches: vi.fn(),
+    };
+
+    const result = await handlePreparePhaseContext(adapter, skillAdapter, createConfig('guarded'), {
+      feature_id: 'FEAT-CTX',
+      phase: '8',
+      include_artifacts: false,
+      include_skills: true,
+      include_learnings: false,
+    });
+
+    const context = (
+      result.structuredContent as {
+        context?: {
+          execution: { response_style: string; recommended_mode: string };
+        };
+      }
+    )?.context;
+
+    expect(context?.execution.response_style).toBe('normal');
+    expect(context?.execution.recommended_mode).toBe('subagent');
+  });
 });

@@ -29,7 +29,11 @@ jobs:
             exit 0
           fi
 
-          changed_files="$(git diff --name-only "$before" "$GITHUB_SHA")"
+          if git rev-parse --verify "$before" >/dev/null 2>&1; then
+            changed_files="$(git diff --name-only "$before" "$GITHUB_SHA")"
+          else
+            changed_files="$(git show --name-only --pretty='' "$GITHUB_SHA")"
+          fi
 
           if printf '%s\n' "$changed_files" | grep -Eq '^(package\.json|runtime/package\.json|loop/package\.json|CHANGELOG\.md)$'; then
             echo "should_release=true" >> "$GITHUB_OUTPUT"
@@ -42,39 +46,8 @@ jobs:
         id: meta
         shell: bash
         run: |
-          root_version="$(node -p "require('./package.json').version")"
-          runtime_version="$(node -p "require('./runtime/package.json').version")"
-          loop_version="$(node -p "require('./loop/package.json').version")"
-
-          if [ "$root_version" != "$runtime_version" ]; then
-            echo "Root version ($root_version) and runtime version ($runtime_version) must match for a GitHub release." >&2
-            exit 1
-          fi
-
-          tag="v${root_version}"
-          notes_file="$(mktemp)"
-
-          changelog_section="$(awk -v version="$root_version" '
-            $0 ~ "^## \\[" version "\\]" { capture=1; next }
-            capture && $0 ~ "^## \\[" { exit }
-            capture { print }
-          ' CHANGELOG.md)"
-
-          if [ -z "$changelog_section" ]; then
-            changelog_section="No matching CHANGELOG section found for ${root_version}."
-          fi
-
-          {
-            printf '## Versions\n'
-            printf -- '- `odin-workflow`: `%s`\n' "$root_version"
-            printf -- '- `@plazmodium/odin`: `%s`\n' "$runtime_version"
-            printf -- '- `ralph-loop`: `%s`\n\n' "$loop_version"
-            printf '%s\n' "$changelog_section"
-          } > "$notes_file"
-
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "release_name=$tag" >> "$GITHUB_OUTPUT"
-          echo "notes_file=$notes_file" >> "$GITHUB_OUTPUT"
+          chmod +x .github/scripts/release-metadata.sh
+          ./.github/scripts/release-metadata.sh export "$GITHUB_OUTPUT"
 
       - name: Create or update GitHub release
         if: steps.changed.outputs.should_release == 'true'
@@ -86,6 +59,8 @@ jobs:
           release_name="${{ steps.meta.outputs.release_name }}"
           notes_file="${{ steps.meta.outputs.notes_file }}"
 
+          # Project policy: beta semver tags still publish as normal GitHub releases
+          # so the repository's Latest release panel tracks the newest shipped line.
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release edit "$tag" --title "$release_name" --notes-file "$notes_file" --latest
           else

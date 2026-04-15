@@ -24,7 +24,6 @@ This guide is for maintainers publishing the Odin runtime from `odin-workflow/ru
 
 ```bash
 npm publish --access public --tag beta
-npm dist-tag add @plazmodium/odin@<x-x-x>-beta beta
 ```
 
 - Only publish to `latest` when you intentionally want `npx -y @plazmodium/odin ...` to resolve to a non-beta release.

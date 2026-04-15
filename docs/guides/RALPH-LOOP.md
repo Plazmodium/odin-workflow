@@ -84,7 +84,8 @@ The child command receives JSON on stdin:
       "prepared_context": {
         "execution": {
           "acting_agent_name": "builder-agent",
-          "recommended_mode": "subagent"
+          "recommended_mode": "subagent",
+          "response_style": "terse_execution"
         }
       }
     },

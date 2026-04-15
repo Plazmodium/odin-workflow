@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 
-import type { PhaseOutcome, SubagentExecutionArtifact, SubagentExecutionRequest, SubagentExecutionResult, SubagentExecutor } from './types.js';
+import type { PhaseId, PhaseOutcome, SubagentExecutionArtifact, SubagentExecutionRequest, SubagentExecutionResult, SubagentExecutor } from './types.js';
 
 interface CommandResult {
   code: number | null;
@@ -11,6 +11,7 @@ interface CommandResult {
 
 const SUBAGENT_EXECUTOR_TIMEOUT_MS = 120_000;
 const SUBAGENT_EXECUTOR_MAX_OUTPUT_BYTES = 1_000_000;
+const PHASE_IDS = new Set<PhaseId>(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
 
 /**
  * Get the executable name from a command array.
@@ -30,6 +31,12 @@ function formatCommand(command: string[]): string {
  */
 function parseOutcome(value: unknown): PhaseOutcome | null {
   return value === 'completed' || value === 'blocked' || value === 'needs_rework' ? value : null;
+}
+
+function parsePhaseId(value: unknown): PhaseId | null {
+  return typeof value === 'string' && PHASE_IDS.has(value as PhaseId)
+    ? value as PhaseId
+    : null;
 }
 
 /**
@@ -62,9 +69,7 @@ function parseArtifacts(value: unknown): SubagentExecutionArtifact[] | null {
     const phase =
       record.phase == null
         ? undefined
-        : typeof record.phase === 'string' && record.phase.trim().length > 0
-          ? record.phase.trim()
-          : null;
+        : parsePhaseId(typeof record.phase === 'string' ? record.phase.trim() : null);
     const has_content = Object.prototype.hasOwnProperty.call(record, 'content') && record.content != null;
     if (output_type == null || phase === null || !has_content) {
       return [];
@@ -126,9 +131,7 @@ function parseResult(stdout: string): SubagentExecutionResult {
   const next_phase =
     record.next_phase == null
       ? undefined
-      : typeof record.next_phase === 'string' && record.next_phase.trim().length > 0
-        ? record.next_phase.trim()
-        : null;
+      : parsePhaseId(typeof record.next_phase === 'string' ? record.next_phase.trim() : null);
   const blockers = parseBlockers(record.blockers);
   const artifacts = parseArtifacts(record.artifacts);
 

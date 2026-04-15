@@ -38,6 +38,8 @@ function asString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+const PHASE_IDS = new Set<PhaseId>(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
+
 /**
  * Validate and coerce an arbitrary value to a PhaseId.
  *
@@ -45,7 +47,9 @@ function asString(value: unknown): string | null {
  * @returns The input as a `PhaseId` if it is a string, `null` otherwise.
  */
 function asPhaseId(value: unknown): PhaseId | null {
-  return typeof value === 'string' ? value : null;
+  return typeof value === 'string' && PHASE_IDS.has(value as PhaseId)
+    ? value as PhaseId
+    : null;
 }
 
 /**
