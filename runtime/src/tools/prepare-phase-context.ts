@@ -9,7 +9,7 @@ import type { RuntimeConfig } from '../config.js';
 import { resolveWorkflowActorName } from '../domain/actors.js';
 import { resolveAutomationDecision } from '../domain/automation-policy.js';
 import { appendDevelopmentEvalChecks, buildDevelopmentEvalContext } from '../domain/development-evals.js';
-import { getPhaseAgentInstructions, getPhaseContract, isWatchedPhase } from '../domain/phases.js';
+import { getPhaseAgentInstructions, getPhaseContract, getPhaseExecutionContract, isWatchedPhase } from '../domain/phases.js';
 import { formatOpenGateSummary } from '../domain/quality-gates.js';
 import { computeResonance, type ResonanceInput } from '../domain/resonance.js';
 import type { PreparePhaseContextInput } from '../schemas.js';
@@ -76,6 +76,7 @@ export async function handlePreparePhaseContext(
   const phase = getPhaseContract(input.phase);
   const agent = getPhaseAgentInstructions(input.phase);
   const actor_name = resolveWorkflowActorName(input.phase, input.agent_name ?? agent.name);
+  const execution = getPhaseExecutionContract(input.phase, actor_name);
   const development_evals = buildDevelopmentEvalContext(feature, input.phase, all_artifacts, open_gate_records);
   const automation = resolveAutomationDecision({
     config,
@@ -115,9 +116,9 @@ export async function handlePreparePhaseContext(
     phase,
     agent: {
       ...agent,
-      name: actor_name,
       constraints: [...new Set([...agent.constraints, ...development_evals.harness_prompt_block, ...watcher_constraints])],
     },
+    execution,
     automation,
     invocation:
       invocation == null

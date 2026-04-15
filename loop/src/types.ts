@@ -1,5 +1,23 @@
 export type PhaseId = string;
 
+export type PhaseExecutionMode = 'inline' | 'subagent';
+
+export type PhaseChildStateStrategy = 'direct_odin_tools_if_available' | 'return_intent_to_parent';
+
+export type PhasePromptSection =
+  | 'phase'
+  | 'role_summary'
+  | 'constraints'
+  | 'development_evals'
+  | 'automation'
+  | 'verification'
+  | 'workflow'
+  | 'artifacts'
+  | 'skills'
+  | 'learnings';
+
+export type PhaseOutcome = 'completed' | 'blocked' | 'needs_rework';
+
 export type SupervisorEventType = 'tick_started' | 'tick_selected' | 'tick_noop' | 'tick_failed' | 'tick_completed';
 
 export interface AutonomousSelection {
@@ -10,6 +28,30 @@ export interface AutonomousSelection {
   branch_name: string | null;
   base_branch: string | null;
   release_notes: string | null;
+  prepared_context: PreparedPhaseContext;
+}
+
+export interface PreparedPhaseContext {
+  raw: Record<string, unknown>;
+  phase: {
+    id: PhaseId;
+    name: string;
+    purpose: string | null;
+    definition_of_done: string[];
+  };
+  agent: {
+    name: string;
+    role_summary: string;
+    constraints: string[];
+  };
+  execution: {
+    phase_role_name: string;
+    acting_agent_name: string;
+    supported_modes: PhaseExecutionMode[];
+    recommended_mode: PhaseExecutionMode;
+    child_state_strategy: PhaseChildStateStrategy;
+    prompt_sections: PhasePromptSection[];
+  };
 }
 
 export interface SkippedSummaryItem {
@@ -42,11 +84,19 @@ export interface RecordSupervisorEventInput {
 export interface RecordPhaseResultInput {
   feature_id: string;
   phase: PhaseId;
-  outcome: 'completed';
-  next_phase: PhaseId;
+  outcome: PhaseOutcome;
+  next_phase?: PhaseId;
   summary: string;
   created_by: string;
   blockers: string[];
+}
+
+export interface RecordPhaseArtifactInput {
+  feature_id: string;
+  phase: PhaseId;
+  output_type: string;
+  content: unknown;
+  created_by: string;
 }
 
 export interface RecordPullRequestInput {
@@ -83,6 +133,7 @@ export interface RecordReleaseCloseoutFailureInput {
 export interface RuntimeToolClient {
   pickNextAutonomousPhase(supervisor_name: string, options?: PickNextAutonomousPhaseOptions): Promise<PickNextAutonomousPhaseResult>;
   recordSupervisorEvent(input: RecordSupervisorEventInput): Promise<void>;
+  recordPhaseArtifact(input: RecordPhaseArtifactInput): Promise<void>;
   recordPhaseResult(input: RecordPhaseResultInput): Promise<void>;
   archiveFeatureRelease(input: ArchiveFeatureReleaseInput): Promise<void>;
   recordPullRequest(input: RecordPullRequestInput): Promise<void>;
@@ -96,10 +147,36 @@ export interface RalphLoopConfig {
   project_root: string;
   supervisor_name: string;
   interval_ms: number;
+  subagent_command: string[] | null;
+}
+
+export interface SubagentExecutionArtifact {
+  phase?: PhaseId;
+  output_type: string;
+  content: unknown;
+}
+
+export interface SubagentExecutionRequest {
+  project_root: string;
+  supervisor_name: string;
+  selection: AutonomousSelection;
+  prompt: string;
+}
+
+export interface SubagentExecutionResult {
+  summary: string;
+  outcome: PhaseOutcome;
+  next_phase?: PhaseId;
+  blockers?: string[];
+  artifacts?: SubagentExecutionArtifact[];
+}
+
+export interface SubagentExecutor {
+  execute(request: SubagentExecutionRequest): Promise<SubagentExecutionResult>;
 }
 
 export interface TickOutcome {
-  outcome: 'noop' | 'completed' | 'failed';
+  outcome: 'noop' | 'completed' | 'blocked' | 'needs_rework' | 'failed';
   summary: string;
   selection: AutonomousSelection | null;
 }

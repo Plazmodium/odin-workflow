@@ -17,6 +17,38 @@ import { runTick } from './tick.js';
 
 type Stage = 'handoff' | 'closeout' | 'noop';
 
+function createPreparedContext(phase: string, recommended_mode: 'inline' | 'subagent', acting_agent_name: string) {
+  const phase_name = phase === '9' ? 'Release' : 'Builder';
+  const role_name = phase === '9' ? 'release-agent' : 'builder-agent';
+
+  return {
+    raw: {
+      phase: { id: phase, name: phase_name },
+      agent: { name: role_name },
+      execution: { recommended_mode, acting_agent_name },
+    },
+    phase: {
+      id: phase,
+      name: phase_name,
+      purpose: `Purpose for ${phase_name}.`,
+      definition_of_done: [`${phase_name} complete`],
+    },
+    agent: {
+      name: role_name,
+      role_summary: `Role summary for ${phase_name}.`,
+      constraints: ['Follow the prepared context.'],
+    },
+    execution: {
+      phase_role_name: role_name,
+      acting_agent_name,
+      supported_modes: ['inline', 'subagent'] as const,
+      recommended_mode,
+      child_state_strategy: recommended_mode === 'subagent' ? 'direct_odin_tools_if_available' as const : 'return_intent_to_parent' as const,
+      prompt_sections: ['phase', 'role_summary', 'constraints'] as const,
+    },
+  };
+}
+
 class FakeRuntimeToolClient implements RuntimeToolClient {
   stage: Stage = 'handoff';
   readonly supervisor_events: RecordSupervisorEventInput[] = [];
@@ -49,6 +81,7 @@ class FakeRuntimeToolClient implements RuntimeToolClient {
           branch_name: 'gr/feature/FEAT-RALPH',
           base_branch: 'main',
           release_notes: 'Added Ralph Loop release handoff support.',
+          prepared_context: createPreparedContext('9', 'inline', 'ralph-loop'),
         },
         skipped_summary: [],
       };
@@ -64,6 +97,7 @@ class FakeRuntimeToolClient implements RuntimeToolClient {
           branch_name: 'gr/feature/FEAT-RALPH',
           base_branch: 'main',
           release_notes: 'Added Ralph Loop release handoff support.',
+          prepared_context: createPreparedContext('9', 'inline', 'ralph-loop'),
         },
         skipped_summary: [],
       };
@@ -86,6 +120,8 @@ class FakeRuntimeToolClient implements RuntimeToolClient {
   async recordSupervisorEvent(input: RecordSupervisorEventInput): Promise<void> {
     this.supervisor_events.push(input);
   }
+
+  async recordPhaseArtifact(): Promise<void> {}
 
   async recordPhaseResult(input: RecordPhaseResultInput): Promise<void> {
     this.phase_results.push(input);

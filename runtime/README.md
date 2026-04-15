@@ -42,7 +42,7 @@ Important: Odin bootstraps with `runtime.mode: in_memory` by default so MCP wiri
 
 If you are developing Odin from this repo, use the repo-checkout `--distribution source` flow shown above.
 
-If you are the maintainer preparing that publish, use [`docs/guides/NPM-PUBLISH.md`](../../../docs/guides/NPM-PUBLISH.md).
+If you are the maintainer preparing that publish, use [`../docs/guides/NPM-PUBLISH.md`](../docs/guides/NPM-PUBLISH.md).
 
 ### Manual MCP wiring
 
@@ -149,7 +149,7 @@ Your AI agent now has these tools available:
 | `odin.start_feature` | Record a feature in the workflow after the branch already exists |
 | `odin.get_next_phase` | Ask "what should happen next?" |
 | `odin.pick_next_autonomous_phase` | Let Ralph Loop pick the next safe feature/phase and return prepared context |
-| `odin.prepare_phase_context` | Get the full working bundle for a phase |
+| `odin.prepare_phase_context` | Get the full working bundle for a phase, including harness execution guidance |
 | `odin.get_development_eval_status` | Inspect focused development-eval state for a feature |
 | `odin.record_phase_artifact` | Register a phase output (PRD, spec, tasks, etc.) |
 | `odin.submit_claim` | Submit a watched-agent claim for policy and watcher verification |
@@ -273,6 +273,48 @@ Notes:
 - PR creation and merge execution still happen outside the runtime via git/GitHub tooling, so the trusted enforcement boundary in this release is the orchestrator consulting `context.automation` before it acts; the record tools persist facts after the external action happens
 - after a merge is recorded, `odin.record_phase_result({ phase: '9', outcome: 'completed', next_phase: '10' })` now uses the runtime-owned completion flow instead of a raw status flip
 
+## Harness Execution Modes
+
+Odin phase agents are **logical phase roles**, not runtime-owned worker processes.
+
+- `context.agent.name` is the canonical Odin phase role for the selected phase
+- `context.execution.phase_role_name` repeats that canonical role explicitly
+- `context.execution.acting_agent_name` is the resolved acting label used for invocation tracking in the current run
+
+If a harness spawns a child agent, that child is acting as the current Odin phase role. The runtime still does not launch or supervise that child itself.
+
+`odin.prepare_phase_context(...)` now returns an `execution` block with:
+
+- `supported_modes` - currently `inline` and `subagent`
+- `recommended_mode` - guidance only; not enforcement
+- `child_state_strategy` - whether the harness should prefer direct `odin.*` calls from the child when available or have the child return intent to the parent session
+- `prompt_sections` - the fields the harness should keep in the active prompt
+
+`context.agent.constraints` already includes `context.development_evals.harness_prompt_block`. Keep the dedicated eval block visible if you want a separate eval section, but do not append both verbatim or the same instructions will appear twice.
+
+Canonical harness flow:
+
+```text
+1. Call odin.prepare_phase_context({ feature_id, phase, agent_name }).
+2. Build the prompt from:
+   - context.agent.name
+   - context.agent.role_summary
+   - context.agent.constraints
+   - context.automation
+   - context.verification
+   - context.workflow
+   - context.artifacts
+   - context.skills.resolved
+   - context.learnings
+3. Choose execution mode:
+   - inline: parent session performs the phase work directly
+   - subagent: parent session spawns a child that acts as the current Odin phase role
+4. Record artifacts, claims, checks, and gates through odin.* tools as work happens.
+5. Close the phase with odin.record_phase_result(...).
+```
+
+If the child agent cannot call `odin.*` directly, keep the same flow but have the child return a clear `State Changes Required` section and the parent session performs those calls on the child's behalf. When proxying, pass `context.execution.acting_agent_name` through to tool fields such as `agent_name` and `created_by` so attribution and invocation tracking stay aligned with the prepared phase context.
+
 ## Optional: TLA+ Design Verification
 
 `odin.verify_design` is optional and stays disabled while `formal_verification.provider` is `none`.
@@ -327,11 +369,13 @@ Recommended harness behavior:
 ```text
 1. Call odin.prepare_phase_context(...)
 2. Build the agent prompt from:
+   - context.agent.name
    - context.agent.role_summary
    - context.agent.constraints
-   - context.development_evals.harness_prompt_block
-3. Keep context.development_evals.status_summary visible to the operator
-4. Do not treat eval instructions as a replacement for formal verification, Semgrep, tests, runtime checks, or watcher checks
+3. Choose inline vs subagent execution using context.execution.recommended_mode as guidance
+4. If the child cannot call odin.* directly, proxy the required state changes from the parent session and pass `context.execution.acting_agent_name` through to `agent_name` / `created_by`
+5. Keep context.development_evals.status_summary visible to the operator
+6. Do not treat eval instructions as a replacement for formal verification, Semgrep, tests, runtime checks, or watcher checks
 ```
 
 Canonical eval-aware orchestration snippet:
@@ -340,12 +384,14 @@ Canonical eval-aware orchestration snippet:
 When orchestrating Odin phases:
 1. Call odin.prepare_phase_context({ feature_id, phase, agent_name }).
 2. Build the active agent prompt from:
+   - context.agent.name
    - context.agent.role_summary
    - context.agent.constraints
-   - context.development_evals.harness_prompt_block
-3. Use odin.get_development_eval_status({ feature_id }) when you need focused eval state.
-4. Record eval artifacts/gates with odin.record_eval_plan, odin.record_eval_run, and odin.record_quality_gate.
-5. Never let Development Evals override odin.verify_design, odin.run_review_checks, tests, runtime verification, or watcher checks.
+3. Use context.execution.recommended_mode as the default inline/subagent choice, but keep Release strongly parent-session controlled.
+4. If the child cannot call odin.* directly, have it return state-change intent and let the parent session proxy those calls with `context.execution.acting_agent_name` as the relevant `agent_name` / `created_by` value.
+5. Use odin.get_development_eval_status({ feature_id }) when you need focused eval state.
+6. Record eval artifacts/gates with odin.record_eval_plan, odin.record_eval_run, and odin.record_quality_gate.
+7. Never let Development Evals override odin.verify_design, odin.run_review_checks, tests, runtime verification, or watcher checks.
 ```
 
 If the harness wants a focused eval-only read path instead of parsing `odin.get_feature_status`, call:

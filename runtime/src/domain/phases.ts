@@ -3,7 +3,7 @@
  * Version: 0.1.0
  */
 
-import type { PhaseAgentInstructions, PhaseContract, PhaseId } from '../types.js';
+import type { PhaseAgentInstructions, PhaseContract, PhaseExecutionContract, PhaseExecutionMode, PhaseId } from '../types.js';
 
 const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
   '0': {
@@ -157,12 +157,67 @@ const PHASE_AGENT_INSTRUCTIONS: Record<PhaseId, PhaseAgentInstructions> = {
   },
 };
 
+const PHASE_RECOMMENDED_EXECUTION_MODES: Record<PhaseId, PhaseExecutionMode> = {
+  '0': 'inline',
+  '1': 'inline',
+  '2': 'inline',
+  '3': 'inline',
+  '4': 'inline',
+  '5': 'subagent',
+  '6': 'subagent',
+  '7': 'subagent',
+  '8': 'subagent',
+  '9': 'inline',
+  '10': 'inline',
+};
+
+const PHASE_CHILD_STATE_STRATEGIES: Record<PhaseId, PhaseExecutionContract['child_state_strategy']> = {
+  '0': 'return_intent_to_parent',
+  '1': 'return_intent_to_parent',
+  '2': 'return_intent_to_parent',
+  '3': 'return_intent_to_parent',
+  '4': 'return_intent_to_parent',
+  '5': 'direct_odin_tools_if_available',
+  '6': 'direct_odin_tools_if_available',
+  '7': 'direct_odin_tools_if_available',
+  '8': 'direct_odin_tools_if_available',
+  '9': 'return_intent_to_parent',
+  '10': 'return_intent_to_parent',
+};
+
+const PHASE_PROMPT_SECTIONS: PhaseExecutionContract['prompt_sections'] = [
+  'phase',
+  'role_summary',
+  'constraints',
+  'development_evals',
+  'automation',
+  'verification',
+  'workflow',
+  'artifacts',
+  'skills',
+  'learnings',
+];
+
 export function getPhaseContract(phase: PhaseId): PhaseContract {
   return PHASE_CONTRACTS[phase];
 }
 
 export function getPhaseAgentInstructions(phase: PhaseId): PhaseAgentInstructions {
   return PHASE_AGENT_INSTRUCTIONS[phase];
+}
+
+export function getPhaseExecutionContract(phase: PhaseId, acting_agent_name: string): PhaseExecutionContract {
+  return {
+    actor_model: 'logical_role',
+    execution_owner: 'harness',
+    phase_role_name: PHASE_AGENT_INSTRUCTIONS[phase].name,
+    acting_agent_name,
+    child_agent_role: 'acts_as_phase_role',
+    supported_modes: ['inline', 'subagent'],
+    recommended_mode: PHASE_RECOMMENDED_EXECUTION_MODES[phase],
+    child_state_strategy: PHASE_CHILD_STATE_STRATEGIES[phase],
+    prompt_sections: [...PHASE_PROMPT_SECTIONS],
+  };
 }
 
 export function getNextPhaseId(phase: PhaseId): PhaseId | null {

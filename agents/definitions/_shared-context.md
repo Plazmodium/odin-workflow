@@ -27,18 +27,18 @@ This file contains common patterns and references shared across all SDD agents. 
 ## Hybrid Orchestration Model
 
 Odin uses a **hybrid orchestration** model:
-- **You (Agent)**: Create artifacts (specs, reviews, code, docs) + document state changes needed
-- **Main Session (Orchestrator)**: Manages workflow state via MCP
+- **You (Agent)**: Create artifacts (specs, reviews, code, docs) and either call `odin.*` directly when your harness grants access or document the state changes the parent session should proxy
+- **Main Session (Orchestrator)**: Manages workflow state directly or proxies returned `odin.*` calls for child agents that do not have runtime access
 
-**Why**: Sub-agents spawned via task/agent tools cannot access MCP servers. Only the main orchestrator session can call MCP tools.
+**Why**: Some harnesses do not give spawned child agents MCP access. Odin supports both direct child `odin.*` access and parent-session proxying.
 
-**Your responsibility**: At the end of your artifact, include a `## State Changes Required` section listing all state changes the orchestrator should make.
+**Your responsibility**: If you cannot call `odin.*` directly, end your artifact with a `## State Changes Required` section listing the calls the orchestrator should proxy.
 
 ---
 
 ## State Changes Required — Template
 
-Every agent artifact must end with this section:
+Every agent artifact must end with this section when the parent session needs to proxy `odin.*` calls:
 
 ```markdown
 ---
@@ -47,10 +47,14 @@ Every agent artifact must end with this section:
 ### 1. Submit Claims (if watched agent: Builder, Integrator, Release)
 [Include structured claims with type, description, risk level, evidence refs]
 
-### 2. Track Duration
+### 2. Record Phase Result (if phase work is complete, blocked, or needs rework)
+- **Feature ID**: [ID]
 - **Phase**: [0-10]
-- **Agent**: [Your agent name]
-- **Operation**: [Brief description]
+- **Outcome**: `completed` | `blocked` | `needs_rework`
+- **Summary**: [Brief result summary]
+- **Created By**: [Agent name]
+- **Next Phase**: [Optional next phase]
+- **Blockers**: [Optional blocker list]
 
 ### 3. Record Development Eval Artifact (if applicable)
 - **Feature ID**: [ID]
@@ -65,13 +69,7 @@ Every agent artifact must end with this section:
 - **Approver**: [Agent name]
 - **Notes**: [Why]
 
-### 5. Transition Phase (if applicable)
-- **Feature ID**: [ID]
-- **From Phase**: [N]
-- **To Phase**: [N+1]
-- **Transitioned By**: [Agent name]
-
-### 6. Create Blocker (if applicable)
+### 5. Create Blocker (if applicable)
 - **Blocker Type**: [SPEC_AMBIGUITY | MISSING_CONTEXT | TECHNICAL_IMPOSSIBILITY | EXTERNAL_DEPENDENCY | INTEGRATION_CONFLICT | DURATION_EXCEEDED | ITERATION_LIMIT_EXCEEDED | QUALITY_GATE_REJECTED | OTHER]
 - **Phase**: [N]
 - **Severity**: [LOW | MEDIUM | HIGH | CRITICAL]
@@ -84,7 +82,7 @@ Every agent artifact must end with this section:
 
 ## Duration Tracking
 
-Agent work duration is tracked automatically by the orchestrator using `start_agent_invocation` and `end_agent_invocation`. You do not need to self-report duration or token usage.
+Agent work duration is tracked automatically by the runtime-managed invocation lifecycle opened by `odin.prepare_phase_context(...)` and closed by `odin.record_phase_result(...)`. You do not need to self-report duration or token usage.
 
 **If an operation is taking excessively long** (e.g., unbounded iteration, runaway complexity):
 - Stop and document a `DURATION_EXCEEDED` blocker
@@ -209,7 +207,7 @@ If Development Evals pass but one of the existing review steps fails, the featur
 
 ### Runtime Recording Convention
 
-Only the main orchestrator session can call Odin MCP tools. Agents should document these state changes when relevant:
+If your harness does not give the child direct `odin.*` access, document these state changes for the parent session to proxy when relevant:
 
 - `odin.record_phase_artifact({ output_type: "eval_plan", ... })`
 - `odin.record_quality_gate({ gate_name: "eval_readiness", ... })`

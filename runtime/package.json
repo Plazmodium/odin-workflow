@@ -1,6 +1,6 @@
 {
   "name": "@plazmodium/odin",
-  "version": "0.5.0-beta",
+  "version": "0.6.0-beta",
   "description": "Odin MCP runtime server for the 11-phase workflow",
   "homepage": "https://github.com/Plazmodium/odin-workflow/tree/dev/runtime",
   "bugs": {

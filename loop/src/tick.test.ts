@@ -1,8 +1,64 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { RuntimeToolClient } from './types.js';
+import type { AutonomousSelection, RuntimeToolClient, SubagentExecutor } from './types.js';
 import { runTick } from './tick.js';
 import type { GitHubCommandRunner } from './executors/release-handoff.js';
+
+function createPreparedContext(
+  phase: string,
+  recommended_mode: 'inline' | 'subagent',
+  acting_agent_name: string,
+) {
+  const phase_name = phase === '9' ? 'Release' : phase === '5' ? 'Builder' : `Phase ${phase}`;
+  const role_name = phase === '9' ? 'release-agent' : phase === '5' ? 'builder-agent' : `${phase_name.toLowerCase()}-agent`;
+
+  return {
+    raw: {
+      phase: { id: phase, name: phase_name },
+      agent: { name: role_name },
+      execution: { recommended_mode, acting_agent_name },
+    },
+    phase: {
+      id: phase,
+      name: phase_name,
+      purpose: `Purpose for ${phase_name}.`,
+      definition_of_done: [`${phase_name} complete`],
+    },
+    agent: {
+      name: role_name,
+      role_summary: `Role summary for ${phase_name}.`,
+      constraints: ['Follow the prepared context.'],
+    },
+    execution: {
+      phase_role_name: role_name,
+      acting_agent_name,
+      supported_modes: ['inline', 'subagent'] as const,
+      recommended_mode,
+      child_state_strategy: recommended_mode === 'subagent' ? 'direct_odin_tools_if_available' as const : 'return_intent_to_parent' as const,
+      prompt_sections: ['phase', 'role_summary', 'constraints'] as const,
+    },
+  };
+}
+
+function createSelection(
+  phase: string,
+  recommended_mode: 'inline' | 'subagent',
+  overrides: Partial<AutonomousSelection> = {},
+): AutonomousSelection {
+  const acting_agent_name = recommended_mode === 'subagent' ? 'builder-agent' : 'ralph-loop';
+
+  return {
+    feature_id: 'FEAT-BASE',
+    feature_name: 'Base Feature',
+    phase,
+    reason: 'ready_for_phase',
+    branch_name: phase === '9' ? 'gr/feature/FEAT-BASE' : null,
+    base_branch: 'main',
+    release_notes: phase === '9' ? 'Release notes' : null,
+    prepared_context: createPreparedContext(phase, recommended_mode, acting_agent_name),
+    ...overrides,
+  };
+}
 
 function createClient(overrides: Partial<RuntimeToolClient> = {}): RuntimeToolClient {
   return {
@@ -11,6 +67,7 @@ function createClient(overrides: Partial<RuntimeToolClient> = {}): RuntimeToolCl
       skipped_summary: [],
     })),
     recordSupervisorEvent: vi.fn(async () => undefined),
+    recordPhaseArtifact: vi.fn(async () => undefined),
     recordPhaseResult: vi.fn(async () => undefined),
     archiveFeatureRelease: vi.fn(async () => undefined),
     recordPullRequest: vi.fn(async () => undefined),
@@ -65,13 +122,14 @@ describe('runTick', () => {
     const client = createClient({
       pickNextAutonomousPhase: vi.fn(async () => ({
         selection: {
-          feature_id: 'FEAT-2',
-          feature_name: 'Feature 2',
-          phase: '9',
-          reason: 'merged_and_ready_to_close_release',
-          branch_name: null,
-          base_branch: null,
-          release_notes: null,
+          ...createSelection('9', 'inline', {
+            feature_id: 'FEAT-2',
+            feature_name: 'Feature 2',
+            reason: 'merged_and_ready_to_close_release',
+            branch_name: null,
+            base_branch: null,
+            release_notes: null,
+          }),
         },
         skipped_summary: [],
       })),
@@ -103,13 +161,14 @@ describe('runTick', () => {
     const client = createClient({
       pickNextAutonomousPhase: vi.fn(async () => ({
         selection: {
-          feature_id: 'FEAT-3',
-          feature_name: 'Feature 3',
-          phase: '9',
-          reason: 'merged_and_ready_to_close_release',
-          branch_name: null,
-          base_branch: null,
-          release_notes: null,
+          ...createSelection('9', 'inline', {
+            feature_id: 'FEAT-3',
+            feature_name: 'Feature 3',
+            reason: 'merged_and_ready_to_close_release',
+            branch_name: null,
+            base_branch: null,
+            release_notes: null,
+          }),
         },
         skipped_summary: [],
       })),
@@ -139,13 +198,12 @@ describe('runTick', () => {
     const client = createClient({
       pickNextAutonomousPhase: vi.fn(async () => ({
         selection: {
-          feature_id: 'FEAT-5',
-          feature_name: 'Feature 5',
-          phase: '9',
-          reason: 'ready_for_phase',
-          branch_name: 'gr/feature/FEAT-5',
-          base_branch: 'main',
-          release_notes: 'Release notes',
+          ...createSelection('9', 'inline', {
+            feature_id: 'FEAT-5',
+            feature_name: 'Feature 5',
+            branch_name: 'gr/feature/FEAT-5',
+            release_notes: 'Release notes',
+          }),
         },
         skipped_summary: [],
       })),
@@ -172,13 +230,12 @@ describe('runTick', () => {
     const client = createClient({
       pickNextAutonomousPhase: vi.fn(async () => ({
         selection: {
-          feature_id: 'FEAT-4',
-          feature_name: 'Feature 4',
-          phase: '9',
-          reason: 'ready_for_phase',
-          branch_name: 'gr/feature/FEAT-4',
-          base_branch: 'main',
-          release_notes: 'Added the automated release handoff flow.',
+          ...createSelection('9', 'inline', {
+            feature_id: 'FEAT-4',
+            feature_name: 'Feature 4',
+            branch_name: 'gr/feature/FEAT-4',
+            release_notes: 'Added the automated release handoff flow.',
+          }),
         },
         skipped_summary: [],
       })),
@@ -218,13 +275,12 @@ describe('runTick', () => {
       recordSupervisorEvent,
       pickNextAutonomousPhase: vi.fn(async () => ({
         selection: {
-          feature_id: 'FEAT-6',
-          feature_name: 'Feature 6',
-          phase: '9',
-          reason: 'ready_for_phase',
-          branch_name: 'gr/feature/FEAT-6',
-          base_branch: 'main',
-          release_notes: 'Release notes',
+          ...createSelection('9', 'inline', {
+            feature_id: 'FEAT-6',
+            feature_name: 'Feature 6',
+            branch_name: 'gr/feature/FEAT-6',
+            release_notes: 'Release notes',
+          }),
         },
         skipped_summary: [],
       })),
@@ -234,5 +290,170 @@ describe('runTick', () => {
 
     expect(result.outcome).toBe('failed');
     expect(client.recordReleaseHandoffFailure).not.toHaveBeenCalled();
+  });
+
+  it('routes subagent phases through the child executor and proxies artifacts/results with acting attribution', async () => {
+    const execute = vi.fn(async () => ({
+      summary: 'Builder implementation finished.',
+      outcome: 'completed' as const,
+      next_phase: '6',
+      blockers: [],
+      artifacts: [{ output_type: 'documentation', content: { note: 'done' } }],
+    }));
+    const subagent_executor: SubagentExecutor = {
+      execute,
+    };
+    const client = createClient({
+      pickNextAutonomousPhase: vi.fn(async () => ({
+        selection: createSelection('5', 'subagent', {
+          feature_id: 'FEAT-7',
+          feature_name: 'Feature 7',
+          branch_name: null,
+          release_notes: null,
+        }),
+        skipped_summary: [],
+      })),
+    });
+
+    const result = await runTick(client, 'ralph-loop', '/tmp/project', undefined, subagent_executor);
+
+    expect(result).toMatchObject({
+      outcome: 'completed',
+      summary: 'Completed FEAT-7 phase 5.',
+    });
+    expect(client.pickNextAutonomousPhase).toHaveBeenCalledWith('ralph-loop', {
+      allowed_phases: ['5', '6', '7', '8', '9'],
+      allowed_selection_reasons: ['ready_for_phase', 'merged_and_ready_to_close_release'],
+    });
+    expect(client.recordPhaseArtifact).toHaveBeenCalledWith({
+      feature_id: 'FEAT-7',
+      phase: '5',
+      output_type: 'documentation',
+      content: { note: 'done' },
+      created_by: 'builder-agent',
+    });
+    expect(subagent_executor.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_root: '/tmp/project',
+        supervisor_name: 'ralph-loop',
+        selection: expect.objectContaining({
+          feature_id: 'FEAT-7',
+          phase: '5',
+        }),
+        prompt: expect.stringContaining('You are acting as builder-agent for Odin phase 5: Builder.'),
+      }),
+    );
+    expect(execute.mock.calls[0]?.[0]?.prompt).toContain(
+      '"role_summary": "Role summary for Builder."'
+    );
+    expect(execute.mock.calls[0]?.[0]?.prompt).not.toContain(
+      '"agent": {'
+    );
+    expect(client.recordPhaseResult).toHaveBeenCalledWith({
+      feature_id: 'FEAT-7',
+      phase: '5',
+      outcome: 'completed',
+      next_phase: '6',
+      summary: 'Builder implementation finished.',
+      created_by: 'builder-agent',
+      blockers: [],
+    });
+  });
+
+  it('collapses duplicate artifact slots before proxying them to the runtime', async () => {
+    const subagent_executor: SubagentExecutor = {
+      execute: vi.fn(async () => ({
+        summary: 'Builder implementation finished.',
+        outcome: 'completed',
+        next_phase: '6',
+        blockers: [],
+        artifacts: [
+          { output_type: 'documentation', content: { note: 'first' } },
+          { output_type: 'documentation', content: { note: 'latest' } },
+        ],
+      })),
+    };
+    const client = createClient({
+      pickNextAutonomousPhase: vi.fn(async () => ({
+        selection: createSelection('5', 'subagent', {
+          feature_id: 'FEAT-7B',
+          feature_name: 'Feature 7B',
+          branch_name: null,
+          release_notes: null,
+        }),
+        skipped_summary: [],
+      })),
+    });
+
+    await runTick(client, 'ralph-loop', '/tmp/project', undefined, subagent_executor);
+
+    expect(client.recordPhaseArtifact).toHaveBeenCalledTimes(1);
+    expect(client.recordPhaseArtifact).toHaveBeenCalledWith({
+      feature_id: 'FEAT-7B',
+      phase: '5',
+      output_type: 'documentation',
+      content: { note: 'latest' },
+      created_by: 'builder-agent',
+    });
+  });
+
+  it('returns the recorded blocked subagent outcome instead of flattening it to completed', async () => {
+    const subagent_executor: SubagentExecutor = {
+      execute: vi.fn(async () => ({
+        summary: 'Builder is blocked on missing credentials.',
+        outcome: 'blocked',
+        blockers: ['Missing API credentials'],
+      })),
+    };
+    const client = createClient({
+      pickNextAutonomousPhase: vi.fn(async () => ({
+        selection: createSelection('5', 'subagent', {
+          feature_id: 'FEAT-8',
+          feature_name: 'Feature 8',
+          branch_name: null,
+          release_notes: null,
+        }),
+        skipped_summary: [],
+      })),
+    });
+
+    const result = await runTick(client, 'ralph-loop', '/tmp/project', undefined, subagent_executor);
+
+    expect(result).toMatchObject({
+      outcome: 'blocked',
+      summary: 'Recorded blocked result for FEAT-8 phase 5.',
+    });
+    expect(client.recordPhaseResult).toHaveBeenCalledWith({
+      feature_id: 'FEAT-8',
+      phase: '5',
+      outcome: 'blocked',
+      next_phase: undefined,
+      summary: 'Builder is blocked on missing credentials.',
+      created_by: 'builder-agent',
+      blockers: ['Missing API credentials'],
+    });
+  });
+
+  it('fails without release cleanup when subagent execution is recommended but no child executor is configured', async () => {
+    const client = createClient({
+      pickNextAutonomousPhase: vi.fn(async () => ({
+        selection: createSelection('5', 'subagent', {
+          feature_id: 'FEAT-9',
+          feature_name: 'Feature 9',
+          branch_name: null,
+          release_notes: null,
+        }),
+        skipped_summary: [],
+      })),
+    });
+
+    const result = await runTick(client, 'ralph-loop', '/tmp/project');
+
+    expect(result).toMatchObject({
+      outcome: 'failed',
+      summary: 'Subagent execution is recommended for FEAT-9 phase 5, but Ralph Loop has no child executor configured.',
+    });
+    expect(client.recordReleaseHandoffFailure).not.toHaveBeenCalled();
+    expect(client.recordReleaseCloseoutFailure).not.toHaveBeenCalled();
   });
 });
