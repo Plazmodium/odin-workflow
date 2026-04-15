@@ -87,6 +87,7 @@ In short: **Odin is a feature workflow system, not a sub-task swarm orchestrator
 - **Governed skill proposals** — repeated unresolved learnings surface draft-ready skill candidates with deterministic validation, approval, and project-local publish flow
 - **TLA+ formal verification** — opt-in design verification for state machine specs via tla-precheck
 - **Dashboard support** for claims, watcher verification, security findings, and the 11-phase model
+- **Internal terse execution profile** — Builder / Reviewer / Integrator / Release can use bounded terse operational chatter while PRDs, specs, tasks, docs, changelogs, and release notes stay in normal human-readable prose
 
 ## Prerequisites
 
@@ -153,6 +154,7 @@ Current supported paths:
 - Release auto-PR handoff when `automation.mode: auto_pr` allows it
 - Release closeout after a human merge is recorded
 - Optional child-command execution for phases 5-8 when `--subagent-command-json` / `RALPH_SUBAGENT_COMMAND_JSON` is configured
+- Phase-specific `response_style` hints so internal execution chatter can be terse without turning final artifacts into caveman prose
 
 From the repo root:
 
@@ -161,7 +163,7 @@ npm run ralph:tick -- --project-root /path/to/your/project
 npm run ralph:watch -- --project-root /path/to/your/project --interval-ms 30000
 ```
 
-See `loop/README.md` and `docs/guides/RALPH-LOOP.md` for the operator runbook, child-command protocol, prerequisites, and smoke steps.
+See `loop/README.md` and `docs/guides/RALPH-LOOP.md` for the operator runbook, child-command protocol, response-style behavior, prerequisites, and smoke steps.
 
 For Claude Code / Amp, use:
 
