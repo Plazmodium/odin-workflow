@@ -1,0 +1,51 @@
+name: Validate Release Metadata
+
+on:
+  pull_request:
+    branches:
+      - dev
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+jobs:
+  validate-release-metadata:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate version alignment and changelog coverage
+        shell: bash
+        run: |
+          root_version="$(node -p "require('./package.json').version")"
+          runtime_version="$(node -p "require('./runtime/package.json').version")"
+          loop_version="$(node -p "require('./loop/package.json').version")"
+
+          if [ "$root_version" != "$runtime_version" ]; then
+            echo "Root version ($root_version) and runtime version ($runtime_version) must match." >&2
+            exit 1
+          fi
+
+          changelog_section="$(awk -v version="$root_version" '
+            $0 ~ "^## \\[" version "\\]" { capture=1; next }
+            capture && $0 ~ "^## \\[" { exit }
+            capture { print }
+          ' CHANGELOG.md)"
+
+          if [ -z "$changelog_section" ]; then
+            echo "CHANGELOG.md is missing a section for version ${root_version}." >&2
+            exit 1
+          fi
+
+          if [ -n "$GITHUB_STEP_SUMMARY" ]; then
+            {
+              printf '## Release Metadata Validated\n\n'
+              printf -- '- `odin-workflow`: `%s`\n' "$root_version"
+              printf -- '- `@plazmodium/odin`: `%s`\n' "$runtime_version"
+              printf -- '- `ralph-loop`: `%s`\n\n' "$loop_version"
+              printf 'Detected matching changelog section for `%s`.\n' "$root_version"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
