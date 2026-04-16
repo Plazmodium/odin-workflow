@@ -105,7 +105,7 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
   const currentPhaseRecommendedMode = RECOMMENDED_MODE_BY_PHASE[feature.current_phase];
   const currentPhaseAttestation = executionAttestations.find((attestation) => attestation.phase === feature.current_phase) ?? null;
   const currentPhaseWarning =
-    currentPhasePolicy === 'inline_allowed'
+    executionAttestationsResult.error != null || currentPhasePolicy === 'inline_allowed'
       ? null
       : currentPhaseAttestation == null
         ? `No execution attestation recorded for current phase ${feature.current_phase}.`
