@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 
 import type { PhaseId, PhaseOutcome, SubagentExecutionArtifact, SubagentExecutionRequest, SubagentExecutionResult, SubagentExecutor } from './types.js';
+import { PHASE_IDS } from './types.js';
 
 interface CommandResult {
   code: number | null;
@@ -11,8 +12,6 @@ interface CommandResult {
 
 const SUBAGENT_EXECUTOR_TIMEOUT_MS = 120_000;
 const SUBAGENT_EXECUTOR_MAX_OUTPUT_BYTES = 1_000_000;
-const PHASE_IDS = new Set<PhaseId>(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
-
 /**
  * Get the executable name from a command array.
  *

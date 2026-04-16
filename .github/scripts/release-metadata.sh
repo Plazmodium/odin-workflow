@@ -13,7 +13,7 @@ ensure_versions_match() {
 }
 
 ensure_changelog_header() {
-  if ! grep -Eq "^## \[$root_version\]" CHANGELOG.md; then
+  if ! grep -Fq "## [$root_version]" CHANGELOG.md; then
     echo "CHANGELOG.md is missing a section for version ${root_version}." >&2
     exit 1
   fi
@@ -21,8 +21,8 @@ ensure_changelog_header() {
 
 extract_changelog_section() {
   awk -v version="$root_version" '
-    $0 ~ "^## \\[" version "\\]" { capture=1; next }
-    capture && $0 ~ "^## \\[" { exit }
+    index($0, "## [" version "]") == 1 { capture=1; next }
+    capture && index($0, "## [") == 1 { exit }
     capture { print }
   ' CHANGELOG.md
 }

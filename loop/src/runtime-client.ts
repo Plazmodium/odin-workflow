@@ -24,6 +24,7 @@ import type {
   RuntimeToolClient,
   SkippedSummaryItem,
 } from './types.js';
+import { PHASE_IDS } from './types.js';
 
 interface RuntimeClientOptions {
   project_root: string;
@@ -37,8 +38,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function asString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
-
-const PHASE_IDS = new Set<PhaseId>(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
 
 /**
  * Validate and coerce an arbitrary value to a PhaseId.

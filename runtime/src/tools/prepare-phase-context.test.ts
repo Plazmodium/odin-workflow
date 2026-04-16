@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SkillAdapter } from '../adapters/skills/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
 import type { RuntimeConfig } from '../config.js';
-import type { FeatureRecord, PhaseArtifact } from '../types.js';
+import type { FeatureRecord, PhaseArtifact, PhaseResponseStyle } from '../types.js';
 import { handlePreparePhaseContext } from './prepare-phase-context.js';
 
 function createFeature(): FeatureRecord {
@@ -172,7 +172,7 @@ describe('handlePreparePhaseContext', () => {
             supported_modes: string[];
             recommended_mode: string;
             child_state_strategy: string;
-            response_style: string;
+            response_style: PhaseResponseStyle;
             prompt_sections: string[];
           };
           verification: { required_checks: string[] };
@@ -388,7 +388,7 @@ describe('handlePreparePhaseContext', () => {
             phase_role_name: string;
             acting_agent_name: string;
             recommended_mode: string;
-            response_style: string;
+            response_style: PhaseResponseStyle;
           };
           invocation: { agent_name: string } | null;
         };
@@ -456,7 +456,7 @@ describe('handlePreparePhaseContext', () => {
     const context = (
       result.structuredContent as {
         context?: {
-          execution: { response_style: string; recommended_mode: string };
+          execution: { response_style: PhaseResponseStyle; recommended_mode: string };
         };
       }
     )?.context;
