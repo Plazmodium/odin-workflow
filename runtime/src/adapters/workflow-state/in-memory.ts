@@ -19,6 +19,7 @@ import type {
   PolicyVerdictRecord,
   PersistedTargetType,
   PhaseArtifact,
+  PhaseExecutionAttestation,
   PhaseId,
   PhaseResultRecord,
   QualityGateRecord,
@@ -51,6 +52,7 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
   private readonly policy_verdicts = new Map<string, PolicyVerdictRecord[]>();
   private readonly watcher_reviews = new Map<string, WatcherReviewRecord[]>();
   private readonly invocations = new Map<string, AgentInvocationRecord>();
+  private readonly execution_attestations = new Map<string, PhaseExecutionAttestation>();
   private readonly propagation_targets: Array<{ learning_id: string; target_type: PersistedTargetType; target_path: string | null; relevance: number }> = [];
   private readonly skill_proposals = new Map<string, SkillProposalCandidate>();
   private readonly skill_proposal_records = new Map<string, SkillProposalRecord>();
@@ -431,6 +433,27 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
 
     this.invocations.set(invocation_id, updated);
     return updated;
+  }
+
+  async registerPhaseExecution(attestation: PhaseExecutionAttestation): Promise<PhaseExecutionAttestation> {
+    this.execution_attestations.set(`${attestation.feature_id}:${attestation.phase}`, attestation);
+    this.touchFeature(attestation.feature_id);
+    return attestation;
+  }
+
+  async clearPhaseExecutionAttestation(feature_id: string, phase: PhaseId): Promise<void> {
+    this.execution_attestations.delete(`${feature_id}:${phase}`);
+    this.touchFeature(feature_id);
+  }
+
+  async getPhaseExecutionAttestation(feature_id: string, phase: PhaseId): Promise<PhaseExecutionAttestation | null> {
+    return this.execution_attestations.get(`${feature_id}:${phase}`) ?? null;
+  }
+
+  async listPhaseExecutionAttestations(feature_id: string): Promise<PhaseExecutionAttestation[]> {
+    return Array.from(this.execution_attestations.values())
+      .filter((attestation) => attestation.feature_id === feature_id)
+      .sort((left, right) => left.phase.localeCompare(right.phase, undefined, { numeric: true }));
   }
 
   async recordCommit(commit: Omit<FeatureCommitRecord, 'committed_at'>): Promise<FeatureCommitRecord> {

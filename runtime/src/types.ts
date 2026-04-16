@@ -77,6 +77,13 @@ export const AUTONOMY_BOARD_STATUSES = [
 ] as const;
 export const AUTONOMY_SELECTION_REASONS = ['ready_for_phase', 'merged_and_ready_to_close_release'] as const;
 export const SUPERVISOR_EVENT_TYPES = ['tick_started', 'tick_selected', 'tick_noop', 'tick_failed', 'tick_completed'] as const;
+export const PHASE_EXECUTION_POLICIES = [
+  'inline_allowed',
+  'distinct_session_preferred',
+  'distinct_session_required',
+] as const;
+export const PHASE_EXECUTION_PROOF_STATUSES = ['none', 'attested', 'verified'] as const;
+export const PHASE_EXECUTION_ATTESTATION_SOURCES = ['harness', 'runtime_inferred'] as const;
 
 export type PhaseId = (typeof PHASE_IDS)[number];
 export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
@@ -98,6 +105,9 @@ export type AutomationMergeStrategy = (typeof AUTOMATION_MERGE_STRATEGIES)[numbe
 export type AutonomyBoardStatus = (typeof AUTONOMY_BOARD_STATUSES)[number];
 export type AutonomySelectionReason = (typeof AUTONOMY_SELECTION_REASONS)[number];
 export type SupervisorEventType = (typeof SUPERVISOR_EVENT_TYPES)[number];
+export type PhaseExecutionPolicy = (typeof PHASE_EXECUTION_POLICIES)[number];
+export type PhaseExecutionProofStatus = (typeof PHASE_EXECUTION_PROOF_STATUSES)[number];
+export type PhaseExecutionAttestationSource = (typeof PHASE_EXECUTION_ATTESTATION_SOURCES)[number];
 
 export type PersistedTargetType = 'skill' | 'agent_definition' | 'agents_md';
 
@@ -482,6 +492,30 @@ export type PhaseChildStateStrategy =
   | 'direct_odin_tools_if_available'
   | 'return_intent_to_parent';
 
+interface PhaseExecutionAttestationBase {
+  feature_id: string;
+  phase: PhaseId;
+  execution_policy: PhaseExecutionPolicy;
+  recommended_mode: PhaseExecutionMode;
+  actual_mode: PhaseExecutionMode;
+  supervisor_session_id: string | null;
+  worker_session_id: string | null;
+  harness_run_id: string | null;
+  recorded_at: string;
+}
+
+export type PhaseExecutionAttestation =
+  | (PhaseExecutionAttestationBase & {
+      proof_status: 'none';
+      attested_by: null;
+      attestation_source: null;
+    })
+  | (PhaseExecutionAttestationBase & {
+      proof_status: 'attested' | 'verified';
+      attested_by: string;
+      attestation_source: PhaseExecutionAttestationSource;
+    });
+
 export type PhasePromptSection =
   | 'phase'
   | 'role_summary'
@@ -513,6 +547,7 @@ export interface PhaseExecutionContract {
   child_agent_role: 'acts_as_phase_role';
   supported_modes: PhaseExecutionMode[];
   recommended_mode: PhaseExecutionMode;
+  execution_policy: PhaseExecutionPolicy;
   child_state_strategy: PhaseChildStateStrategy;
   response_style: PhaseResponseStyle;
   prompt_sections: PhasePromptSection[];

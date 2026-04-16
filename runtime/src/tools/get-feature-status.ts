@@ -8,6 +8,7 @@ import type { RuntimeConfig } from '../config.js';
 import { resolveAutomationDecision } from '../domain/automation-policy.js';
 import { deriveAutonomyFeatureState } from '../domain/autonomous-pickup.js';
 import { buildDevelopmentEvalContext } from '../domain/development-evals.js';
+import { assessPhaseExecutionPolicy, summarizePhaseExecutionStatus } from '../domain/execution-policy.js';
 import { getNextPhaseId, getPhaseContract } from '../domain/phases.js';
 import { formatOpenGateSummary } from '../domain/quality-gates.js';
 import type { GetFeatureStatusInput } from '../schemas.js';
@@ -82,6 +83,7 @@ export async function handleGetFeatureStatus(
     claim_verification,
     claims_needing_review,
     invocations,
+    execution_attestations,
     latest_feature_eval,
   ] =
     await Promise.all([
@@ -95,6 +97,7 @@ export async function handleGetFeatureStatus(
       adapter.listClaimVerificationStatus(input.feature_id),
       adapter.listClaimsNeedingReview(input.feature_id),
       adapter.listAgentInvocations(input.feature_id),
+      adapter.listPhaseExecutionAttestations(input.feature_id),
       adapter.getLatestFeatureEval(input.feature_id),
     ]);
 
@@ -105,6 +108,11 @@ export async function handleGetFeatureStatus(
   const open_gates = open_gate_records.map(formatOpenGateSummary);
   const development_evals = buildDevelopmentEvalContext(feature, feature.current_phase, artifacts, open_gate_records);
   const invocation_coverage = buildInvocationCoverage(invocations);
+  const execution_status = summarizePhaseExecutionStatus(execution_attestations);
+  const current_phase_execution = assessPhaseExecutionPolicy(
+    feature.current_phase,
+    execution_attestations.find((attestation) => attestation.phase === feature.current_phase) ?? null,
+  );
   const automation = resolveAutomationDecision({
     config,
     feature,
@@ -160,10 +168,14 @@ export async function handleGetFeatureStatus(
           passed: claim_verification.filter((claim) => claim.final_status === 'PASS').length,
           failed: claim_verification.filter((claim) => claim.final_status === 'FAIL').length,
           needs_review: claim_verification.filter((claim) => claim.final_status === 'NEEDS_REVIEW').length,
-        pending: claim_verification.filter((claim) => claim.final_status === 'PENDING').length,
+          pending: claim_verification.filter((claim) => claim.final_status === 'PENDING').length,
+        },
+        invocation_coverage,
       },
-      invocation_coverage,
-    },
+      phase_execution: {
+        current_phase: current_phase_execution,
+        summary: execution_status,
+      },
       development_evals,
       latest_feature_eval,
       latest_review_check,

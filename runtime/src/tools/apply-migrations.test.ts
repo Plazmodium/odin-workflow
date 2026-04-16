@@ -10,6 +10,7 @@ import { bootstrapExistingSchema, createSqlExecutor, describeSupabaseManagementA
 
 const tools_dir = dirname(fileURLToPath(import.meta.url));
 const bundled_migration_011_path = resolve(tools_dir, '../../migrations/011_complete_feature_phase_coverage.sql');
+const bundled_migration_012_path = resolve(tools_dir, '../../migrations/012_phase_execution_attestations.sql');
 
 function resolveCanonicalMigration011Path(): string {
   const candidates = [
@@ -20,6 +21,20 @@ function resolveCanonicalMigration011Path(): string {
   const match = candidates.find((candidate) => existsSync(candidate));
   if (match == null) {
     throw new Error(`Could not find canonical migration 011 at any expected path: ${candidates.join(', ')}`);
+  }
+
+  return match;
+}
+
+function resolveCanonicalMigration012Path(): string {
+  const candidates = [
+    resolve(tools_dir, '../../../../database/supabase-migrations/012_phase_execution_attestations.sql'),
+    resolve(tools_dir, '../../../migrations/012_phase_execution_attestations.sql'),
+  ];
+
+  const match = candidates.find((candidate) => existsSync(candidate));
+  if (match == null) {
+    throw new Error(`Could not find canonical migration 012 at any expected path: ${candidates.join(', ')}`);
   }
 
   return match;
@@ -106,6 +121,7 @@ describe('bootstrapExistingSchema', () => {
           { tablename: 'agent_claims' },
           { tablename: 'skill_proposal_candidates' },
           { tablename: 'skill_proposals' },
+          { tablename: 'phase_execution_attestations' },
         ],
       },
       { rows: [] },
@@ -117,6 +133,7 @@ describe('bootstrapExistingSchema', () => {
       { name: '008_related_learnings.sql' },
       { name: '009_skill_proposal_candidates.sql' },
       { name: '010_skill_proposals.sql' },
+      { name: '012_phase_execution_attestations.sql' },
     ]);
 
     expect(result.bootstrapped).toEqual([
@@ -125,6 +142,7 @@ describe('bootstrapExistingSchema', () => {
       '008_related_learnings.sql',
       '009_skill_proposal_candidates.sql',
       '010_skill_proposals.sql',
+      '012_phase_execution_attestations.sql',
     ]);
   });
 });
@@ -135,6 +153,16 @@ describe('migration 011', () => {
     const canonical_sql = readFileSync(resolveCanonicalMigration011Path(), 'utf8');
 
     expect(bundled_sql).toContain('DROP FUNCTION IF EXISTS get_feature_status(TEXT);');
+    expect(bundled_sql).toBe(canonical_sql);
+  });
+});
+
+describe('migration 012', () => {
+  it('stays aligned with the canonical SQL', () => {
+    const bundled_sql = readFileSync(bundled_migration_012_path, 'utf8');
+    const canonical_sql = readFileSync(resolveCanonicalMigration012Path(), 'utf8');
+
+    expect(bundled_sql).toContain('CREATE TABLE phase_execution_attestations');
     expect(bundled_sql).toBe(canonical_sql);
   });
 });

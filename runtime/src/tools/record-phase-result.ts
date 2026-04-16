@@ -6,6 +6,7 @@
 import type { ArchiveAdapter } from '../adapters/archive/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
 import { resolveWorkflowActorName } from '../domain/actors.js';
+import { assessPhaseExecutionPolicy } from '../domain/execution-policy.js';
 import { getNextPhaseId, getPhaseContract } from '../domain/phases.js';
 import { completeTaskArtifactContent } from '../domain/tasks.js';
 import type { RecordPhaseResultInput } from '../schemas.js';
@@ -68,6 +69,16 @@ export async function handleRecordPhaseResult(
     input.outcome === 'completed' ? input.next_phase ?? getNextPhaseId(input.phase) : input.next_phase ?? null;
   const workflow_actor = resolveWorkflowActorName(input.phase, input.created_by);
   const completing_feature = input.phase === '9' && input.outcome === 'completed' && next_phase === '10';
+  const execution_attestation = await adapter.getPhaseExecutionAttestation(input.feature_id, input.phase);
+  const execution_assessment = assessPhaseExecutionPolicy(input.phase, execution_attestation);
+
+  if (execution_assessment.error != null) {
+    return createErrorResult(execution_assessment.error, {
+      feature_id: input.feature_id,
+      phase: input.phase,
+      execution: execution_assessment.row,
+    });
+  }
 
   if (completing_feature && feature.merged_at == null) {
     return createErrorResult(
@@ -212,10 +223,15 @@ export async function handleRecordPhaseResult(
   }
 
   return createTextResult(
-    `Recorded ${input.outcome} result for phase ${input.phase} on feature ${input.feature_id}.`,
+    execution_assessment.warning == null
+      ? `Recorded ${input.outcome} result for phase ${input.phase} on feature ${input.feature_id}.`
+      : `Recorded ${input.outcome} result for phase ${input.phase} on feature ${input.feature_id}. Warning: ${execution_assessment.warning}`,
     {
       feature: updated_feature,
       next_phase,
+      execution: {
+        ...execution_assessment,
+      },
       ...(feature_eval != null ? { feature_eval } : {}),
       ...(auto_archive != null ? { auto_archive } : {}),
     }

@@ -77,6 +77,10 @@ export type VerificationStatus = 'PENDING' | 'PASS' | 'FAIL' | 'NEEDS_REVIEW';
 export type FindingSeverity = 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+export type PhaseExecutionMode = 'inline' | 'subagent';
+export type PhaseExecutionPolicy = 'inline_allowed' | 'distinct_session_preferred' | 'distinct_session_required';
+export type PhaseExecutionProofStatus = 'none' | 'attested' | 'verified';
+export type PhaseExecutionAttestationSource = 'harness' | 'runtime_inferred';
 
 // ============================================================
 // Core table row types
@@ -307,6 +311,22 @@ export interface AgentInvocation {
   notes: string | null;
   // Skills tracking (Migration 024)
   skills_used: string[] | null;
+}
+
+export interface PhaseExecutionAttestation {
+  feature_id: string;
+  phase: Phase;
+  execution_policy: PhaseExecutionPolicy;
+  recommended_mode: PhaseExecutionMode;
+  actual_mode: PhaseExecutionMode;
+  proof_status: PhaseExecutionProofStatus;
+  supervisor_session_id: string | null;
+  worker_session_id: string | null;
+  harness_run_id: string | null;
+  attested_by: string | null;
+  attestation_source: PhaseExecutionAttestationSource | null;
+  recorded_at: string;
+  updated_at: string;
 }
 
 export interface IterationTracking {

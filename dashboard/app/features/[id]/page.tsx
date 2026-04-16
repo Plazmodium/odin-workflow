@@ -7,6 +7,7 @@ import {
   getPhaseDurations,
   getAgentDurations,
   getAgentInvocations,
+  getPhaseExecutionAttestations,
   getQualityGates,
   getBlockers,
   getFeatureEval,
@@ -40,6 +41,34 @@ import { Badge } from '@/components/ui/badge';
 import { formatConfidence } from '@/lib/utils';
 import Link from 'next/link';
 
+const EXECUTION_POLICY_BY_PHASE = {
+  '0': 'inline_allowed',
+  '1': 'inline_allowed',
+  '2': 'inline_allowed',
+  '3': 'inline_allowed',
+  '4': 'inline_allowed',
+  '5': 'distinct_session_preferred',
+  '6': 'distinct_session_preferred',
+  '7': 'distinct_session_preferred',
+  '8': 'inline_allowed',
+  '9': 'inline_allowed',
+  '10': 'inline_allowed',
+} as const;
+
+const RECOMMENDED_MODE_BY_PHASE = {
+  '0': 'inline',
+  '1': 'inline',
+  '2': 'inline',
+  '3': 'inline',
+  '4': 'inline',
+  '5': 'subagent',
+  '6': 'subagent',
+  '7': 'subagent',
+  '8': 'subagent',
+  '9': 'inline',
+  '10': 'inline',
+} as const;
+
 interface FeatureDetailPageProps {
   params: Promise<{ id: string }>;
 }
@@ -50,11 +79,12 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
   const feature = await getFeatureStatus(id);
   if (!feature) notFound();
 
-  const [phases, agentDurationsResult, invocations, gates, blockers, eval_, learnings, transitions, iterations, commits, auditLog, phaseOutputs, archive, claims, claimsSummary, securityFindings, securitySummary] =
+  const [phases, agentDurationsResult, invocations, executionAttestationsResult, gates, blockers, eval_, learnings, transitions, iterations, commits, auditLog, phaseOutputs, archive, claims, claimsSummary, securityFindings, securitySummary] =
     await Promise.all([
       getPhaseDurations(id),
       getAgentDurations(id),
       getAgentInvocations(id),
+      getPhaseExecutionAttestations(id),
       getQualityGates(id),
       getBlockers(id),
       getFeatureEval(id),
@@ -70,6 +100,21 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
       getSecurityFindings(id),
       getSecuritySummary(id),
     ]);
+  const executionAttestations = executionAttestationsResult.attestations;
+  const currentPhasePolicy = EXECUTION_POLICY_BY_PHASE[feature.current_phase];
+  const currentPhaseRecommendedMode = RECOMMENDED_MODE_BY_PHASE[feature.current_phase];
+  const currentPhaseAttestation = executionAttestations.find((attestation) => attestation.phase === feature.current_phase) ?? null;
+  const currentPhaseWarning =
+    currentPhasePolicy === 'inline_allowed'
+      ? null
+      : currentPhaseAttestation == null
+        ? `No execution attestation recorded for current phase ${feature.current_phase}.`
+        : currentPhaseAttestation.actual_mode !== 'subagent' ||
+            currentPhaseAttestation.worker_session_id == null ||
+            currentPhaseAttestation.supervisor_session_id == null ||
+            currentPhaseAttestation.worker_session_id === currentPhaseAttestation.supervisor_session_id
+          ? `Current phase ${feature.current_phase} prefers a distinct worker session, but the recorded attestation does not prove one.`
+          : null;
 
   return (
     <>
@@ -119,6 +164,55 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
           </CardHeader>
           <CardContent>
             <AgentProfiler durations={agentDurationsResult.durations} error={agentDurationsResult.error} claimsSummary={claimsSummary} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Phase Execution</CardTitle>
+            <CardDescription>
+              Expected policy vs attested execution mode for the current phase.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">Policy: {currentPhasePolicy}</Badge>
+              <Badge variant="outline">Recommended: {currentPhaseRecommendedMode}</Badge>
+              <Badge variant={currentPhaseAttestation == null ? 'outline' : 'secondary'}>
+                Actual: {currentPhaseAttestation?.actual_mode ?? 'not recorded'}
+              </Badge>
+              <Badge variant={currentPhaseAttestation?.proof_status === 'attested' || currentPhaseAttestation?.proof_status === 'verified' ? 'secondary' : 'outline'}>
+                Proof: {currentPhaseAttestation?.proof_status ?? 'none'}
+              </Badge>
+            </div>
+            {currentPhaseAttestation != null && (
+              <div className="space-y-1 text-muted-foreground">
+                <p>Supervisor session: {currentPhaseAttestation.supervisor_session_id ?? 'n/a'}</p>
+                <p>Worker session: {currentPhaseAttestation.worker_session_id ?? 'n/a'}</p>
+                <p>Attested by: {currentPhaseAttestation.attested_by ?? 'n/a'}</p>
+              </div>
+            )}
+            {currentPhaseWarning != null && (
+              <p className="text-amber-600 dark:text-amber-400">{currentPhaseWarning}</p>
+            )}
+            {executionAttestationsResult.error != null && (
+              <p className="text-amber-600 dark:text-amber-400">{executionAttestationsResult.error}</p>
+            )}
+            {executionAttestations.length > 0 && (
+              <div className="space-y-2 border-t pt-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Recorded attestations</p>
+                <div className="space-y-2">
+                  {executionAttestations.map((attestation) => (
+                    <div key={`${attestation.feature_id}:${attestation.phase}`} className="flex flex-wrap items-center gap-2 text-xs">
+                      <Badge variant="outline">Phase {attestation.phase}</Badge>
+                      <span>{attestation.actual_mode}</span>
+                      <span className="text-muted-foreground">proof: {attestation.proof_status}</span>
+                      <span className="text-muted-foreground">by {attestation.attested_by ?? 'n/a'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

@@ -36,6 +36,13 @@ Odin uses a **hybrid orchestration** model:
 
 If a harness applies an internal terse execution style for operational chatter, that does **not** change the readability requirement for final artifacts. PRDs, specs, tasks, docs, changelogs, and release notes should still follow their normal templates and human-readable prose.
 
+If the harness exposes execution guidance, keep these distinctions straight:
+
+- `recommended_mode` = harness guidance
+- `execution_policy` = runtime enforcement level
+- invocation lifecycle telemetry = timing/ownership bookkeeping, not distinct-session proof
+- `odin.register_phase_execution(...)` = attested proof of actual mode plus supervisor/worker session linkage
+
 ---
 
 ## State Changes Required — Template

@@ -15,6 +15,7 @@ import type {
   Learning,
   PhaseTransition,
   IterationTracking,
+  PhaseExecutionAttestation,
   PhaseOutput,
 } from '@/lib/types/database';
 
@@ -23,8 +24,17 @@ export interface AgentDurationsResult {
   error: string | null;
 }
 
+export interface PhaseExecutionAttestationsResult {
+  attestations: PhaseExecutionAttestation[];
+  error: string | null;
+}
+
 function formatMissingRpcError(functionName: string): string {
   return `RPC function ${functionName} is missing in Supabase. Apply the latest migrations and verify the function exists.`;
+}
+
+function formatMissingTableError(tableName: string): string {
+  return `Table ${tableName} is missing in Supabase. Apply migration 012_phase_execution_attestations.sql and verify the table exists.`;
 }
 
 export async function getFeatureStatus(
@@ -244,6 +254,30 @@ export async function getAgentInvocations(
     .order('started_at', { ascending: true });
   if (error || !data) return [];
   return data as AgentInvocation[];
+}
+
+export async function getPhaseExecutionAttestations(
+  featureId: string
+): Promise<PhaseExecutionAttestationsResult> {
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from('phase_execution_attestations')
+    .select('*')
+    .eq('feature_id', featureId)
+    .order('phase', { ascending: true });
+  if (error) {
+    const isMissingTable = error.message.includes('relation "phase_execution_attestations" does not exist');
+    return {
+      attestations: [],
+      error: isMissingTable ? formatMissingTableError('phase_execution_attestations') : error.message,
+    };
+  }
+
+  if (!data) {
+    return { attestations: [], error: null };
+  }
+
+  return { attestations: data as PhaseExecutionAttestation[], error: null };
 }
 
 export async function getIterationTracking(

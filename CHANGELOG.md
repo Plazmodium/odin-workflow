@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.6.2-beta] - 2026-04-16
+
+### Added
+
+- Odin now exposes strict phase execution semantics through `execution_policy`, persisted phase execution attestations, and the new `odin.register_phase_execution` / `odin.clear_phase_execution` runtime tools.
+- `odin.get_feature_status` and the dashboard feature-detail page now show expected policy vs actual mode vs attested proof so live projects can audit whether a distinct phase-owned worker actually ran.
+
+### Changed
+
+- `record_phase_result` now soft-warns when preferred distinct-session execution is missing and is ready to hard-reject when a phase policy is elevated to `distinct_session_required`.
+- Ralph Loop now records actual inline/subagent execution mode and clears stale attestations on failed attempts.
+- Runtime migrations now include `012_phase_execution_attestations.sql` in both the bundled runtime migrations and the top-level public migrations folder.
+- Root package version, runtime package version, runtime MCP server version, root README badge, and Ralph Loop version updated for this release.
+
 ## [0.6.1-beta] - 2026-04-15
 
 ### Added

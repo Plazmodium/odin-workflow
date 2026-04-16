@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SkillAdapter } from '../adapters/skills/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
 import type { RuntimeConfig } from '../config.js';
-import type { FeatureRecord, PhaseArtifact, PhaseResponseStyle } from '../types.js';
+import type { FeatureRecord, PhaseArtifact, PhaseExecutionPolicy, PhaseResponseStyle } from '../types.js';
 import { handlePreparePhaseContext } from './prepare-phase-context.js';
 
 function createFeature(): FeatureRecord {
@@ -171,6 +171,7 @@ describe('handlePreparePhaseContext', () => {
             child_agent_role: string;
             supported_modes: string[];
             recommended_mode: string;
+            execution_policy: PhaseExecutionPolicy;
             child_state_strategy: string;
             response_style: PhaseResponseStyle;
             prompt_sections: string[];
@@ -207,6 +208,7 @@ describe('handlePreparePhaseContext', () => {
         child_agent_role: 'acts_as_phase_role',
         supported_modes: ['inline', 'subagent'],
         recommended_mode: 'subagent',
+        execution_policy: 'distinct_session_preferred',
         child_state_strategy: 'direct_odin_tools_if_available',
         response_style: 'terse_execution',
       },

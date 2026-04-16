@@ -287,6 +287,7 @@ If a harness spawns a child agent, that child is acting as the current Odin phas
 
 - `supported_modes` - currently `inline` and `subagent`
 - `recommended_mode` - guidance only; not enforcement
+- `execution_policy` - whether inline execution is allowed, distinct sessions are preferred, or distinct sessions are required
 - `child_state_strategy` - whether the harness should prefer direct `odin.*` calls from the child when available or have the child return intent to the parent session
 - `response_style` - whether internal execution chatter should stay `normal` or use `terse_execution`
 - `prompt_sections` - the fields the harness should keep in the active prompt
@@ -310,11 +311,19 @@ Canonical harness flow:
 3. Choose execution mode:
    - inline: parent session performs the phase work directly
    - subagent: parent session spawns a child that acts as the current Odin phase role
-4. Record artifacts, claims, checks, and gates through odin.* tools as work happens.
-5. Close the phase with odin.record_phase_result(...).
+4. Record the actual mode with `odin.register_phase_execution(...)` when you want auditable phase ownership.
+5. Record artifacts, claims, checks, and gates through odin.* tools as work happens.
+6. Close the phase with odin.record_phase_result(...).
 ```
 
 If the child agent cannot call `odin.*` directly, keep the same flow but have the child return a clear `State Changes Required` section and the parent session performs those calls on the child's behalf. When proxying, pass `context.execution.acting_agent_name` through to tool fields such as `agent_name` and `created_by` so attribution and invocation tracking stay aligned with the prepared phase context.
+
+Execution attestation rules:
+
+- invocation open/close telemetry is not proof of distinct-session execution
+- `odin.register_phase_execution(...)` records the harness-attested actual mode plus supervisor/worker session linkage
+- `odin.record_phase_result(...)` may warn or reject based on `execution_policy`
+- `odin.get_feature_status(...)` exposes expected vs actual vs proven execution state for auditing
 
 `response_style` is a bounded internal execution hint, not a global constitution change:
 

@@ -18,6 +18,7 @@ Current supported execution paths:
 3. **Optional child-command execution for phases 5-8**
    - enabled with `RALPH_SUBAGENT_COMMAND_JSON` or `--subagent-command-json`
    - Ralph Loop spawns the configured child command
+   - Ralph Loop records `odin.register_phase_execution(...)` so Odin can audit actual mode and attested session linkage
    - the child returns artifacts and a final phase outcome on stdout
    - Ralph Loop proxies `odin.record_phase_artifact` / `odin.record_phase_result` from the parent session using `context.execution.acting_agent_name`
    - Ralph Loop also respects `context.execution.response_style` so internal execution chatter can be terse without changing final artifact templates
@@ -85,6 +86,7 @@ The child command receives JSON on stdin:
         "execution": {
           "acting_agent_name": "builder-agent",
           "recommended_mode": "subagent",
+          "execution_policy": "distinct_session_preferred",
           "response_style": "terse_execution"
         }
       }
@@ -114,6 +116,8 @@ It must return JSON on stdout:
 ```
 
 Ralph Loop then proxies the returned artifacts and phase result through `odin.*` using `selection.prepared_context.execution.acting_agent_name` for `created_by`.
+
+It also records `odin.register_phase_execution(...)` before execution so Odin can tell whether a phase was run inline or by an attested child session.
 
 When `selection.prepared_context.execution.response_style = terse_execution`, Ralph Loop adds terse operational-style instructions to the child prompt. This applies to execution chatter and summaries only. Final artifacts are still expected to follow the normal human-readable templates for the phase.
 
