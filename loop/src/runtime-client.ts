@@ -280,10 +280,7 @@ function extractPreparedContext(context: Record<string, unknown> | null): Prepar
  * @throws Error if no runtime server file is found among the expected candidates
  */
 async function resolveRuntimeServerPath(cwd: string): Promise<string> {
-  const candidates = [
-    resolve(cwd, '../runtime/dist/server.js'),
-    resolve(cwd, '../mcp-servers/odin-runtime/dist/server.js'),
-  ];
+  const candidates = [resolve(cwd, '../runtime/dist/server.js')];
 
   for (const candidate of candidates) {
     try {
