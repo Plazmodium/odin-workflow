@@ -34,6 +34,8 @@ Odin uses a **hybrid orchestration** model:
 
 **Your responsibility**: If you cannot call `odin.*` directly, end your artifact with a `## State Changes Required` section listing the calls the orchestrator should proxy.
 
+If a harness applies an internal terse execution style for operational chatter, that does **not** change the readability requirement for final artifacts. PRDs, specs, tasks, docs, changelogs, and release notes should still follow their normal templates and human-readable prose.
+
 ---
 
 ## State Changes Required — Template

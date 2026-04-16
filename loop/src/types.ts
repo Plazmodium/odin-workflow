@@ -1,6 +1,10 @@
 export type PhaseId = string;
 
+export const PHASE_IDS = new Set<PhaseId>(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']);
+
 export type PhaseExecutionMode = 'inline' | 'subagent';
+
+export type PhaseResponseStyle = 'normal' | 'terse_execution';
 
 export type PhaseChildStateStrategy = 'direct_odin_tools_if_available' | 'return_intent_to_parent';
 
@@ -50,6 +54,7 @@ export interface PreparedPhaseContext {
     supported_modes: PhaseExecutionMode[];
     recommended_mode: PhaseExecutionMode;
     child_state_strategy: PhaseChildStateStrategy;
+    response_style: PhaseResponseStyle;
     prompt_sections: PhasePromptSection[];
   };
 }

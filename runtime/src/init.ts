@@ -398,6 +398,13 @@ function isMcpJsonTool(tool: HarnessTool): boolean {
   return tool === 'claude-code' || tool === 'amp';
 }
 
+/**
+ * Print a harness MCP configuration snippet and concise eval-aware orchestration tips for a given tool and distribution.
+ *
+ * @param projectRoot - Absolute path to the project root; used when generating the snippet
+ * @param tool - Target harness tool (e.g., `opencode`, `claude-code`, `amp`, `codex`, `generic`)
+ * @param distribution - Distribution mode that affects the generated command spec (`published` or `source`)
+ */
 function printHarnessSnippet(projectRoot: string, tool: HarnessTool, distribution: DistributionMode): void {
   const target = tool === 'opencode'
     ? 'opencode.json'

@@ -1,0 +1,68 @@
+name: Publish Release On Main
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  publish-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect release-surface changes
+        id: changed
+        shell: bash
+        run: |
+          before="${{ github.event.before }}"
+
+          if [ "$before" = "0000000000000000000000000000000000000000" ]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git rev-parse --verify "$before" >/dev/null 2>&1; then
+            changed_files="$(git diff --name-only "$before" "$GITHUB_SHA")"
+          else
+            changed_files="$(git show --name-only --pretty='' "$GITHUB_SHA")"
+          fi
+
+          if printf '%s\n' "$changed_files" | grep -Eq '^(package\.json|runtime/package\.json|loop/package\.json|CHANGELOG\.md)$'; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build release metadata from merged versions
+        if: steps.changed.outputs.should_release == 'true'
+        id: meta
+        shell: bash
+        run: |
+          chmod +x .github/scripts/release-metadata.sh
+          ./.github/scripts/release-metadata.sh export "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub release
+        if: steps.changed.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag="${{ steps.meta.outputs.tag }}"
+          release_name="${{ steps.meta.outputs.release_name }}"
+          notes_file="${{ steps.meta.outputs.notes_file }}"
+
+          # Project policy: beta semver tags still publish as normal GitHub releases
+          # so the repository's Latest release panel tracks the newest shipped line.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" --title "$release_name" --notes-file "$notes_file" --latest
+          else
+            gh release create "$tag" --target "$GITHUB_SHA" --title "$release_name" --notes-file "$notes_file" --latest
+          fi

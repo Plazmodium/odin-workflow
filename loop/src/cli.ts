@@ -6,6 +6,12 @@ import { createCommandSubagentExecutor } from './subagent-command.js';
 import { runTick } from './tick.js';
 import { runWatchLoop } from './watch.js';
 
+/**
+ * Print the CLI usage and available command examples for the Ralph Loop tool to standard output.
+ *
+ * The message documents how to run the `tick` and `watch` commands and shows examples including
+ * the `--project-root`, `--interval-ms`, and `--subagent-command-json` options.
+ */
 function printHelp(): void {
   console.log(`Ralph Loop
 
@@ -16,6 +22,17 @@ Usage:
 `);
 }
 
+/**
+ * CLI entrypoint that parses command-line arguments and dispatches the requested command.
+ *
+ * Loads configuration from the provided argv and environment, connects a runtime client, and optionally
+ * creates a subagent executor from configuration. Handles the `tick` command by running a single
+ * supervisor tick, logging its outcome and setting `process.exitCode` to `1` on failure or `0` on success.
+ * Handles the `watch` command by starting a continuous watch loop (the runtime client is intentionally
+ * left open for the duration of the watch). If no command or `--help`/`-h` is provided, prints help and exits.
+ *
+ * @throws Error if the provided command is not recognized
+ */
 async function main(): Promise<void> {
   const [, , command, ...args] = process.argv;
 

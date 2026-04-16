@@ -40,6 +40,7 @@ npm pack --dry-run
 ```
 
 Confirm the package includes:
+
 - `dist/cli.js`
 - `dist/server.js`
 - `dist/init.js`
@@ -50,6 +51,7 @@ Confirm the package includes:
 - `README.md`
 
 Confirm the package does not include:
+
 - local `.env` files
 - editor files
 - unrelated repo content

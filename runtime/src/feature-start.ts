@@ -246,6 +246,12 @@ function extractFeature(structuredContent: unknown): FeatureRecord {
   return feature as unknown as FeatureRecord;
 }
 
+/**
+ * Creates and connects a FeatureStartClient configured to run the Odin runtime for the specified project root.
+ *
+ * @param projectRoot - Absolute path to the target project directory; used as the runtime working directory and provided to the runtime via the `ODIN_PROJECT_ROOT` environment variable.
+ * @returns A connected FeatureStartClient exposing `startFeature(input)` to invoke the runtime's feature-start tool and `close()` to shut down the underlying transport.
+ */
 export async function connectFeatureStartClient(projectRoot: string): Promise<FeatureStartClient> {
   const transport = new StdioClientTransport({
     command: process.execPath,
@@ -258,7 +264,7 @@ export async function connectFeatureStartClient(projectRoot: string): Promise<Fe
   });
   const client = new Client({
     name: 'odin-feature-start',
-    version: '0.6.0-beta',
+    version: '0.6.1-beta',
   });
   await client.connect(transport);
 
