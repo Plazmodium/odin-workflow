@@ -19,6 +19,44 @@ function createFeature(overrides: Partial<FeatureRecord> = {}): FeatureRecord {
 }
 
 describe('handleRegisterPhaseExecution', () => {
+  it('returns an error when the feature does not exist', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => null),
+      registerPhaseExecution: vi.fn(),
+    } as unknown as WorkflowStateAdapter;
+
+    const result = await handleRegisterPhaseExecution(adapter, {
+      feature_id: 'MISSING',
+      phase: '5',
+      actual_mode: 'inline',
+      supervisor_session_id: 'ralph-loop:run-1',
+      attested_by: 'ralph-loop',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('Feature MISSING was not found');
+    expect(adapter.registerPhaseExecution).not.toHaveBeenCalled();
+  });
+
+  it('returns an error when the requested phase is not the current phase', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => createFeature({ current_phase: '6' })),
+      registerPhaseExecution: vi.fn(),
+    } as unknown as WorkflowStateAdapter;
+
+    const result = await handleRegisterPhaseExecution(adapter, {
+      feature_id: 'FEAT-EXEC',
+      phase: '5',
+      actual_mode: 'inline',
+      supervisor_session_id: 'ralph-loop:run-1',
+      attested_by: 'ralph-loop',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('is currently in phase 6, not 5');
+    expect(adapter.registerPhaseExecution).not.toHaveBeenCalled();
+  });
+
   it('records an attested inline execution row', async () => {
     const adapter: WorkflowStateAdapter = {
       getFeature: vi.fn(async () => createFeature()),

@@ -146,7 +146,7 @@ describe('bootstrapExistingSchema', () => {
     ]);
   });
 
-  it('still bootstraps migration 012 when the attestation table exists without later repair objects', async () => {
+  it('leaves repair migration 013 pending when only the attestation table exists', async () => {
     const executor = createExecutor([
       {
         rows: [{
@@ -167,9 +167,11 @@ describe('bootstrapExistingSchema', () => {
       { name: '009_skill_proposal_candidates.sql' },
       { name: '010_skill_proposals.sql' },
       { name: '012_phase_execution_attestations.sql' },
+      { name: '013_phase_execution_attestations_repairs.sql' },
     ]);
 
     expect(result.bootstrapped).toContain('012_phase_execution_attestations.sql');
+    expect(result.bootstrapped).not.toContain('013_phase_execution_attestations_repairs.sql');
   });
 });
 

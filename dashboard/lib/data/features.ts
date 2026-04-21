@@ -84,8 +84,10 @@ function assessCurrentPhaseExecution(
   attestation: PhaseExecutionAttestation | null,
   error: string | null,
 ) {
-  const execution_policy = EXECUTION_POLICY_BY_PHASE[currentPhase];
-  const recommended_mode = RECOMMENDED_MODE_BY_PHASE[currentPhase];
+  const execution_policy =
+    attestation?.execution_policy ?? EXECUTION_POLICY_BY_PHASE[currentPhase];
+  const recommended_mode =
+    attestation?.recommended_mode ?? RECOMMENDED_MODE_BY_PHASE[currentPhase];
 
   if (error != null || execution_policy === 'inline_allowed') {
     return {
