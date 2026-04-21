@@ -121,6 +121,19 @@ function formatMissingTableError(tableName: string): string {
   return `Table ${tableName} is missing in Supabase. Apply migration 012_phase_execution_attestations.sql and verify the table exists.`;
 }
 
+function isMissingTableError(error: unknown, tableName: string): boolean {
+  const message = typeof error === 'object' && error !== null && 'message' in error
+    ? String((error as { message?: unknown }).message ?? '')
+    : String(error ?? '');
+
+  return (
+    message.includes(`relation "public.${tableName}" does not exist`) ||
+    message.includes(`relation "${tableName}" does not exist`) ||
+    message.includes(`Could not find the table 'public.${tableName}'`) ||
+    message.includes(`Could not find the table '${tableName}'`)
+  );
+}
+
 export async function getFeatureStatus(
   featureId: string
 ): Promise<FeatureStatusResult | null> {
@@ -351,11 +364,14 @@ export async function getPhaseExecutionAttestations(
     .eq('feature_id', featureId)
     .order('phase', { ascending: true });
   if (error) {
-    const isMissingTable = error.message.includes('relation "phase_execution_attestations" does not exist');
+    const isMissingTable = isMissingTableError(error, 'phase_execution_attestations');
+    const formattedError = isMissingTable
+      ? formatMissingTableError('phase_execution_attestations')
+      : error.message;
     return {
       attestations: [],
-      error: isMissingTable ? formatMissingTableError('phase_execution_attestations') : error.message,
-      current_phase: assessCurrentPhaseExecution(currentPhase, null, isMissingTable ? formatMissingTableError('phase_execution_attestations') : error.message),
+      error: formattedError,
+      current_phase: assessCurrentPhaseExecution(currentPhase, null, formattedError),
     };
   }
 

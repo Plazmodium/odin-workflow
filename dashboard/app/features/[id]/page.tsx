@@ -76,6 +76,8 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
   const currentPhaseExecution = executionAttestationsResult.current_phase;
   const currentPhasePolicy = currentPhaseExecution?.execution_policy ?? 'inline_allowed';
   const currentPhaseRecommendedMode = currentPhaseExecution?.recommended_mode ?? 'inline';
+  const currentPhaseActualMode = currentPhaseExecution?.actual_mode ?? null;
+  const currentPhaseProofStatus = currentPhaseExecution?.proof_status ?? 'none';
   const currentPhaseAttestation = executionAttestations.find((attestation) => attestation.phase === feature.current_phase) ?? null;
   const currentPhaseWarning = currentPhaseExecution?.warning ?? null;
 
@@ -141,11 +143,11 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary">Policy: {currentPhasePolicy}</Badge>
               <Badge variant="outline">Recommended: {currentPhaseRecommendedMode}</Badge>
-              <Badge variant={currentPhaseAttestation == null ? 'outline' : 'secondary'}>
-                Actual: {currentPhaseAttestation?.actual_mode ?? 'not recorded'}
+              <Badge variant={currentPhaseActualMode == null ? 'outline' : 'secondary'}>
+                Actual: {currentPhaseActualMode ?? 'not recorded'}
               </Badge>
-              <Badge variant={currentPhaseAttestation?.proof_status === 'attested' || currentPhaseAttestation?.proof_status === 'verified' ? 'secondary' : 'outline'}>
-                Proof: {currentPhaseAttestation?.proof_status ?? 'none'}
+              <Badge variant={currentPhaseProofStatus === 'attested' || currentPhaseProofStatus === 'verified' ? 'secondary' : 'outline'}>
+                Proof: {currentPhaseProofStatus}
               </Badge>
             </div>
             {currentPhaseAttestation != null && (
