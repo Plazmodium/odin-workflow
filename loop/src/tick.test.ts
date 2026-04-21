@@ -35,7 +35,7 @@ function createPreparedContext(
       acting_agent_name,
       supported_modes: ['inline', 'subagent'] as const,
       recommended_mode,
-      execution_policy: phase === '5' || phase === '6' || phase === '7' || phase === '9'
+      execution_policy: phase === '5' || phase === '6' || phase === '7'
         ? 'distinct_session_preferred' as const
         : 'inline_allowed' as const,
       child_state_strategy: recommended_mode === 'subagent' ? 'direct_odin_tools_if_available' as const : 'return_intent_to_parent' as const,

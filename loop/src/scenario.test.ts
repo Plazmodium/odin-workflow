@@ -43,7 +43,9 @@ function createPreparedContext(phase: string, recommended_mode: 'inline' | 'suba
       acting_agent_name,
       supported_modes: ['inline', 'subagent'] as const,
       recommended_mode,
-      execution_policy: 'distinct_session_preferred' as const,
+      execution_policy: (phase === '5' || phase === '6' || phase === '7')
+        ? 'distinct_session_preferred' as const
+        : 'inline_allowed' as const,
       child_state_strategy: recommended_mode === 'subagent' ? 'direct_odin_tools_if_available' as const : 'return_intent_to_parent' as const,
       response_style: 'terse_execution' as const,
       prompt_sections: ['phase', 'role_summary', 'constraints'] as const,

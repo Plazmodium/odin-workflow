@@ -129,6 +129,7 @@ Ralph Loop then proxies:
 - `odin.register_phase_execution(...)` to attest actual mode and session linkage
 - `odin.record_phase_artifact(...)` for each returned artifact
 - `odin.record_phase_result(...)` for the returned outcome
+- on failed/aborted attempts after registration: `odin.clear_phase_execution(...)` before retry
 
 using `selection.prepared_context.execution.acting_agent_name` as the proxied `created_by` value.
 
