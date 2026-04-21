@@ -146,7 +146,7 @@ describe('bootstrapExistingSchema', () => {
     ]);
   });
 
-  it('leaves repair migration 013 pending when only the attestation table exists', async () => {
+  it('leaves repair migration 013 pending when migration 012 objects exist but repair migration 013 is still unapplied', async () => {
     const executor = createExecutor([
       {
         rows: [{

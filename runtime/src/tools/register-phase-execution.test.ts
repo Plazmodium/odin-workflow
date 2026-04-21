@@ -88,6 +88,59 @@ describe('handleRegisterPhaseExecution', () => {
     );
   });
 
+  it('records an attested subagent execution row with a distinct worker session', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => createFeature()),
+      registerPhaseExecution: vi.fn(async (attestation: PhaseExecutionAttestation) => attestation),
+    } as unknown as WorkflowStateAdapter;
+
+    const result = await handleRegisterPhaseExecution(adapter, {
+      feature_id: 'FEAT-EXEC',
+      phase: '5',
+      actual_mode: 'subagent',
+      supervisor_session_id: 'ralph-loop:run-1',
+      worker_session_id: 'worker-agent:session-2',
+      harness_run_id: 'run-1',
+      attested_by: 'ralph-loop',
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(adapter.registerPhaseExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        feature_id: 'FEAT-EXEC',
+        phase: '5',
+        actual_mode: 'subagent',
+        execution_policy: 'distinct_session_preferred',
+        recommended_mode: 'subagent',
+        proof_status: 'attested',
+        supervisor_session_id: 'ralph-loop:run-1',
+        worker_session_id: 'worker-agent:session-2',
+        attested_by: 'ralph-loop',
+      })
+    );
+  });
+
+  it('rejects inline attestation when worker_session_id differs from supervisor_session_id', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => createFeature()),
+      registerPhaseExecution: vi.fn(),
+    } as unknown as WorkflowStateAdapter;
+
+    const result = await handleRegisterPhaseExecution(adapter, {
+      feature_id: 'FEAT-EXEC',
+      phase: '5',
+      actual_mode: 'inline',
+      supervisor_session_id: 'ralph-loop:run-1',
+      worker_session_id: 'worker-agent:session-2',
+      harness_run_id: 'run-1',
+      attested_by: 'ralph-loop',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('worker_session_id must be omitted or match supervisor_session_id');
+    expect(adapter.registerPhaseExecution).not.toHaveBeenCalled();
+  });
+
   it('rejects subagent attestation without a distinct worker session id', async () => {
     const adapter: WorkflowStateAdapter = {
       getFeature: vi.fn(async () => createFeature()),
