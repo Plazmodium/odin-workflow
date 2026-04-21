@@ -69,4 +69,25 @@ describe('handleRegisterPhaseExecution', () => {
     expect(result.content[0]?.text).toContain('worker_session_id is required when actual_mode is subagent');
     expect(adapter.registerPhaseExecution).not.toHaveBeenCalled();
   });
+
+  it('rejects subagent attestation when worker_session_id matches supervisor_session_id', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => createFeature()),
+      registerPhaseExecution: vi.fn(),
+    } as unknown as WorkflowStateAdapter;
+
+    const result = await handleRegisterPhaseExecution(adapter, {
+      feature_id: 'FEAT-EXEC',
+      phase: '5',
+      actual_mode: 'subagent',
+      supervisor_session_id: 'ralph-loop:run-1',
+      worker_session_id: 'ralph-loop:run-1',
+      harness_run_id: 'run-1',
+      attested_by: 'ralph-loop',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('worker_session_id must differ from supervisor_session_id');
+    expect(adapter.registerPhaseExecution).not.toHaveBeenCalled();
+  });
 });

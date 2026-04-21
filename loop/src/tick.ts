@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { executeReleaseHandoff, type GitHubCommandRunner } from './executors/release-handoff.js';
 import { executeReleaseCloseout } from './executors/release-closeout.js';
-import type { AutonomousSelection, RuntimeToolClient, SubagentExecutionArtifact, SubagentExecutor, TickOutcome } from './types.js';
+import type { AutonomousSelection, ExecutablePhaseId, RuntimeToolClient, SubagentExecutionArtifact, SubagentExecutor, TickOutcome } from './types.js';
 
 /**
  * Selects the explanation to report when no autonomous phase was chosen.
@@ -99,6 +99,14 @@ function buildExecutionAttestationIds(supervisor_name: string) {
     harness_run_id,
     supervisor_session_id,
   };
+}
+
+function asExecutablePhaseId(phase: string): ExecutablePhaseId {
+  if (phase === '1' || phase === '2' || phase === '3' || phase === '4' || phase === '5' || phase === '6' || phase === '7' || phase === '8' || phase === '9') {
+    return phase;
+  }
+
+  throw new Error(`Phase ${phase} is not executable in Ralph Loop.`);
 }
 
 /**
@@ -325,12 +333,13 @@ export async function runTick(
     let execution_result:
       | { phase_outcome: 'completed'; summary: string }
       | { phase_outcome: 'blocked' | 'needs_rework'; summary: string };
+    const executable_phase = asExecutablePhaseId(pick.selection.phase);
 
     if (pick.selection.prepared_context.execution.recommended_mode === 'inline') {
       const attestation = buildExecutionAttestationIds(supervisor_name);
       await client.registerPhaseExecution({
         feature_id: pick.selection.feature_id,
-        phase: pick.selection.phase,
+        phase: executable_phase,
         actual_mode: 'inline',
         supervisor_session_id: attestation.supervisor_session_id,
         harness_run_id: attestation.harness_run_id,
@@ -353,7 +362,7 @@ export async function runTick(
       const attestation = buildExecutionAttestationIds(supervisor_name);
       await client.registerPhaseExecution({
         feature_id: pick.selection.feature_id,
-        phase: pick.selection.phase,
+        phase: executable_phase,
         actual_mode: 'subagent',
         supervisor_session_id: attestation.supervisor_session_id,
         worker_session_id: `${attestation.supervisor_session_id}:worker:${randomUUID()}`,
@@ -396,7 +405,10 @@ export async function runTick(
     const summary = error instanceof Error ? error.message : 'Ralph Loop tick failed.';
     if (execution_attempted && !execution_succeeded && registered_execution != null) {
       try {
-        await client.clearPhaseExecution(registered_execution);
+        await client.clearPhaseExecution({
+          feature_id: registered_execution.feature_id,
+          phase: asExecutablePhaseId(registered_execution.phase),
+        });
       } catch (cleanup_error) {
         const cleanup_message = cleanup_error instanceof Error ? cleanup_error.message : 'Unknown phase execution cleanup failure';
         console.error(`[Ralph Loop] Failed to clear phase execution attestation: ${cleanup_message}`);

@@ -6,6 +6,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 import type {
   ArchiveFeatureReleaseInput,
+  ExecutablePhaseId,
   PickNextAutonomousPhaseResult,
   PickNextAutonomousPhaseOptions,
   PhaseChildStateStrategy,
@@ -453,7 +454,7 @@ class McpRuntimeToolClient implements RuntimeToolClient {
     }
   }
 
-  async clearPhaseExecution(input: { feature_id: string; phase: PhaseId }): Promise<void> {
+  async clearPhaseExecution(input: { feature_id: string; phase: ExecutablePhaseId }): Promise<void> {
     const result = await this.client.callTool({
       name: 'odin.clear_phase_execution',
       arguments: {

@@ -116,13 +116,13 @@ describe('bootstrapExistingSchema', () => {
   it('bootstraps migration 009 when the skill proposal table already exists', async () => {
     const executor = createExecutor([
       {
-        rows: [
-          { tablename: 'features' },
-          { tablename: 'agent_claims' },
-          { tablename: 'skill_proposal_candidates' },
-          { tablename: 'skill_proposals' },
-          { tablename: 'phase_execution_attestations' },
-        ],
+        rows: [{
+          has_core: true,
+          has_v2: true,
+          has_skill_proposals: true,
+          has_skill_proposal_workflow: true,
+          has_phase_execution_attestations: true,
+        }],
       },
       { rows: [] },
     ]);
@@ -145,6 +145,32 @@ describe('bootstrapExistingSchema', () => {
       '012_phase_execution_attestations.sql',
     ]);
   });
+
+  it('still bootstraps migration 012 when the attestation table exists without later repair objects', async () => {
+    const executor = createExecutor([
+      {
+        rows: [{
+          has_core: true,
+          has_v2: true,
+          has_skill_proposals: true,
+          has_skill_proposal_workflow: true,
+          has_phase_execution_attestations: true,
+        }],
+      },
+      { rows: [] },
+    ]);
+
+    const result = await bootstrapExistingSchema(executor, [
+      { name: '001_schema.sql' },
+      { name: '005_odin_v2_schema.sql' },
+      { name: '008_related_learnings.sql' },
+      { name: '009_skill_proposal_candidates.sql' },
+      { name: '010_skill_proposals.sql' },
+      { name: '012_phase_execution_attestations.sql' },
+    ]);
+
+    expect(result.bootstrapped).toContain('012_phase_execution_attestations.sql');
+  });
 });
 
 describe('migration 011', () => {
@@ -163,6 +189,32 @@ describe('migration 012', () => {
     const canonical_sql = readFileSync(resolveCanonicalMigration012Path(), 'utf8');
 
     expect(bundled_sql).toContain('CREATE TABLE phase_execution_attestations');
+    expect(bundled_sql).toBe(canonical_sql);
+  });
+});
+
+describe('migration 013', () => {
+  const bundled_migration_013_path = resolve(tools_dir, '../../migrations/013_phase_execution_attestations_repairs.sql');
+
+  function resolveCanonicalMigration013Path(): string {
+    const candidates = [
+      resolve(tools_dir, '../../../../database/supabase-migrations/013_phase_execution_attestations_repairs.sql'),
+      resolve(tools_dir, '../../../migrations/013_phase_execution_attestations_repairs.sql'),
+    ];
+
+    const match = candidates.find((candidate) => existsSync(candidate));
+    if (match == null) {
+      throw new Error(`Could not find canonical migration 013 at any expected path: ${candidates.join(', ')}`);
+    }
+
+    return match;
+  }
+
+  it('stays aligned with the canonical SQL', () => {
+    const bundled_sql = readFileSync(bundled_migration_013_path, 'utf8');
+    const canonical_sql = readFileSync(resolveCanonicalMigration013Path(), 'utf8');
+
+    expect(bundled_sql).toContain('CREATE TRIGGER phase_execution_attestations_updated_at_trigger');
     expect(bundled_sql).toBe(canonical_sql);
   });
 });

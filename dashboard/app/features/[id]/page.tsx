@@ -41,34 +41,6 @@ import { Badge } from '@/components/ui/badge';
 import { formatConfidence } from '@/lib/utils';
 import Link from 'next/link';
 
-const EXECUTION_POLICY_BY_PHASE = {
-  '0': 'inline_allowed',
-  '1': 'inline_allowed',
-  '2': 'inline_allowed',
-  '3': 'inline_allowed',
-  '4': 'inline_allowed',
-  '5': 'distinct_session_preferred',
-  '6': 'distinct_session_preferred',
-  '7': 'distinct_session_preferred',
-  '8': 'inline_allowed',
-  '9': 'inline_allowed',
-  '10': 'inline_allowed',
-} as const;
-
-const RECOMMENDED_MODE_BY_PHASE = {
-  '0': 'inline',
-  '1': 'inline',
-  '2': 'inline',
-  '3': 'inline',
-  '4': 'inline',
-  '5': 'subagent',
-  '6': 'subagent',
-  '7': 'subagent',
-  '8': 'subagent',
-  '9': 'inline',
-  '10': 'inline',
-} as const;
-
 interface FeatureDetailPageProps {
   params: Promise<{ id: string }>;
 }
@@ -84,7 +56,7 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
       getPhaseDurations(id),
       getAgentDurations(id),
       getAgentInvocations(id),
-      getPhaseExecutionAttestations(id),
+      getPhaseExecutionAttestations(id, feature.current_phase),
       getQualityGates(id),
       getBlockers(id),
       getFeatureEval(id),
@@ -101,20 +73,11 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
       getSecuritySummary(id),
     ]);
   const executionAttestations = executionAttestationsResult.attestations;
-  const currentPhasePolicy = EXECUTION_POLICY_BY_PHASE[feature.current_phase];
-  const currentPhaseRecommendedMode = RECOMMENDED_MODE_BY_PHASE[feature.current_phase];
+  const currentPhaseExecution = executionAttestationsResult.current_phase;
+  const currentPhasePolicy = currentPhaseExecution?.execution_policy ?? 'inline_allowed';
+  const currentPhaseRecommendedMode = currentPhaseExecution?.recommended_mode ?? 'inline';
   const currentPhaseAttestation = executionAttestations.find((attestation) => attestation.phase === feature.current_phase) ?? null;
-  const currentPhaseWarning =
-    executionAttestationsResult.error != null || currentPhasePolicy === 'inline_allowed'
-      ? null
-      : currentPhaseAttestation == null
-        ? `No execution attestation recorded for current phase ${feature.current_phase}.`
-        : currentPhaseAttestation.actual_mode !== 'subagent' ||
-            currentPhaseAttestation.worker_session_id == null ||
-            currentPhaseAttestation.supervisor_session_id == null ||
-            currentPhaseAttestation.worker_session_id === currentPhaseAttestation.supervisor_session_id
-          ? `Current phase ${feature.current_phase} prefers a distinct worker session, but the recorded attestation does not prove one.`
-          : null;
+  const currentPhaseWarning = currentPhaseExecution?.warning ?? null;
 
   return (
     <>

@@ -19,6 +19,22 @@ function createFeature(overrides: Partial<FeatureRecord> = {}): FeatureRecord {
 }
 
 describe('handleClearPhaseExecution', () => {
+  it('returns an error when the feature does not exist', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => null),
+      clearPhaseExecutionAttestation: vi.fn(async () => undefined),
+    } as unknown as WorkflowStateAdapter;
+
+    const result = await handleClearPhaseExecution(adapter, {
+      feature_id: 'MISSING',
+      phase: '5',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('Feature MISSING was not found');
+    expect(adapter.clearPhaseExecutionAttestation).not.toHaveBeenCalled();
+  });
+
   it('clears the current phase execution attestation', async () => {
     const adapter: WorkflowStateAdapter = {
       getFeature: vi.fn(async () => createFeature()),

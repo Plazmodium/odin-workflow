@@ -8,6 +8,10 @@ import type {
   PhaseDuration,
   AgentDuration,
   AgentInvocation,
+  Phase,
+  PhaseExecutionMode,
+  PhaseExecutionPolicy,
+  PhaseExecutionProofStatus,
   QualityGate,
   Blocker,
   FeatureEval,
@@ -27,6 +31,86 @@ export interface AgentDurationsResult {
 export interface PhaseExecutionAttestationsResult {
   attestations: PhaseExecutionAttestation[];
   error: string | null;
+  current_phase: {
+    execution_policy: PhaseExecutionPolicy;
+    recommended_mode: PhaseExecutionMode;
+    actual_mode: PhaseExecutionMode | null;
+    proof_status: PhaseExecutionProofStatus;
+    warning: string | null;
+  } | null;
+}
+
+const EXECUTION_POLICY_BY_PHASE: Record<Phase, PhaseExecutionPolicy> = {
+  '0': 'inline_allowed',
+  '1': 'inline_allowed',
+  '2': 'inline_allowed',
+  '3': 'inline_allowed',
+  '4': 'inline_allowed',
+  '5': 'distinct_session_preferred',
+  '6': 'distinct_session_preferred',
+  '7': 'distinct_session_preferred',
+  '8': 'inline_allowed',
+  '9': 'inline_allowed',
+  '10': 'inline_allowed',
+};
+
+const RECOMMENDED_MODE_BY_PHASE: Record<Phase, PhaseExecutionMode> = {
+  '0': 'inline',
+  '1': 'inline',
+  '2': 'inline',
+  '3': 'inline',
+  '4': 'inline',
+  '5': 'subagent',
+  '6': 'subagent',
+  '7': 'subagent',
+  '8': 'subagent',
+  '9': 'inline',
+  '10': 'inline',
+};
+
+function hasDistinctSessionProof(attestation: PhaseExecutionAttestation | null): boolean {
+  return (
+    attestation != null &&
+    attestation.actual_mode === 'subagent' &&
+    attestation.proof_status !== 'none' &&
+    attestation.supervisor_session_id != null &&
+    attestation.worker_session_id != null &&
+    attestation.worker_session_id !== attestation.supervisor_session_id
+  );
+}
+
+function assessCurrentPhaseExecution(
+  currentPhase: Phase,
+  attestation: PhaseExecutionAttestation | null,
+  error: string | null,
+) {
+  const execution_policy = EXECUTION_POLICY_BY_PHASE[currentPhase];
+  const recommended_mode = RECOMMENDED_MODE_BY_PHASE[currentPhase];
+
+  if (error != null || execution_policy === 'inline_allowed') {
+    return {
+      execution_policy,
+      recommended_mode,
+      actual_mode: attestation?.actual_mode ?? null,
+      proof_status: attestation?.proof_status ?? 'none',
+      warning: null,
+    };
+  }
+
+  const warning =
+    attestation == null
+      ? `No execution attestation recorded for current phase ${currentPhase}.`
+      : !hasDistinctSessionProof(attestation)
+        ? `Current phase ${currentPhase} prefers a distinct worker session, but the recorded attestation does not prove one.`
+        : null;
+
+  return {
+    execution_policy,
+    recommended_mode,
+    actual_mode: attestation?.actual_mode ?? null,
+    proof_status: attestation?.proof_status ?? 'none',
+    warning,
+  };
 }
 
 function formatMissingRpcError(functionName: string): string {
@@ -257,7 +341,8 @@ export async function getAgentInvocations(
 }
 
 export async function getPhaseExecutionAttestations(
-  featureId: string
+  featureId: string,
+  currentPhase: Phase,
 ): Promise<PhaseExecutionAttestationsResult> {
   const supabase = createServerClient();
   const { data, error } = await supabase
@@ -270,14 +355,26 @@ export async function getPhaseExecutionAttestations(
     return {
       attestations: [],
       error: isMissingTable ? formatMissingTableError('phase_execution_attestations') : error.message,
+      current_phase: assessCurrentPhaseExecution(currentPhase, null, isMissingTable ? formatMissingTableError('phase_execution_attestations') : error.message),
     };
   }
 
   if (!data) {
-    return { attestations: [], error: null };
+    return {
+      attestations: [],
+      error: null,
+      current_phase: assessCurrentPhaseExecution(currentPhase, null, null),
+    };
   }
 
-  return { attestations: data as PhaseExecutionAttestation[], error: null };
+  const attestations = data as PhaseExecutionAttestation[];
+  const currentPhaseAttestation = attestations.find((attestation) => attestation.phase === currentPhase) ?? null;
+
+  return {
+    attestations,
+    error: null,
+    current_phase: assessCurrentPhaseExecution(currentPhase, currentPhaseAttestation, null),
+  };
 }
 
 export async function getIterationTracking(
