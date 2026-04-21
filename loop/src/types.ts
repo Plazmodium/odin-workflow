@@ -4,6 +4,8 @@ export const PHASE_IDS = new Set<PhaseId>(['0', '1', '2', '3', '4', '5', '6', '7
 
 export type PhaseExecutionMode = 'inline' | 'subagent';
 
+export type PhaseExecutionPolicy = 'inline_allowed' | 'distinct_session_preferred' | 'distinct_session_required';
+
 export type PhaseResponseStyle = 'normal' | 'terse_execution';
 
 export type PhaseChildStateStrategy = 'direct_odin_tools_if_available' | 'return_intent_to_parent';
@@ -53,10 +55,21 @@ export interface PreparedPhaseContext {
     acting_agent_name: string;
     supported_modes: PhaseExecutionMode[];
     recommended_mode: PhaseExecutionMode;
+    execution_policy: PhaseExecutionPolicy;
     child_state_strategy: PhaseChildStateStrategy;
     response_style: PhaseResponseStyle;
     prompt_sections: PhasePromptSection[];
   };
+}
+
+export interface RegisterPhaseExecutionInput {
+  feature_id: string;
+  phase: PhaseId;
+  actual_mode: PhaseExecutionMode;
+  supervisor_session_id: string;
+  worker_session_id?: string;
+  harness_run_id?: string;
+  attested_by: string;
 }
 
 export interface SkippedSummaryItem {
@@ -138,6 +151,8 @@ export interface RecordReleaseCloseoutFailureInput {
 export interface RuntimeToolClient {
   pickNextAutonomousPhase(supervisor_name: string, options?: PickNextAutonomousPhaseOptions): Promise<PickNextAutonomousPhaseResult>;
   recordSupervisorEvent(input: RecordSupervisorEventInput): Promise<void>;
+  registerPhaseExecution(input: RegisterPhaseExecutionInput): Promise<void>;
+  clearPhaseExecution(input: { feature_id: string; phase: PhaseId }): Promise<void>;
   recordPhaseArtifact(input: RecordPhaseArtifactInput): Promise<void>;
   recordPhaseResult(input: RecordPhaseResultInput): Promise<void>;
   archiveFeatureRelease(input: ArchiveFeatureReleaseInput): Promise<void>;

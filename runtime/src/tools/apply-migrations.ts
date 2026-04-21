@@ -161,14 +161,15 @@ async function fetchAppliedNames(executor: SqlExecutor): Promise<{ names: Set<st
  * already in place. If `agent_claims` exists, the current bundled v2 baseline
  * (`005`-`008`) is also present. If `skill_proposal_candidates` exists,
  * migration `009` is already present too. If `skill_proposals` exists,
- * migration `010` is already present too.
+ * migration `010` is already present too. If `phase_execution_attestations`
+ * exists, migration `012` is already present too.
  */
 export async function bootstrapExistingSchema(
   executor: SqlExecutor,
   migration_files: Array<{ name: string }>,
 ): Promise<{ bootstrapped: string[]; error?: string }> {
   const check = await executor.execute(
-    `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename IN ('features', 'agent_claims', 'skill_proposal_candidates', 'skill_proposals') ORDER BY tablename;`
+    `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename IN ('features', 'agent_claims', 'skill_proposal_candidates', 'skill_proposals', 'phase_execution_attestations') ORDER BY tablename;`
   );
   if (check.error != null) {
     return { bootstrapped: [], error: check.error };
@@ -183,9 +184,10 @@ export async function bootstrapExistingSchema(
   const has_v2 = existing_tables.has('agent_claims');
   const has_skill_proposals = existing_tables.has('skill_proposal_candidates');
   const has_skill_proposal_workflow = existing_tables.has('skill_proposals');
+  const has_phase_execution_attestations = existing_tables.has('phase_execution_attestations');
 
   // Determine which migrations are already represented in the live schema.
-  // Core migrations: 001-004. Current bundled v2 baseline: 005-008. Skill proposal storage: 009. Workflow state: 010.
+  // Core migrations: 001-004. Current bundled v2 baseline: 005-008. Skill proposal storage: 009. Workflow state: 010. Execution attestation storage: 012.
   const bootstrapped: string[] = [];
   for (const file of migration_files) {
     const prefix = parseInt(file.name.split('_')[0] ?? '', 10);
@@ -198,6 +200,8 @@ export async function bootstrapExistingSchema(
     } else if (has_skill_proposals && prefix === 9) {
       bootstrapped.push(file.name);
     } else if (has_skill_proposal_workflow && prefix === 10) {
+      bootstrapped.push(file.name);
+    } else if (has_phase_execution_attestations && prefix === 12) {
       bootstrapped.push(file.name);
     }
   }

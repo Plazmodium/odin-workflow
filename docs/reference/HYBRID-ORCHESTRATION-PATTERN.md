@@ -16,6 +16,8 @@ Odin uses a **hybrid orchestration** model where:
 
 This document now describes the **fallback pattern** for harnesses where spawned child agents cannot call `odin.*` directly. If your harness gives the child direct Odin runtime access, use [`../../runtime/README.md#harness-execution-modes`](../../runtime/README.md#harness-execution-modes) as the canonical contract and treat this doc as the parent-session proxy pattern only.
 
+Important: invocation lifecycle telemetry (`prepare_phase_context -> record_phase_result`) is not the same as proof of a distinct child session. When projects care about provable phase ownership, the harness must also record `odin.register_phase_execution(...)`.
+
 Read the examples below using the current 11-phase order (Planning → Product → Discovery → Architect → Guardian → Builder → Reviewer → Integrator → Documenter → Release → Complete).
 
 ---
@@ -95,6 +97,7 @@ In the packaged Odin runtime, the same proxy rule applies when a child agent lac
 ### ✅ Enforce Workflow Rules
 
 - Let the runtime own invocation lifecycle via `odin.prepare_phase_context(...)` and `odin.record_phase_result(...)`
+- Record actual execution mode with `odin.register_phase_execution(...)` when a project needs auditable phase ownership
 - Validate quality gates before phase transitions
 - Manage feature locks for parallel work
 - Handle escalations and blockers

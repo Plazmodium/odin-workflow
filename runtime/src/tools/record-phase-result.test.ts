@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { ArchiveAdapter } from '../adapters/archive/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
-import type { FeatureRecord, PhaseArtifact, PhaseResultRecord } from '../types.js';
+import type { FeatureRecord, PhaseArtifact, PhaseExecutionAttestation, PhaseResultRecord } from '../types.js';
 import { handleRecordPhaseResult } from './record-phase-result.js';
 
 function createFeature(overrides: Partial<FeatureRecord> = {}): FeatureRecord {
@@ -40,6 +40,20 @@ describe('handleRecordPhaseResult', () => {
         createTasksArtifact([{ id: 'T1', title: 'Add tests', status: 'pending' }]),
       ]),
       recordPhaseArtifact: vi.fn(async (artifact: PhaseArtifact) => artifact),
+      getPhaseExecutionAttestation: vi.fn(async () => ({
+        feature_id: 'FEAT-RESULT',
+        phase: '5',
+        execution_policy: 'distinct_session_preferred',
+        recommended_mode: 'subagent',
+        actual_mode: 'subagent',
+        proof_status: 'attested',
+        supervisor_session_id: 'ralph-loop:run-1',
+        worker_session_id: 'ralph-loop:run-1:worker',
+        harness_run_id: 'run-1',
+        attested_by: 'ralph-loop',
+        attestation_source: 'harness',
+        recorded_at: '2026-03-20T00:00:00.000Z',
+      } satisfies PhaseExecutionAttestation)),
       findOpenAgentInvocation: vi.fn(async () => ({
         id: 'inv_open',
         feature_id: 'FEAT-RESULT',
@@ -106,6 +120,20 @@ describe('handleRecordPhaseResult', () => {
     const adapter: WorkflowStateAdapter = {
       getFeature: vi.fn(async () => createFeature({ current_phase: '9' })),
       listPhaseArtifacts: vi.fn(async () => []),
+      getPhaseExecutionAttestation: vi.fn(async () => ({
+        feature_id: 'FEAT-RESULT',
+        phase: '9',
+        execution_policy: 'distinct_session_preferred',
+        recommended_mode: 'inline',
+        actual_mode: 'inline',
+        proof_status: 'attested',
+        supervisor_session_id: 'ralph-loop:run-9',
+        worker_session_id: 'ralph-loop:run-9',
+        harness_run_id: 'run-9',
+        attested_by: 'ralph-loop',
+        attestation_source: 'harness',
+        recorded_at: '2026-03-20T00:00:00.000Z',
+      } satisfies PhaseExecutionAttestation)),
       recordPhaseResult: vi.fn(),
     } as unknown as WorkflowStateAdapter;
 
@@ -140,6 +168,20 @@ describe('handleRecordPhaseResult', () => {
         })
       ),
       listPhaseArtifacts: vi.fn(async () => []),
+      getPhaseExecutionAttestation: vi.fn(async () => ({
+        feature_id: 'FEAT-RESULT',
+        phase: '9',
+        execution_policy: 'distinct_session_preferred',
+        recommended_mode: 'inline',
+        actual_mode: 'inline',
+        proof_status: 'attested',
+        supervisor_session_id: 'ralph-loop:run-9',
+        worker_session_id: 'ralph-loop:run-9',
+        harness_run_id: 'run-9',
+        attested_by: 'ralph-loop',
+        attestation_source: 'harness',
+        recorded_at: '2026-03-20T00:00:00.000Z',
+      } satisfies PhaseExecutionAttestation)),
       findOpenAgentInvocation: vi.fn(async () => ({
         id: 'inv_release',
         feature_id: 'FEAT-RESULT',
@@ -208,6 +250,55 @@ describe('handleRecordPhaseResult', () => {
     expect(archive_adapter.uploadArchive).not.toHaveBeenCalled();
     expect(result.structuredContent?.feature_eval).toMatchObject({
       id: 'eval_release',
+    });
+  });
+
+  it('returns a warning when a preferred distinct-session phase closes without an attestation', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => createFeature()),
+      listPhaseArtifacts: vi.fn(async () => []),
+      getPhaseExecutionAttestation: vi.fn(async () => null),
+      findOpenAgentInvocation: vi.fn(async () => ({
+        id: 'inv_warn',
+        feature_id: 'FEAT-RESULT',
+        phase: '5',
+        agent_name: 'builder-agent',
+        operation: 'Phase 5: Builder',
+        skills_used: [],
+        started_at: '2026-03-20T00:00:00.000Z',
+        ended_at: null,
+        duration_ms: null,
+      })),
+      completeAgentInvocation: vi.fn(async () => ({
+        id: 'inv_warn',
+        feature_id: 'FEAT-RESULT',
+        phase: '5',
+        agent_name: 'builder-agent',
+        operation: 'Phase 5: Builder',
+        skills_used: [],
+        started_at: '2026-03-20T00:00:00.000Z',
+        ended_at: '2026-03-20T00:05:00.000Z',
+        duration_ms: 300000,
+      })),
+      recordPhaseResult: vi.fn(async () => createFeature({ current_phase: '6' })),
+      recordQualityGate: vi.fn(async () => 1),
+      computeFeatureEval: vi.fn(async () => null),
+    } as unknown as WorkflowStateAdapter;
+
+    const result = await handleRecordPhaseResult(adapter, null, {
+      feature_id: 'FEAT-RESULT',
+      phase: '5',
+      outcome: 'completed',
+      summary: 'Builder finished implementation',
+      created_by: 'opencode',
+      blockers: [],
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0]?.text).toContain('Warning: Phase 5 (builder-agent) prefers a distinct worker session');
+    expect(result.structuredContent?.execution).toMatchObject({
+      warning: expect.stringContaining('prefers a distinct worker session'),
+      error: null,
     });
   });
 });

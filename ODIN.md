@@ -782,11 +782,21 @@ Database schema is applied via `odin.apply_migrations`, which auto-detects exist
 
 ### MCP Limitation
 
-Task-spawned sub-agents cannot access MCP servers. Only the main orchestrator session can make MCP calls.
+Some harnesses do not give task-spawned child agents direct MCP access. Odin supports both:
+
+- child agents that can call `odin.*` directly
+- parent-session proxying when the child cannot
 
 ### Hybrid Orchestration
 
-Agents create artifacts; the main session orchestrates MCP calls and file operations.
+Agents create artifacts; the main session orchestrates `odin.*` calls and file operations when needed.
+
+Important distinction:
+
+- `recommended_mode` is harness guidance
+- `execution_policy` is the enforcement level
+- invocation telemetry alone does **not** prove a distinct child session ran
+- strict phase ownership is only proven when the harness records execution attestation
 
 > **Full Documentation**: See [HYBRID-ORCHESTRATION-PATTERN.md](docs/reference/HYBRID-ORCHESTRATION-PATTERN.md)
 

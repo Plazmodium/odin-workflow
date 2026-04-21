@@ -21,6 +21,7 @@ import {
 } from './types.js';
 
 const phase_id_schema = z.enum(PHASE_IDS);
+const executable_phase_id_schema = z.enum(['1', '2', '3', '4', '5', '6', '7', '8', '9']);
 
 export const StartFeatureInputSchema = z.object({
   id: z.string().min(1),
@@ -246,6 +247,21 @@ export const PreparePhaseContextInputSchema = z.object({
   include_learnings: z.boolean().default(true),
 });
 
+export const ClearPhaseExecutionInputSchema = z.object({
+  feature_id: z.string().min(1),
+  phase: executable_phase_id_schema,
+});
+
+export const RegisterPhaseExecutionInputSchema = z.object({
+  feature_id: z.string().min(1),
+  phase: executable_phase_id_schema,
+  actual_mode: z.union([z.literal('inline'), z.literal('subagent')]),
+  supervisor_session_id: z.string().min(1),
+  worker_session_id: z.string().min(1).optional(),
+  harness_run_id: z.string().min(1).optional(),
+  attested_by: z.string().min(1),
+});
+
 export const RecordPhaseArtifactInputSchema = z.object({
   feature_id: z.string().min(1),
   phase: phase_id_schema,
@@ -323,6 +339,8 @@ export type GetClaimsNeedingReviewInput = z.infer<typeof GetClaimsNeedingReviewI
 export type RecordWatcherReviewInput = z.infer<typeof RecordWatcherReviewInputSchema>;
 export type ArchiveFeatureReleaseInput = z.infer<typeof ArchiveFeatureReleaseInputSchema>;
 export type PreparePhaseContextInput = z.infer<typeof PreparePhaseContextInputSchema>;
+export type ClearPhaseExecutionInput = z.infer<typeof ClearPhaseExecutionInputSchema>;
+export type RegisterPhaseExecutionInput = z.infer<typeof RegisterPhaseExecutionInputSchema>;
 export type RecordPhaseArtifactInput = z.infer<typeof RecordPhaseArtifactInputSchema>;
 export type RecordPhaseResultInput = z.infer<typeof RecordPhaseResultInputSchema>;
 export type RunReviewChecksInput = z.infer<typeof RunReviewChecksInputSchema>;
