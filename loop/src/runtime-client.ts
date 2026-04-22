@@ -6,14 +6,17 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 import type {
   ArchiveFeatureReleaseInput,
+  ExecutablePhaseId,
   PickNextAutonomousPhaseResult,
   PickNextAutonomousPhaseOptions,
   PhaseChildStateStrategy,
   PhaseExecutionMode,
+  PhaseExecutionPolicy,
   PhaseId,
   PhasePromptSection,
   PhaseResponseStyle,
   PreparedPhaseContext,
+  RegisterPhaseExecutionInput,
   RecordPhaseArtifactInput,
   RecordPhaseResultInput,
   RecordPullRequestInput,
@@ -102,6 +105,12 @@ function parseExecutionModeArray(value: unknown): PhaseExecutionMode[] | null {
  */
 function asChildStateStrategy(value: unknown): PhaseChildStateStrategy | null {
   return value === 'direct_odin_tools_if_available' || value === 'return_intent_to_parent'
+    ? value
+    : null;
+}
+
+function asExecutionPolicy(value: unknown): PhaseExecutionPolicy | null {
+  return value === 'inline_allowed' || value === 'distinct_session_preferred' || value === 'distinct_session_required'
     ? value
     : null;
 }
@@ -220,6 +229,7 @@ function extractPreparedContext(context: Record<string, unknown> | null): Prepar
   const acting_agent_name = execution == null ? null : asString(execution.acting_agent_name);
   const supported_modes = execution == null ? null : parseExecutionModeArray(execution.supported_modes);
   const recommended_mode = execution == null ? null : asExecutionMode(execution.recommended_mode);
+  const execution_policy = execution == null ? null : asExecutionPolicy(execution.execution_policy);
   const child_state_strategy = execution == null ? null : asChildStateStrategy(execution.child_state_strategy);
   const response_style = execution == null ? null : asResponseStyle(execution.response_style);
   const prompt_sections = execution == null ? null : parsePromptSectionArray(execution.prompt_sections);
@@ -235,6 +245,7 @@ function extractPreparedContext(context: Record<string, unknown> | null): Prepar
     acting_agent_name == null ||
     supported_modes == null ||
     recommended_mode == null ||
+    execution_policy == null ||
     child_state_strategy == null ||
     response_style == null ||
     prompt_sections == null ||
@@ -265,6 +276,7 @@ function extractPreparedContext(context: Record<string, unknown> | null): Prepar
       acting_agent_name,
       supported_modes,
       recommended_mode,
+      execution_policy,
       child_state_strategy,
       response_style,
       prompt_sections,
@@ -422,6 +434,41 @@ class McpRuntimeToolClient implements RuntimeToolClient {
     }
   }
 
+  async registerPhaseExecution(input: RegisterPhaseExecutionInput): Promise<void> {
+    const result = await this.client.callTool({
+      name: 'odin.register_phase_execution',
+      arguments: {
+        feature_id: input.feature_id,
+        phase: input.phase,
+        actual_mode: input.actual_mode,
+        supervisor_session_id: input.supervisor_session_id,
+        worker_session_id: input.worker_session_id,
+        harness_run_id: input.harness_run_id,
+        attested_by: input.attested_by,
+      },
+    });
+
+    const error = extractError(result);
+    if (error != null) {
+      throw new Error(error);
+    }
+  }
+
+  async clearPhaseExecution(input: { feature_id: string; phase: ExecutablePhaseId }): Promise<void> {
+    const result = await this.client.callTool({
+      name: 'odin.clear_phase_execution',
+      arguments: {
+        feature_id: input.feature_id,
+        phase: input.phase,
+      },
+    });
+
+    const error = extractError(result);
+    if (error != null) {
+      throw new Error(error);
+    }
+  }
+
   async recordPhaseArtifact(input: RecordPhaseArtifactInput): Promise<void> {
     const result = await this.client.callTool({
       name: 'odin.record_phase_artifact',
@@ -563,7 +610,7 @@ export async function connectRuntimeClient(options: RuntimeClientOptions): Promi
   });
   const client = new Client({
     name: 'ralph-loop',
-    version: '0.2.1',
+    version: '0.2.2',
   });
   await client.connect(transport);
   return new McpRuntimeToolClient(client, transport);

@@ -43,7 +43,11 @@ function createPreparedContext(phase: string, recommended_mode: 'inline' | 'suba
       acting_agent_name,
       supported_modes: ['inline', 'subagent'] as const,
       recommended_mode,
+      execution_policy: (phase === '5' || phase === '6' || phase === '7')
+        ? 'distinct_session_preferred' as const
+        : 'inline_allowed' as const,
       child_state_strategy: recommended_mode === 'subagent' ? 'direct_odin_tools_if_available' as const : 'return_intent_to_parent' as const,
+      response_style: 'terse_execution' as const,
       prompt_sections: ['phase', 'role_summary', 'constraints'] as const,
     },
   };
@@ -58,6 +62,8 @@ class FakeRuntimeToolClient implements RuntimeToolClient {
   readonly release_handoff_failures: RecordReleaseHandoffFailureInput[] = [];
   readonly release_closeout_failures: RecordReleaseCloseoutFailureInput[] = [];
   readonly phase_results: RecordPhaseResultInput[] = [];
+  readonly phase_executions: Array<{ feature_id: string; phase: string; actual_mode: string }> = [];
+  readonly cleared_phase_executions: Array<{ feature_id: string; phase: string }> = [];
 
   async pickNextAutonomousPhase(_supervisor_name: string, options?: PickNextAutonomousPhaseOptions): Promise<PickNextAutonomousPhaseResult> {
     const allow_reason = (reason: string): boolean =>
@@ -119,6 +125,14 @@ class FakeRuntimeToolClient implements RuntimeToolClient {
 
   async recordSupervisorEvent(input: RecordSupervisorEventInput): Promise<void> {
     this.supervisor_events.push(input);
+  }
+
+  async registerPhaseExecution(input: { feature_id: string; phase: string; actual_mode: string }): Promise<void> {
+    this.phase_executions.push(input);
+  }
+
+  async clearPhaseExecution(input: { feature_id: string; phase: string }): Promise<void> {
+    this.cleared_phase_executions.push(input);
   }
 
   async recordPhaseArtifact(): Promise<void> {}
@@ -198,6 +212,11 @@ describe('Ralph Loop simulated scenarios', () => {
         created_by: 'ralph-loop',
       },
     ]);
+    expect(client.phase_executions[0]).toMatchObject({
+      feature_id: 'FEAT-RALPH',
+      phase: '9',
+      actual_mode: 'inline',
+    });
 
     client.stage = 'closeout';
 
@@ -239,6 +258,12 @@ describe('Ralph Loop simulated scenarios', () => {
         feature_id: 'FEAT-RALPH',
         summary: 'gh pr create failed',
         created_by: 'ralph-loop',
+      },
+    ]);
+    expect(client.cleared_phase_executions).toEqual([
+      {
+        feature_id: 'FEAT-RALPH',
+        phase: '9',
       },
     ]);
   });

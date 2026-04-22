@@ -8,6 +8,10 @@ import type {
   PhaseDuration,
   AgentDuration,
   AgentInvocation,
+  Phase,
+  PhaseExecutionMode,
+  PhaseExecutionPolicy,
+  PhaseExecutionProofStatus,
   QualityGate,
   Blocker,
   FeatureEval,
@@ -15,6 +19,7 @@ import type {
   Learning,
   PhaseTransition,
   IterationTracking,
+  PhaseExecutionAttestation,
   PhaseOutput,
 } from '@/lib/types/database';
 
@@ -23,8 +28,112 @@ export interface AgentDurationsResult {
   error: string | null;
 }
 
+export interface PhaseExecutionAttestationsResult {
+  attestations: PhaseExecutionAttestation[];
+  error: string | null;
+  current_phase: {
+    execution_policy: PhaseExecutionPolicy;
+    recommended_mode: PhaseExecutionMode;
+    actual_mode: PhaseExecutionMode | null;
+    proof_status: PhaseExecutionProofStatus;
+    warning: string | null;
+  } | null;
+}
+
+const EXECUTION_POLICY_BY_PHASE: Record<Phase, PhaseExecutionPolicy> = {
+  '0': 'inline_allowed',
+  '1': 'inline_allowed',
+  '2': 'inline_allowed',
+  '3': 'inline_allowed',
+  '4': 'inline_allowed',
+  '5': 'distinct_session_preferred',
+  '6': 'distinct_session_preferred',
+  '7': 'distinct_session_preferred',
+  '8': 'inline_allowed',
+  '9': 'inline_allowed',
+  '10': 'inline_allowed',
+};
+
+const RECOMMENDED_MODE_BY_PHASE: Record<Phase, PhaseExecutionMode> = {
+  '0': 'inline',
+  '1': 'inline',
+  '2': 'inline',
+  '3': 'inline',
+  '4': 'inline',
+  '5': 'subagent',
+  '6': 'subagent',
+  '7': 'subagent',
+  '8': 'subagent',
+  '9': 'inline',
+  '10': 'inline',
+};
+
+function hasDistinctSessionProof(attestation: PhaseExecutionAttestation | null): boolean {
+  return (
+    attestation != null &&
+    attestation.actual_mode === 'subagent' &&
+    attestation.proof_status !== 'none' &&
+    attestation.supervisor_session_id != null &&
+    attestation.worker_session_id != null &&
+    attestation.worker_session_id !== attestation.supervisor_session_id
+  );
+}
+
+function assessCurrentPhaseExecution(
+  currentPhase: Phase,
+  attestation: PhaseExecutionAttestation | null,
+  error: string | null,
+) {
+  const execution_policy =
+    attestation?.execution_policy ?? EXECUTION_POLICY_BY_PHASE[currentPhase];
+  const recommended_mode =
+    attestation?.recommended_mode ?? RECOMMENDED_MODE_BY_PHASE[currentPhase];
+
+  if (error != null || execution_policy === 'inline_allowed') {
+    return {
+      execution_policy,
+      recommended_mode,
+      actual_mode: attestation?.actual_mode ?? null,
+      proof_status: attestation?.proof_status ?? 'none',
+      warning: null,
+    };
+  }
+
+  const warning =
+    attestation == null
+      ? `No execution attestation recorded for current phase ${currentPhase}.`
+      : !hasDistinctSessionProof(attestation)
+        ? `Current phase ${currentPhase} prefers a distinct worker session, but the recorded attestation does not prove one.`
+        : null;
+
+  return {
+    execution_policy,
+    recommended_mode,
+    actual_mode: attestation?.actual_mode ?? null,
+    proof_status: attestation?.proof_status ?? 'none',
+    warning,
+  };
+}
+
 function formatMissingRpcError(functionName: string): string {
   return `RPC function ${functionName} is missing in Supabase. Apply the latest migrations and verify the function exists.`;
+}
+
+function formatMissingTableError(tableName: string): string {
+  return `Table ${tableName} is missing in Supabase. Apply migration 012_phase_execution_attestations.sql and verify the table exists.`;
+}
+
+function isMissingTableError(error: unknown, tableName: string): boolean {
+  const message = typeof error === 'object' && error !== null && 'message' in error
+    ? String((error as { message?: unknown }).message ?? '')
+    : String(error ?? '');
+
+  return (
+    message.includes(`relation "public.${tableName}" does not exist`) ||
+    message.includes(`relation "${tableName}" does not exist`) ||
+    message.includes(`Could not find the table 'public.${tableName}'`) ||
+    message.includes(`Could not find the table '${tableName}'`)
+  );
 }
 
 export async function getFeatureStatus(
@@ -244,6 +353,46 @@ export async function getAgentInvocations(
     .order('started_at', { ascending: true });
   if (error || !data) return [];
   return data as AgentInvocation[];
+}
+
+export async function getPhaseExecutionAttestations(
+  featureId: string,
+  currentPhase: Phase,
+): Promise<PhaseExecutionAttestationsResult> {
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from('phase_execution_attestations')
+    .select('*')
+    .eq('feature_id', featureId)
+    .order('phase', { ascending: true });
+  if (error) {
+    const isMissingTable = isMissingTableError(error, 'phase_execution_attestations');
+    const formattedError = isMissingTable
+      ? formatMissingTableError('phase_execution_attestations')
+      : error.message;
+    return {
+      attestations: [],
+      error: formattedError,
+      current_phase: assessCurrentPhaseExecution(currentPhase, null, formattedError),
+    };
+  }
+
+  if (!data) {
+    return {
+      attestations: [],
+      error: null,
+      current_phase: assessCurrentPhaseExecution(currentPhase, null, null),
+    };
+  }
+
+  const attestations = data as PhaseExecutionAttestation[];
+  const currentPhaseAttestation = attestations.find((attestation) => attestation.phase === currentPhase) ?? null;
+
+  return {
+    attestations,
+    error: null,
+    current_phase: assessCurrentPhaseExecution(currentPhase, currentPhaseAttestation, null),
+  };
 }
 
 export async function getIterationTracking(

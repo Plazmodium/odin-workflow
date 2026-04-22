@@ -35,6 +35,9 @@ function createPreparedContext(
       acting_agent_name,
       supported_modes: ['inline', 'subagent'] as const,
       recommended_mode,
+      execution_policy: phase === '5' || phase === '6' || phase === '7'
+        ? 'distinct_session_preferred' as const
+        : 'inline_allowed' as const,
       child_state_strategy: recommended_mode === 'subagent' ? 'direct_odin_tools_if_available' as const : 'return_intent_to_parent' as const,
       response_style,
       prompt_sections: ['phase', 'role_summary', 'constraints'] as const,
@@ -72,6 +75,8 @@ function createClient(overrides: Partial<RuntimeToolClient> = {}): RuntimeToolCl
       skipped_summary: [],
     })),
     recordSupervisorEvent: vi.fn(async () => undefined),
+    registerPhaseExecution: vi.fn(async () => undefined),
+    clearPhaseExecution: vi.fn(async () => undefined),
     recordPhaseArtifact: vi.fn(async () => undefined),
     recordPhaseResult: vi.fn(async () => undefined),
     archiveFeatureRelease: vi.fn(async () => undefined),
@@ -157,6 +162,14 @@ describe('runTick', () => {
       created_by: 'ralph-loop',
       blockers: [],
     });
+    expect(client.registerPhaseExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        feature_id: 'FEAT-2',
+        phase: '9',
+        actual_mode: 'inline',
+        attested_by: 'ralph-loop',
+      }),
+    );
     expect(client.recordSupervisorEvent).toHaveBeenCalledWith(
       expect.objectContaining({ event_type: 'tick_completed', feature_id: 'FEAT-2' }),
     );
@@ -187,6 +200,10 @@ describe('runTick', () => {
     expect(result).toMatchObject({
       outcome: 'failed',
       summary: 'runtime completion blocked',
+    });
+    expect(client.clearPhaseExecution).toHaveBeenCalledWith({
+      feature_id: 'FEAT-3',
+      phase: '9',
     });
     expect(client.recordSupervisorEvent).toHaveBeenCalledWith(
       expect.objectContaining({ event_type: 'tick_failed', summary: 'runtime completion blocked' }),
@@ -222,6 +239,10 @@ describe('runTick', () => {
     expect(result).toMatchObject({
       outcome: 'failed',
       summary: 'archive unavailable',
+    });
+    expect(client.clearPhaseExecution).toHaveBeenCalledWith({
+      feature_id: 'FEAT-5',
+      phase: '9',
     });
     expect(client.recordReleaseHandoffFailure).toHaveBeenCalledWith({
       feature_id: 'FEAT-5',
@@ -337,6 +358,14 @@ describe('runTick', () => {
       content: { note: 'done' },
       created_by: 'builder-agent',
     });
+    expect(client.registerPhaseExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        feature_id: 'FEAT-7',
+        phase: '5',
+        actual_mode: 'subagent',
+        attested_by: 'ralph-loop',
+      }),
+    );
     expect(subagent_executor.execute).toHaveBeenCalledWith(
       expect.objectContaining({
         project_root: '/tmp/project',
@@ -396,6 +425,13 @@ describe('runTick', () => {
     );
     expect((subagent_executor.execute as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.prompt).toContain(
       'Response style: normal'
+    );
+    expect(client.registerPhaseExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        feature_id: 'FEAT-8A',
+        phase: '8',
+        actual_mode: 'subagent',
+      }),
     );
   });
 

@@ -20,6 +20,7 @@ import type {
   PolicyCheckResult,
   PersistedTargetType,
   PhaseArtifact,
+  PhaseExecutionAttestation,
   PhaseId,
   PhaseResultRecord,
   QualityGateRecord,
@@ -132,6 +133,23 @@ function toQualityGateRecord(row: JsonRecord): QualityGateRecord {
     approved_at: String(row.approved_at),
     approval_notes: typeof row.approval_notes === 'string' ? row.approval_notes : null,
   };
+}
+
+function toPhaseExecutionAttestation(row: JsonRecord): PhaseExecutionAttestation {
+  return {
+    feature_id: String(row.feature_id),
+    phase: String(row.phase) as PhaseId,
+    execution_policy: String(row.execution_policy) as PhaseExecutionAttestation['execution_policy'],
+    recommended_mode: String(row.recommended_mode) as PhaseExecutionAttestation['recommended_mode'],
+    actual_mode: String(row.actual_mode) as PhaseExecutionAttestation['actual_mode'],
+    proof_status: String(row.proof_status) as PhaseExecutionAttestation['proof_status'],
+    supervisor_session_id: row.supervisor_session_id == null ? null : String(row.supervisor_session_id),
+    worker_session_id: row.worker_session_id == null ? null : String(row.worker_session_id),
+    harness_run_id: row.harness_run_id == null ? null : String(row.harness_run_id),
+    attested_by: row.attested_by == null ? null : String(row.attested_by),
+    attestation_source: row.attestation_source == null ? null : String(row.attestation_source) as PhaseExecutionAttestation['attestation_source'],
+    recorded_at: String(row.recorded_at),
+  } as PhaseExecutionAttestation;
 }
 
 export function shouldTransitionPhaseResult(result: PhaseResultRecord): boolean {
@@ -888,6 +906,84 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       ended_at: row.ended_at == null ? null : String(row.ended_at),
       duration_ms: row.duration_ms == null ? null : Number(row.duration_ms),
     };
+  }
+
+  async registerPhaseExecution(attestation: PhaseExecutionAttestation): Promise<PhaseExecutionAttestation> {
+    const { data, error } = await this.client
+      .from('phase_execution_attestations')
+      .upsert({
+        feature_id: attestation.feature_id,
+        phase: attestation.phase,
+        execution_policy: attestation.execution_policy,
+        recommended_mode: attestation.recommended_mode,
+        actual_mode: attestation.actual_mode,
+        proof_status: attestation.proof_status,
+        supervisor_session_id: attestation.supervisor_session_id,
+        worker_session_id: attestation.worker_session_id,
+        harness_run_id: attestation.harness_run_id,
+        attested_by: attestation.attested_by,
+        attestation_source: attestation.attestation_source,
+        recorded_at: attestation.recorded_at,
+      }, {
+        onConflict: 'feature_id,phase',
+      })
+      .select('*')
+      .single();
+
+    if (error != null || data == null) {
+      throw new Error(`Failed to register phase execution attestation: ${error?.message ?? 'No result returned.'}`);
+    }
+
+    return toPhaseExecutionAttestation(data as JsonRecord);
+  }
+
+  async clearPhaseExecutionAttestation(feature_id: string, phase: PhaseId): Promise<void> {
+    const { error } = await this.client
+      .from('phase_execution_attestations')
+      .delete()
+      .eq('feature_id', feature_id)
+      .eq('phase', phase);
+
+    if (error != null) {
+      throw new Error(`Failed to clear phase execution attestation: ${error.message}`);
+    }
+  }
+
+  async getPhaseExecutionAttestation(feature_id: string, phase: PhaseId): Promise<PhaseExecutionAttestation | null> {
+    const { data, error } = await this.client
+      .from('phase_execution_attestations')
+      .select('*')
+      .eq('feature_id', feature_id)
+      .eq('phase', phase)
+      .maybeSingle();
+
+    if (error != null) {
+      throw new Error(`Failed to fetch phase execution attestation: ${error.message}`);
+    }
+
+    if (data == null) {
+      return null;
+    }
+
+    return toPhaseExecutionAttestation(data as JsonRecord);
+  }
+
+  async listPhaseExecutionAttestations(feature_id: string): Promise<PhaseExecutionAttestation[]> {
+    const { data, error } = await this.client
+      .from('phase_execution_attestations')
+      .select('*')
+      .eq('feature_id', feature_id)
+      .order('phase', { ascending: true });
+
+    if (error != null) {
+      throw new Error(`Failed to list phase execution attestations: ${error.message}`);
+    }
+
+    if (data == null) {
+      return [];
+    }
+
+    return (data as JsonRecord[]).map(toPhaseExecutionAttestation);
   }
 
   async recordCommit(commit: Omit<FeatureCommitRecord, 'committed_at'>): Promise<FeatureCommitRecord> {

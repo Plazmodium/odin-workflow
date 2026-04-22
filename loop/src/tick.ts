@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto';
+
 import { executeReleaseHandoff, type GitHubCommandRunner } from './executors/release-handoff.js';
 import { executeReleaseCloseout } from './executors/release-closeout.js';
-import type { AutonomousSelection, RuntimeToolClient, SubagentExecutionArtifact, SubagentExecutor, TickOutcome } from './types.js';
+import type { AutonomousSelection, ExecutablePhaseId, RuntimeToolClient, SubagentExecutionArtifact, SubagentExecutor, TickOutcome } from './types.js';
 
 /**
  * Selects the explanation to report when no autonomous phase was chosen.
@@ -87,6 +89,24 @@ function buildResponseStyleInstructions(selection: AutonomousSelection): string[
     '- preserve exact code, commands, identifiers, and evidence',
     '- when producing final workflow artifacts, follow the normal template and readable prose expected by the phase',
   ];
+}
+
+function buildExecutionAttestationIds(supervisor_name: string) {
+  const harness_run_id = randomUUID();
+  const supervisor_session_id = `${supervisor_name}:${harness_run_id}`;
+
+  return {
+    harness_run_id,
+    supervisor_session_id,
+  };
+}
+
+function asExecutablePhaseId(phase: string): ExecutablePhaseId {
+  if (phase === '1' || phase === '2' || phase === '3' || phase === '4' || phase === '5' || phase === '6' || phase === '7' || phase === '8' || phase === '9') {
+    return phase;
+  }
+
+  throw new Error(`Phase ${phase} is not executable in Ralph Loop.`);
 }
 
 /**
@@ -268,6 +288,7 @@ export async function runTick(
   let execution_attempted = false;
   let execution_succeeded = false;
   let execution_route: 'inline_release' | 'subagent' | null = null;
+  let registered_execution: { feature_id: string; phase: string } | null = null;
 
   try {
     const allowed_phases = subagent_executor == null ? ['9'] : ['5', '6', '7', '8', '9'];
@@ -304,6 +325,7 @@ export async function runTick(
       details: {
         reason: pick.selection.reason,
         recommended_mode: pick.selection.prepared_context.execution.recommended_mode,
+        execution_policy: pick.selection.prepared_context.execution.execution_policy,
         acting_agent_name: pick.selection.prepared_context.execution.acting_agent_name,
       },
     });
@@ -311,8 +333,22 @@ export async function runTick(
     let execution_result:
       | { phase_outcome: 'completed'; summary: string }
       | { phase_outcome: 'blocked' | 'needs_rework'; summary: string };
+    const executable_phase = asExecutablePhaseId(pick.selection.phase);
 
     if (pick.selection.prepared_context.execution.recommended_mode === 'inline') {
+      const attestation = buildExecutionAttestationIds(supervisor_name);
+      await client.registerPhaseExecution({
+        feature_id: pick.selection.feature_id,
+        phase: executable_phase,
+        actual_mode: 'inline',
+        supervisor_session_id: attestation.supervisor_session_id,
+        harness_run_id: attestation.harness_run_id,
+        attested_by: supervisor_name,
+      });
+      registered_execution = {
+        feature_id: pick.selection.feature_id,
+        phase: pick.selection.phase,
+      };
       execution_attempted = true;
       execution_route = 'inline_release';
       execution_result = await executeInlineSelection(client, pick.selection, supervisor_name, project_root, runner);
@@ -323,6 +359,20 @@ export async function runTick(
         );
       }
 
+      const attestation = buildExecutionAttestationIds(supervisor_name);
+      await client.registerPhaseExecution({
+        feature_id: pick.selection.feature_id,
+        phase: executable_phase,
+        actual_mode: 'subagent',
+        supervisor_session_id: attestation.supervisor_session_id,
+        worker_session_id: `${attestation.supervisor_session_id}:worker:${randomUUID()}`,
+        harness_run_id: attestation.harness_run_id,
+        attested_by: supervisor_name,
+      });
+      registered_execution = {
+        feature_id: pick.selection.feature_id,
+        phase: pick.selection.phase,
+      };
       execution_attempted = true;
       execution_route = 'subagent';
       execution_result = await executeSubagentSelection(client, pick.selection, supervisor_name, project_root, subagent_executor);
@@ -353,6 +403,17 @@ export async function runTick(
     };
   } catch (error) {
     const summary = error instanceof Error ? error.message : 'Ralph Loop tick failed.';
+    if (execution_attempted && !execution_succeeded && registered_execution != null) {
+      try {
+        await client.clearPhaseExecution({
+          feature_id: registered_execution.feature_id,
+          phase: asExecutablePhaseId(registered_execution.phase),
+        });
+      } catch (cleanup_error) {
+        const cleanup_message = cleanup_error instanceof Error ? cleanup_error.message : 'Unknown phase execution cleanup failure';
+        console.error(`[Ralph Loop] Failed to clear phase execution attestation: ${cleanup_message}`);
+      }
+    }
     if (
       execution_route === 'inline_release' &&
       execution_attempted &&

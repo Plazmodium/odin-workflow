@@ -126,7 +126,7 @@ This is the canonical step-by-step workflow the orchestrator follows for every f
 
 When a project opts into runtime automation policy, the orchestrator must consult the `automation` block returned by `odin.prepare_phase_context` before attempting PR-related actions. `odin.record_pr` and `odin.record_merge` persist facts after external git/GitHub actions; they are not the trusted authorization boundary by themselves.
 
-> **Remember**: Only the main orchestrator session can call `odin.*` tools. Task-spawned sub-agents cannot access MCP — they produce output that the orchestrator persists.
+> **Remember**: Child-agent MCP access depends on harness capabilities. Some harnesses let task-spawned child agents call `odin.*` directly; others require the main orchestrator session to proxy those calls. `recommended_mode` is guidance, `execution_policy` is enforcement, and invocation telemetry alone does not prove a distinct child session.
 
 ### Feature Is the Unit of Execution
 
@@ -782,11 +782,21 @@ Database schema is applied via `odin.apply_migrations`, which auto-detects exist
 
 ### MCP Limitation
 
-Task-spawned sub-agents cannot access MCP servers. Only the main orchestrator session can make MCP calls.
+Some harnesses do not give task-spawned child agents direct MCP access. Odin supports both:
+
+- child agents that can call `odin.*` directly
+- parent-session proxying when the child cannot
 
 ### Hybrid Orchestration
 
-Agents create artifacts; the main session orchestrates MCP calls and file operations.
+Agents create artifacts; the main session orchestrates `odin.*` calls and file operations when needed.
+
+Important distinction:
+
+- `recommended_mode` is harness guidance
+- `execution_policy` is the enforcement level
+- invocation telemetry alone does **not** prove a distinct child session ran
+- strict phase ownership is only proven when the harness records execution attestation
 
 > **Full Documentation**: See [HYBRID-ORCHESTRATION-PATTERN.md](docs/reference/HYBRID-ORCHESTRATION-PATTERN.md)
 

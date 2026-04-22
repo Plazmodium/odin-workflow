@@ -8,6 +8,7 @@ import type {
   FeatureRecord,
   LearningRecord,
   PhaseArtifact,
+  PhaseExecutionAttestation,
   PhaseResultRecord,
   ReviewCheckRecord,
 } from '../types.js';
@@ -200,6 +201,22 @@ function createWorkflowAdapter(feature: FeatureRecord | null): WorkflowStateAdap
         duration_ms: 240000,
       },
     ]),
+    listPhaseExecutionAttestations: vi.fn(async () => [
+      {
+        feature_id: 'FEAT-002',
+        phase: '5',
+        execution_policy: 'distinct_session_preferred',
+        recommended_mode: 'subagent',
+        actual_mode: 'subagent',
+        proof_status: 'attested',
+        supervisor_session_id: 'ralph-loop:run-1',
+        worker_session_id: 'builder-worker-1',
+        harness_run_id: 'run-1',
+        attested_by: 'ralph-loop',
+        attestation_source: 'harness',
+        recorded_at: '2026-03-13T01:00:00.000Z',
+      } satisfies PhaseExecutionAttestation,
+    ]),
   } as unknown as WorkflowStateAdapter;
 }
 
@@ -245,6 +262,21 @@ describe('handleGetFeatureStatus', () => {
         invocation_coverage: {
           pre_release_complete: boolean;
           pre_release_missing: Array<{ phase: string; agent_name: string }>;
+        };
+      };
+      phase_execution: {
+        current_phase: {
+          row: {
+            actual_mode: string | null;
+            execution_policy: string;
+            proof_status: string;
+          };
+          warning: string | null;
+          error: string | null;
+        };
+        summary: {
+          counts: { attested: number; subagent_attested: number };
+          preferred_without_distinct_session: Array<{ phase: string; phase_role_name: string }>;
         };
       };
       development_evals: unknown;
@@ -297,6 +329,20 @@ describe('handleGetFeatureStatus', () => {
       phase: '3',
       agent_name: 'architect-agent',
     });
+    expect(status.phase_execution.current_phase.row).toMatchObject({
+      actual_mode: 'subagent',
+      execution_policy: 'distinct_session_preferred',
+      proof_status: 'attested',
+    });
+    expect(status.phase_execution.current_phase.warning).toBeNull();
+    expect(status.phase_execution.summary.counts).toMatchObject({
+      attested: 1,
+      subagent_attested: 1,
+    });
+    expect(status.phase_execution.summary.preferred_without_distinct_session).toContainEqual({
+      phase: '6',
+      phase_role_name: 'reviewer-agent',
+    });
     expect(status.development_evals).toMatchObject({
       mode: 'plan_required',
       latest_plan: {
@@ -346,6 +392,7 @@ describe('handleGetFeatureStatus', () => {
         },
       ]),
       listAgentInvocations: vi.fn(async () => []),
+      listPhaseExecutionAttestations: vi.fn(async () => []),
     } as WorkflowStateAdapter;
 
     const result = await handleGetFeatureStatus(adapter, createConfig('auto_pr'), {
@@ -379,6 +426,7 @@ describe('handleGetFeatureStatus', () => {
           duration_ms: 300000,
         },
       ]),
+      listPhaseExecutionAttestations: vi.fn(async () => []),
     } as WorkflowStateAdapter;
 
     const result = await handleGetFeatureStatus(adapter, createConfig('auto_pr'), {

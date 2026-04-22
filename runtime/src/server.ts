@@ -24,6 +24,7 @@ import {
   ApplyMigrationsInputSchema,
   ArchiveFeatureReleaseInputSchema,
   CaptureLearningInputSchema,
+  ClearPhaseExecutionInputSchema,
   ExploreKnowledgeInputSchema,
   GetClaimsNeedingReviewInputSchema,
   GetDevelopmentEvalStatusInputSchema,
@@ -34,6 +35,7 @@ import {
   GetSkillProposalsInputSchema,
   PreparePhaseContextInputSchema,
   PublishSkillProposalInputSchema,
+  RegisterPhaseExecutionInputSchema,
   RecordCommitInputSchema,
   RecordEvalPlanInputSchema,
   RecordEvalRunInputSchema,
@@ -60,6 +62,7 @@ import {
 import { handleApplyMigrations } from './tools/apply-migrations.js';
 import { handleArchiveFeatureRelease } from './tools/archive-feature-release.js';
 import { handleCaptureLearning } from './tools/capture-learning.js';
+import { handleClearPhaseExecution } from './tools/clear-phase-execution.js';
 import { handleExploreKnowledge } from './tools/explore-knowledge.js';
 import { handleGetClaimsNeedingReview } from './tools/get-claims-needing-review.js';
 import { handleGetDevelopmentEvalStatus } from './tools/get-development-eval-status.js';
@@ -69,6 +72,7 @@ import { handleGetSkillProposalQueue } from './tools/get-skill-proposal-queue.js
 import { handleGetSkillProposals } from './tools/get-skill-proposals.js';
 import { handlePickNextAutonomousPhase } from './tools/pick-next-autonomous-phase.js';
 import { handlePreparePhaseContext } from './tools/prepare-phase-context.js';
+import { handleRegisterPhaseExecution } from './tools/register-phase-execution.js';
 import { handlePublishSkillProposal } from './tools/publish-skill-proposal.js';
 import { handleRecordCommit } from './tools/record-commit.js';
 import { handleRecordEvalPlan } from './tools/record-eval-plan.js';
@@ -189,7 +193,7 @@ const formal_verification_adapter = createFormalVerificationAdapter(project_root
 const server = new McpServer(
   {
     name: 'odin',
-    version: '0.6.1-beta',
+    version: '0.6.2-beta',
   },
   {
     capabilities: {
@@ -266,6 +270,26 @@ server.registerTool(
     inputSchema: PreparePhaseContextInputSchema,
   },
   safeToolHandler(async (input) => handlePreparePhaseContext(workflow_state, skill_adapter, runtime_config, input))
+);
+
+server.registerTool(
+  'odin.clear_phase_execution',
+  {
+    title: 'Clear Phase Execution',
+    description: 'Clear a previously recorded execution attestation for a phase when a harness needs to roll back a failed attempt.',
+    inputSchema: ClearPhaseExecutionInputSchema,
+  },
+  safeToolHandler(async (input) => handleClearPhaseExecution(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.register_phase_execution',
+  {
+    title: 'Register Phase Execution',
+    description: 'Record the actual execution mode and attested session linkage for a feature phase.',
+    inputSchema: RegisterPhaseExecutionInputSchema,
+  },
+  safeToolHandler(async (input) => handleRegisterPhaseExecution(workflow_state, input))
 );
 
 server.registerTool(

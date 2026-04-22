@@ -28,3 +28,5 @@ Latest additive bundled migrations include:
 - `009_skill_proposal_candidates.sql`
 - `010_skill_proposals.sql`
 - `011_complete_feature_phase_coverage.sql`
+- `012_phase_execution_attestations.sql`
+- `013_phase_execution_attestations_repairs.sql`

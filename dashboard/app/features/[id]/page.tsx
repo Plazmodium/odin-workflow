@@ -7,6 +7,7 @@ import {
   getPhaseDurations,
   getAgentDurations,
   getAgentInvocations,
+  getPhaseExecutionAttestations,
   getQualityGates,
   getBlockers,
   getFeatureEval,
@@ -50,11 +51,12 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
   const feature = await getFeatureStatus(id);
   if (!feature) notFound();
 
-  const [phases, agentDurationsResult, invocations, gates, blockers, eval_, learnings, transitions, iterations, commits, auditLog, phaseOutputs, archive, claims, claimsSummary, securityFindings, securitySummary] =
+  const [phases, agentDurationsResult, invocations, executionAttestationsResult, gates, blockers, eval_, learnings, transitions, iterations, commits, auditLog, phaseOutputs, archive, claims, claimsSummary, securityFindings, securitySummary] =
     await Promise.all([
       getPhaseDurations(id),
       getAgentDurations(id),
       getAgentInvocations(id),
+      getPhaseExecutionAttestations(id, feature.current_phase),
       getQualityGates(id),
       getBlockers(id),
       getFeatureEval(id),
@@ -70,6 +72,14 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
       getSecurityFindings(id),
       getSecuritySummary(id),
     ]);
+  const executionAttestations = executionAttestationsResult.attestations;
+  const currentPhaseExecution = executionAttestationsResult.current_phase;
+  const currentPhasePolicy = currentPhaseExecution?.execution_policy ?? 'inline_allowed';
+  const currentPhaseRecommendedMode = currentPhaseExecution?.recommended_mode ?? 'inline';
+  const currentPhaseActualMode = currentPhaseExecution?.actual_mode ?? null;
+  const currentPhaseProofStatus = currentPhaseExecution?.proof_status ?? 'none';
+  const currentPhaseAttestation = executionAttestations.find((attestation) => attestation.phase === feature.current_phase) ?? null;
+  const currentPhaseWarning = currentPhaseExecution?.warning ?? null;
 
   return (
     <>
@@ -119,6 +129,55 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
           </CardHeader>
           <CardContent>
             <AgentProfiler durations={agentDurationsResult.durations} error={agentDurationsResult.error} claimsSummary={claimsSummary} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Phase Execution</CardTitle>
+            <CardDescription>
+              Expected policy vs attested execution mode for the current phase.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">Policy: {currentPhasePolicy}</Badge>
+              <Badge variant="outline">Recommended: {currentPhaseRecommendedMode}</Badge>
+              <Badge variant={currentPhaseActualMode == null ? 'outline' : 'secondary'}>
+                Actual: {currentPhaseActualMode ?? 'not recorded'}
+              </Badge>
+              <Badge variant={currentPhaseProofStatus === 'attested' || currentPhaseProofStatus === 'verified' ? 'secondary' : 'outline'}>
+                Proof: {currentPhaseProofStatus}
+              </Badge>
+            </div>
+            {currentPhaseAttestation != null && (
+              <div className="space-y-1 text-muted-foreground">
+                <p>Supervisor session: {currentPhaseAttestation.supervisor_session_id ?? 'n/a'}</p>
+                <p>Worker session: {currentPhaseAttestation.worker_session_id ?? 'n/a'}</p>
+                <p>Attested by: {currentPhaseAttestation.attested_by ?? 'n/a'}</p>
+              </div>
+            )}
+            {currentPhaseWarning != null && (
+              <p className="text-amber-600 dark:text-amber-400">{currentPhaseWarning}</p>
+            )}
+            {executionAttestationsResult.error != null && (
+              <p className="text-amber-600 dark:text-amber-400">{executionAttestationsResult.error}</p>
+            )}
+            {executionAttestations.length > 0 && (
+              <div className="space-y-2 border-t pt-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Recorded attestations</p>
+                <div className="space-y-2">
+                  {executionAttestations.map((attestation) => (
+                    <div key={`${attestation.feature_id}:${attestation.phase}`} className="flex flex-wrap items-center gap-2 text-xs">
+                      <Badge variant="outline">Phase {attestation.phase}</Badge>
+                      <span>{attestation.actual_mode}</span>
+                      <span className="text-muted-foreground">proof: {attestation.proof_status}</span>
+                      <span className="text-muted-foreground">by {attestation.attested_by ?? 'n/a'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

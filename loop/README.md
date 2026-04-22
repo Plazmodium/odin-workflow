@@ -19,6 +19,12 @@ This tracer-bullet slice supports:
 
 Release stays inline inside Ralph Loop. Phases 5-8 only become eligible when a child command is configured; Ralph Loop then spawns that command and proxies the returned artifacts and final phase result from the parent session. Ralph Loop also respects `context.execution.response_style`, so terse operational chatter can be requested without changing the normal human-readable templates for final artifacts.
 
+Ralph Loop now also records `odin.register_phase_execution(...)` before it executes a picked phase so Odin can distinguish:
+
+- expected execution mode
+- actual execution mode
+- whether a distinct worker session was attested
+
 ## Commands
 
 From the full Odin suite repo:
@@ -89,7 +95,8 @@ Ralph Loop writes JSON to stdin shaped like:
         },
         "execution": {
           "acting_agent_name": "builder-agent",
-          "recommended_mode": "subagent"
+          "recommended_mode": "subagent",
+          "execution_policy": "distinct_session_preferred"
         }
       }
     },
@@ -119,8 +126,10 @@ The child command must write JSON to stdout shaped like:
 
 Ralph Loop then proxies:
 
+- `odin.register_phase_execution(...)` to attest actual mode and session linkage
 - `odin.record_phase_artifact(...)` for each returned artifact
 - `odin.record_phase_result(...)` for the returned outcome
+- on failed/aborted attempts after registration: `odin.clear_phase_execution(...)` before retry
 
 using `selection.prepared_context.execution.acting_agent_name` as the proxied `created_by` value.
 
