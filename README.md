@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.6.2--beta-orange" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.6.3--beta-orange" alt="Version">
   <img src="https://img.shields.io/badge/workflow-11_phase-blue" alt="11-phase workflow">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
 </p>
@@ -89,6 +89,7 @@ In short: **Odin is a feature workflow system, not a sub-task swarm orchestrator
 - **Dashboard support** for claims, watcher verification, security findings, and the 11-phase model
 - **Internal terse execution profile** — Builder / Reviewer / Integrator / Release can use bounded terse operational chatter while PRDs, specs, tasks, docs, changelogs, and release notes stay in normal human-readable prose
 - **Strict phase execution attestation** — Odin can now record expected policy vs actual mode vs attested session linkage so live projects can audit whether a distinct phase-owned worker actually ran
+- **Phase-prompt realization attestation** — Odin can now distinguish "a child session existed" from "the child session was launched from the canonical Odin phase bundle"
 
 ## Prerequisites
 
@@ -157,6 +158,7 @@ Current supported paths:
 - Optional child-command execution for phases 5-8 when `--subagent-command-json` / `RALPH_SUBAGENT_COMMAND_JSON` is configured
 - Phase-specific `response_style` hints so internal execution chatter can be terse without turning final artifacts into caveman prose
 - Phase-specific `execution_policy` plus attested inline/subagent execution tracking through `odin.register_phase_execution`
+- Phase-prompt realization manifests plus attestation so strict runs can prove the child used the actual Odin phase prompt bundle, not just any generic worker
 
 From the repo root:
 

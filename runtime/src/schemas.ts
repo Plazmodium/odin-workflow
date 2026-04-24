@@ -22,6 +22,7 @@ import {
 
 const phase_id_schema = z.enum(PHASE_IDS);
 const executable_phase_id_schema = z.enum(['1', '2', '3', '4', '5', '6', '7', '8', '9']);
+const realizable_phase_id_schema = z.enum(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
 
 export const StartFeatureInputSchema = z.object({
   id: z.string().min(1),
@@ -262,6 +263,38 @@ export const RegisterPhaseExecutionInputSchema = z.object({
   attested_by: z.string().min(1),
 });
 
+export const RegisterPhaseRealizationInputSchema = z.object({
+  feature_id: z.string().min(1),
+  phase: realizable_phase_id_schema,
+  actual_mode: z.union([z.literal('inline'), z.literal('subagent')]),
+  supervisor_session_id: z.string().min(1),
+  worker_session_id: z.string().min(1).optional(),
+  harness_run_id: z.string().min(1).optional(),
+  attested_by: z.string().min(1),
+  manifest: z.object({
+    manifest_id: z.string().min(1),
+    phase: realizable_phase_id_schema,
+    phase_role_name: z.string().min(1),
+    shared_context_hash: z.string().regex(/^[a-f0-9]{64}$/),
+    phase_definition_hash: z.string().regex(/^[a-f0-9]{64}$/),
+    resolved_skill_hashes: z.array(z.string().regex(/^[a-f0-9]{64}$/)),
+    required_prompt_sections: z.array(z.enum(['phase', 'role_summary', 'constraints', 'development_evals', 'automation', 'verification', 'workflow', 'artifacts', 'skills', 'learnings'])),
+    context_bundle_hash: z.string().regex(/^[a-f0-9]{64}$/),
+    manifest_version: z.string().min(1),
+    nonce: z.string().min(1),
+  }),
+  child_prompt_hash: z.string().regex(/^[a-f0-9]{64}$/),
+  wrapper_hash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  child_ack_nonce: z.string().min(1).optional(),
+  proof_status: z.union([z.literal('bundle_attested'), z.literal('bundle_verified')]),
+}).refine(
+  (value) => value.manifest.phase === value.phase,
+  'manifest.phase must match phase.'
+).refine(
+  (value) => value.proof_status !== 'bundle_verified' || value.child_ack_nonce === value.manifest.nonce,
+  'bundle_verified requires child_ack_nonce to match the manifest nonce.'
+);
+
 export const RecordPhaseArtifactInputSchema = z.object({
   feature_id: z.string().min(1),
   phase: phase_id_schema,
@@ -341,6 +374,7 @@ export type ArchiveFeatureReleaseInput = z.infer<typeof ArchiveFeatureReleaseInp
 export type PreparePhaseContextInput = z.infer<typeof PreparePhaseContextInputSchema>;
 export type ClearPhaseExecutionInput = z.infer<typeof ClearPhaseExecutionInputSchema>;
 export type RegisterPhaseExecutionInput = z.infer<typeof RegisterPhaseExecutionInputSchema>;
+export type RegisterPhaseRealizationInput = z.infer<typeof RegisterPhaseRealizationInputSchema>;
 export type RecordPhaseArtifactInput = z.infer<typeof RecordPhaseArtifactInputSchema>;
 export type RecordPhaseResultInput = z.infer<typeof RecordPhaseResultInputSchema>;
 export type RunReviewChecksInput = z.infer<typeof RunReviewChecksInputSchema>;

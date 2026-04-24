@@ -162,40 +162,35 @@ async function fetchAppliedNames(executor: SqlExecutor): Promise<{ names: Set<st
  * (`005`-`008`) is also present. If `skill_proposal_candidates` exists,
  * migration `009` is already present too. If `skill_proposals` exists,
  * migration `010` is already present too. If `phase_execution_attestations`
- * exists, migration `012` is already present too. Follow-up repair migration
+ * exists, migration `012` is already present too. If `phase_prompt_realizations`
+ * exists, migration `014` is already present too. Follow-up repair migration
  * `013` remains intentionally additive and idempotent.
  */
 export async function bootstrapExistingSchema(
   executor: SqlExecutor,
   migration_files: Array<{ name: string }>,
 ): Promise<{ bootstrapped: string[]; error?: string }> {
-  const check = await executor.execute(`
-SELECT
-  EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'features') AS has_core,
-  EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'agent_claims') AS has_v2,
-  EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'skill_proposal_candidates') AS has_skill_proposals,
-  EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'skill_proposals') AS has_skill_proposal_workflow,
-  EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'phase_execution_attestations') AS has_phase_execution_attestations;
-  `);
+  const check = await executor.execute(
+    `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename IN ('features', 'agent_claims', 'skill_proposal_candidates', 'skill_proposals', 'phase_execution_attestations', 'phase_prompt_realizations') ORDER BY tablename;`
+  );
   if (check.error != null) {
     return { bootstrapped: [], error: check.error };
   }
 
-  const row = check.rows[0] as Record<string, unknown> | undefined;
-  if (row == null) {
+  const existing_tables = new Set(check.rows.map((row) => row.tablename as string));
+  if (existing_tables.size === 0) {
     return { bootstrapped: [] };
   }
 
-  const asBoolean = (value: unknown): boolean => value === true || value === 't';
-
-  const has_core = asBoolean(row.has_core);
-  const has_v2 = asBoolean(row.has_v2);
-  const has_skill_proposals = asBoolean(row.has_skill_proposals);
-  const has_skill_proposal_workflow = asBoolean(row.has_skill_proposal_workflow);
-  const has_phase_execution_attestations = asBoolean(row.has_phase_execution_attestations);
+  const has_core = existing_tables.has('features');
+  const has_v2 = existing_tables.has('agent_claims');
+  const has_skill_proposals = existing_tables.has('skill_proposal_candidates');
+  const has_skill_proposal_workflow = existing_tables.has('skill_proposals');
+  const has_phase_execution_attestations = existing_tables.has('phase_execution_attestations');
+  const has_phase_prompt_realizations = existing_tables.has('phase_prompt_realizations');
 
   // Determine which migrations are already represented in the live schema.
-  // Core migrations: 001-004. Current bundled v2 baseline: 005-008. Skill proposal storage: 009. Workflow state: 010. Execution attestation storage: 012. Repair wave: 013.
+  // Core migrations: 001-004. Current bundled v2 baseline: 005-008. Skill proposal storage: 009. Workflow state: 010. Execution attestation storage: 012. Prompt realization storage: 014. Repair wave: 013 remains intentionally pending.
   const bootstrapped: string[] = [];
   for (const file of migration_files) {
     const prefix = parseInt(file.name.split('_')[0] ?? '', 10);
@@ -210,6 +205,8 @@ SELECT
     } else if (has_skill_proposal_workflow && prefix === 10) {
       bootstrapped.push(file.name);
     } else if (has_phase_execution_attestations && prefix === 12) {
+      bootstrapped.push(file.name);
+    } else if (has_phase_prompt_realizations && prefix === 14) {
       bootstrapped.push(file.name);
     }
   }

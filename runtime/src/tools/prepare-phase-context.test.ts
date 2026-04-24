@@ -3,7 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SkillAdapter } from '../adapters/skills/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
 import type { RuntimeConfig } from '../config.js';
-import type { FeatureRecord, PhaseArtifact, PhaseExecutionPolicy, PhaseResponseStyle } from '../types.js';
+import type {
+  FeatureRecord,
+  PhaseArtifact,
+  PhaseExecutionPolicy,
+  PhasePromptManifest,
+  PhaseResponseStyle,
+  PromptRealizationPolicy,
+} from '../types.js';
 import { handlePreparePhaseContext } from './prepare-phase-context.js';
 
 function createFeature(): FeatureRecord {
@@ -172,8 +179,10 @@ describe('handlePreparePhaseContext', () => {
             supported_modes: string[];
             recommended_mode: string;
             execution_policy: PhaseExecutionPolicy;
+            prompt_realization_policy: PromptRealizationPolicy;
             child_state_strategy: string;
             response_style: PhaseResponseStyle;
+            phase_prompt_manifest: PhasePromptManifest | null;
             prompt_sections: string[];
           };
           verification: { required_checks: string[] };
@@ -209,6 +218,7 @@ describe('handlePreparePhaseContext', () => {
         supported_modes: ['inline', 'subagent'],
         recommended_mode: 'subagent',
         execution_policy: 'distinct_session_preferred',
+        prompt_realization_policy: 'phase_bundle_preferred',
         child_state_strategy: 'direct_odin_tools_if_available',
         response_style: 'terse_execution',
       },
@@ -264,6 +274,26 @@ describe('handlePreparePhaseContext', () => {
       'skills',
       'learnings',
     ]);
+    expect(context?.execution.phase_prompt_manifest).toMatchObject({
+      phase: '5',
+      phase_role_name: 'builder-agent',
+      manifest_version: '1',
+      required_prompt_sections: [
+        'phase',
+        'role_summary',
+        'constraints',
+        'development_evals',
+        'automation',
+        'verification',
+        'workflow',
+        'artifacts',
+        'skills',
+        'learnings',
+      ],
+    });
+    expect(context?.execution.phase_prompt_manifest?.shared_context_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(context?.execution.phase_prompt_manifest?.phase_definition_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(context?.execution.phase_prompt_manifest?.resolved_skill_hashes).toHaveLength(2);
   });
 
   it('retains development eval artifact context even when include_artifacts is false', async () => {
@@ -390,7 +420,10 @@ describe('handlePreparePhaseContext', () => {
             phase_role_name: string;
             acting_agent_name: string;
             recommended_mode: string;
+            execution_policy: PhaseExecutionPolicy;
+            prompt_realization_policy: PromptRealizationPolicy;
             response_style: PhaseResponseStyle;
+            phase_prompt_manifest: PhasePromptManifest | null;
           };
           invocation: { agent_name: string } | null;
         };
@@ -408,13 +441,16 @@ describe('handlePreparePhaseContext', () => {
     expect(context?.execution.phase_role_name).toBe('builder-agent');
     expect(context?.execution.acting_agent_name).toBe('senior-builder');
     expect(context?.execution.recommended_mode).toBe('subagent');
+    expect(context?.execution.execution_policy).toBe('distinct_session_preferred');
+    expect(context?.execution.prompt_realization_policy).toBe('phase_bundle_preferred');
     expect(context?.execution.response_style).toBe('terse_execution');
+    expect(context?.execution.phase_prompt_manifest?.phase_role_name).toBe('builder-agent');
     expect(context?.invocation?.agent_name).toBe('senior-builder');
   });
 
-  it('returns normal response style for durable artifact phases', async () => {
+  it('returns inline-allowed execution policy for durable artifact phases', async () => {
     const adapter: WorkflowStateAdapter = {
-      getFeature: vi.fn(async () => createFeature()),
+      getFeature: vi.fn(async () => createFeature({ current_phase: '8' })),
       listPhaseArtifacts: vi.fn(async () => []),
       listLearnings: vi.fn(async () => []),
       listRelatedLearnings: vi.fn(async () => []),
@@ -458,12 +494,21 @@ describe('handlePreparePhaseContext', () => {
     const context = (
       result.structuredContent as {
         context?: {
-          execution: { response_style: PhaseResponseStyle; recommended_mode: string };
+          execution: {
+            execution_policy: PhaseExecutionPolicy;
+            prompt_realization_policy: PromptRealizationPolicy;
+            response_style: PhaseResponseStyle;
+            recommended_mode: string;
+            phase_prompt_manifest: PhasePromptManifest | null;
+          };
         };
       }
     )?.context;
 
+    expect(context?.execution.execution_policy).toBe('inline_allowed');
+    expect(context?.execution.prompt_realization_policy).toBe('phase_bundle_optional');
     expect(context?.execution.response_style).toBe('normal');
     expect(context?.execution.recommended_mode).toBe('subagent');
+    expect(context?.execution.phase_prompt_manifest?.phase).toBe('8');
   });
 });

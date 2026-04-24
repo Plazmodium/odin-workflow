@@ -8,6 +8,7 @@ import {
   getAgentDurations,
   getAgentInvocations,
   getPhaseExecutionAttestations,
+  getPhasePromptRealizations,
   getQualityGates,
   getBlockers,
   getFeatureEval,
@@ -51,12 +52,13 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
   const feature = await getFeatureStatus(id);
   if (!feature) notFound();
 
-  const [phases, agentDurationsResult, invocations, executionAttestationsResult, gates, blockers, eval_, learnings, transitions, iterations, commits, auditLog, phaseOutputs, archive, claims, claimsSummary, securityFindings, securitySummary] =
+  const [phases, agentDurationsResult, invocations, executionAttestationsResult, promptRealizationsResult, gates, blockers, eval_, learnings, transitions, iterations, commits, auditLog, phaseOutputs, archive, claims, claimsSummary, securityFindings, securitySummary] =
     await Promise.all([
       getPhaseDurations(id),
       getAgentDurations(id),
       getAgentInvocations(id),
       getPhaseExecutionAttestations(id, feature.current_phase),
+      getPhasePromptRealizations(id, feature.current_phase),
       getQualityGates(id),
       getBlockers(id),
       getFeatureEval(id),
@@ -73,6 +75,7 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
       getSecuritySummary(id),
     ]);
   const executionAttestations = executionAttestationsResult.attestations;
+  const promptRealizations = promptRealizationsResult.realizations;
   const currentPhaseExecution = executionAttestationsResult.current_phase;
   const currentPhasePolicy = currentPhaseExecution?.execution_policy ?? 'inline_allowed';
   const currentPhaseRecommendedMode = currentPhaseExecution?.recommended_mode ?? 'inline';
@@ -178,6 +181,36 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
                 </div>
               </div>
             )}
+            <div className="space-y-3 border-t pt-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Prompt realization</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">Policy: {promptRealizationsResult.current_phase?.prompt_realization_policy ?? 'phase_bundle_optional'}</Badge>
+                <Badge variant={promptRealizationsResult.current_phase?.attested_manifest_id == null ? 'outline' : 'secondary'}>
+                  Manifest: {promptRealizationsResult.current_phase?.attested_manifest_id ?? 'not recorded'}
+                </Badge>
+                <Badge variant={promptRealizationsResult.current_phase?.proof_status === 'bundle_attested' || promptRealizationsResult.current_phase?.proof_status === 'bundle_verified' ? 'secondary' : 'outline'}>
+                  Proof: {promptRealizationsResult.current_phase?.proof_status ?? 'none'}
+                </Badge>
+              </div>
+              {promptRealizationsResult.current_phase?.warning != null && (
+                <p className="text-amber-600 dark:text-amber-400">{promptRealizationsResult.current_phase.warning}</p>
+              )}
+              {promptRealizationsResult.error != null && (
+                <p className="text-amber-600 dark:text-amber-400">{promptRealizationsResult.error}</p>
+              )}
+              {promptRealizations.length > 0 && (
+                <div className="space-y-2">
+                  {promptRealizations.map((realization) => (
+                    <div key={`${realization.feature_id}:${realization.phase}`} className="flex flex-wrap items-center gap-2 text-xs">
+                      <Badge variant="outline">Phase {realization.phase}</Badge>
+                      <span className="text-muted-foreground">manifest: {realization.manifest_id}</span>
+                      <span className="text-muted-foreground">proof: {realization.proof_status}</span>
+                      <span className="text-muted-foreground">by {realization.attested_by}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 

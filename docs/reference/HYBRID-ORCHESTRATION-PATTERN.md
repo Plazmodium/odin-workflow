@@ -18,6 +18,8 @@ This document now describes the **fallback pattern** for harnesses where spawned
 
 Important: invocation lifecycle telemetry (`prepare_phase_context -> record_phase_result`) is not the same as proof of a distinct child session. When projects care about provable phase ownership, the harness must also record `odin.register_phase_execution(...)`.
 
+For the stricter question "did the child actually run from the properly defined Odin phase bundle?", the harness must additionally record `odin.register_phase_realization(...)` against the manifest returned by `odin.prepare_phase_context(...)`.
+
 Read the examples below using the current 11-phase order (Planning → Product → Discovery → Architect → Guardian → Builder → Reviewer → Integrator → Documenter → Release → Complete).
 
 ---
@@ -98,6 +100,7 @@ In the packaged Odin runtime, the same proxy rule applies when a child agent lac
 
 - Let the runtime own invocation lifecycle via `odin.prepare_phase_context(...)` and `odin.record_phase_result(...)`
 - Record actual execution mode with `odin.register_phase_execution(...)` when a project needs auditable phase ownership
+- Record prompt-bundle realization with `odin.register_phase_realization(...)` when a project needs proof that the child ran from the canonical Odin phase bundle manifest
 - Validate quality gates before phase transitions
 - Manage feature locks for parallel work
 - Handle escalations and blockers

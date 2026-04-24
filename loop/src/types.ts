@@ -6,6 +6,8 @@ export type ExecutablePhaseId = '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | 
 export type PhaseExecutionMode = 'inline' | 'subagent';
 
 export type PhaseExecutionPolicy = 'inline_allowed' | 'distinct_session_preferred' | 'distinct_session_required';
+export type PromptRealizationPolicy = 'phase_bundle_optional' | 'phase_bundle_preferred' | 'phase_bundle_required';
+export type PromptRealizationProofStatus = 'none' | 'bundle_attested' | 'bundle_verified';
 
 export type PhaseResponseStyle = 'normal' | 'terse_execution';
 
@@ -22,6 +24,19 @@ export type PhasePromptSection =
   | 'artifacts'
   | 'skills'
   | 'learnings';
+
+export interface PhasePromptManifest {
+  manifest_id: string;
+  phase: PhaseId;
+  phase_role_name: string;
+  shared_context_hash: string;
+  phase_definition_hash: string;
+  resolved_skill_hashes: string[];
+  required_prompt_sections: PhasePromptSection[];
+  context_bundle_hash: string;
+  manifest_version: string;
+  nonce: string;
+}
 
 export type PhaseOutcome = 'completed' | 'blocked' | 'needs_rework';
 
@@ -57,8 +72,10 @@ export interface PreparedPhaseContext {
     supported_modes: PhaseExecutionMode[];
     recommended_mode: PhaseExecutionMode;
     execution_policy: PhaseExecutionPolicy;
+    prompt_realization_policy: PromptRealizationPolicy;
     child_state_strategy: PhaseChildStateStrategy;
     response_style: PhaseResponseStyle;
+    phase_prompt_manifest: PhasePromptManifest | null;
     prompt_sections: PhasePromptSection[];
   };
 }
@@ -71,6 +88,21 @@ export interface RegisterPhaseExecutionInput {
   worker_session_id?: string;
   harness_run_id?: string;
   attested_by: string;
+}
+
+export interface RegisterPhaseRealizationInput {
+  feature_id: string;
+  phase: ExecutablePhaseId;
+  manifest: PhasePromptManifest;
+  actual_mode: PhaseExecutionMode;
+  supervisor_session_id: string;
+  worker_session_id?: string;
+  harness_run_id?: string;
+  attested_by: string;
+  child_prompt_hash: string;
+  wrapper_hash?: string;
+  child_ack_nonce?: string;
+  proof_status: Exclude<PromptRealizationProofStatus, 'none'>;
 }
 
 export interface SkippedSummaryItem {
@@ -154,6 +186,7 @@ export interface RuntimeToolClient {
   recordSupervisorEvent(input: RecordSupervisorEventInput): Promise<void>;
   registerPhaseExecution(input: RegisterPhaseExecutionInput): Promise<void>;
   clearPhaseExecution(input: { feature_id: string; phase: ExecutablePhaseId }): Promise<void>;
+  registerPhaseRealization(input: RegisterPhaseRealizationInput): Promise<void>;
   recordPhaseArtifact(input: RecordPhaseArtifactInput): Promise<void>;
   recordPhaseResult(input: RecordPhaseResultInput): Promise<void>;
   archiveFeatureRelease(input: ArchiveFeatureReleaseInput): Promise<void>;
@@ -190,6 +223,7 @@ export interface SubagentExecutionResult {
   next_phase?: PhaseId;
   blockers?: string[];
   artifacts?: SubagentExecutionArtifact[];
+  phase_prompt_nonce_ack?: string;
 }
 
 export interface SubagentExecutor {

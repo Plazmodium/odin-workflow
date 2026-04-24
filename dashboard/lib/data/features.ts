@@ -12,6 +12,8 @@ import type {
   PhaseExecutionMode,
   PhaseExecutionPolicy,
   PhaseExecutionProofStatus,
+  PromptRealizationPolicy,
+  PromptRealizationProofStatus,
   QualityGate,
   Blocker,
   FeatureEval,
@@ -20,6 +22,7 @@ import type {
   PhaseTransition,
   IterationTracking,
   PhaseExecutionAttestation,
+  PhasePromptRealization,
   PhaseOutput,
 } from '@/lib/types/database';
 
@@ -36,6 +39,18 @@ export interface PhaseExecutionAttestationsResult {
     recommended_mode: PhaseExecutionMode;
     actual_mode: PhaseExecutionMode | null;
     proof_status: PhaseExecutionProofStatus;
+    warning: string | null;
+  } | null;
+}
+
+export interface PhasePromptRealizationsResult {
+  realizations: PhasePromptRealization[];
+  error: string | null;
+  current_phase: {
+    prompt_realization_policy: PromptRealizationPolicy;
+    actual_mode: PhaseExecutionMode | null;
+    proof_status: PromptRealizationProofStatus;
+    attested_manifest_id: string | null;
     warning: string | null;
   } | null;
 }
@@ -66,6 +81,20 @@ const RECOMMENDED_MODE_BY_PHASE: Record<Phase, PhaseExecutionMode> = {
   '8': 'subagent',
   '9': 'inline',
   '10': 'inline',
+};
+
+const PROMPT_REALIZATION_POLICY_BY_PHASE: Record<Phase, PromptRealizationPolicy> = {
+  '0': 'phase_bundle_optional',
+  '1': 'phase_bundle_optional',
+  '2': 'phase_bundle_optional',
+  '3': 'phase_bundle_optional',
+  '4': 'phase_bundle_optional',
+  '5': 'phase_bundle_preferred',
+  '6': 'phase_bundle_preferred',
+  '7': 'phase_bundle_preferred',
+  '8': 'phase_bundle_optional',
+  '9': 'phase_bundle_optional',
+  '10': 'phase_bundle_optional',
 };
 
 function hasDistinctSessionProof(attestation: PhaseExecutionAttestation | null): boolean {
@@ -115,12 +144,63 @@ function assessCurrentPhaseExecution(
   };
 }
 
+function assessCurrentPhasePromptRealization(
+  currentPhase: Phase,
+  realization: PhasePromptRealization | null,
+  error: string | null,
+): NonNullable<PhasePromptRealizationsResult['current_phase']> {
+  const prompt_realization_policy = realization?.prompt_realization_policy ?? PROMPT_REALIZATION_POLICY_BY_PHASE[currentPhase];
+
+  if (error != null || prompt_realization_policy === 'phase_bundle_optional') {
+    return {
+      prompt_realization_policy,
+      actual_mode: realization?.actual_mode ?? null,
+      proof_status: realization?.proof_status ?? 'none',
+      attested_manifest_id: realization?.manifest_id ?? null,
+      warning: null,
+    };
+  }
+
+  if (
+    realization != null &&
+    realization.actual_mode === 'subagent' &&
+    (realization.proof_status === 'bundle_attested' || realization.proof_status === 'bundle_verified')
+  ) {
+    return {
+      prompt_realization_policy,
+      actual_mode: realization.actual_mode,
+      proof_status: realization.proof_status,
+      attested_manifest_id: realization.manifest_id,
+      warning: null,
+    };
+  }
+
+  const warning =
+    realization == null
+      ? `No prompt realization attestation recorded for current phase ${currentPhase}.`
+      : realization.actual_mode !== 'subagent'
+        ? `Current phase ${currentPhase} prefers realization through the Odin phase bundle, but the recorded actual mode was ${realization.actual_mode}.`
+        : `Current phase ${currentPhase} prefers prompt-bundle realization, but the recorded proof is only ${realization.proof_status}.`;
+
+  return {
+    prompt_realization_policy,
+    actual_mode: realization?.actual_mode ?? null,
+    proof_status: realization?.proof_status ?? 'none',
+    attested_manifest_id: realization?.manifest_id ?? null,
+    warning,
+  };
+}
+
 function formatMissingRpcError(functionName: string): string {
   return `RPC function ${functionName} is missing in Supabase. Apply the latest migrations and verify the function exists.`;
 }
 
 function formatMissingTableError(tableName: string): string {
   return `Table ${tableName} is missing in Supabase. Apply migration 012_phase_execution_attestations.sql and verify the table exists.`;
+}
+
+function formatMissingPromptRealizationTableError(tableName: string): string {
+  return `Table ${tableName} is missing in Supabase. Apply migration 014_phase_prompt_realizations.sql and verify the table exists.`;
 }
 
 function isMissingTableError(error: unknown, tableName: string): boolean {
@@ -392,6 +472,47 @@ export async function getPhaseExecutionAttestations(
     attestations,
     error: null,
     current_phase: assessCurrentPhaseExecution(currentPhase, currentPhaseAttestation, null),
+  };
+}
+
+export async function getPhasePromptRealizations(
+  featureId: string,
+  currentPhase: Phase,
+): Promise<PhasePromptRealizationsResult> {
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from('phase_prompt_realizations')
+    .select('*')
+    .eq('feature_id', featureId)
+    .order('phase', { ascending: true });
+
+  if (error) {
+    const isMissingTable = isMissingTableError(error, 'phase_prompt_realizations');
+    const formattedError = isMissingTable
+      ? formatMissingPromptRealizationTableError('phase_prompt_realizations')
+      : error.message;
+    return {
+      realizations: [],
+      error: formattedError,
+      current_phase: assessCurrentPhasePromptRealization(currentPhase, null, formattedError),
+    };
+  }
+
+  if (!data) {
+    return {
+      realizations: [],
+      error: null,
+      current_phase: assessCurrentPhasePromptRealization(currentPhase, null, null),
+    };
+  }
+
+  const realizations = data as PhasePromptRealization[];
+  const currentPhaseRealization = realizations.find((realization) => realization.phase === currentPhase) ?? null;
+
+  return {
+    realizations,
+    error: null,
+    current_phase: assessCurrentPhasePromptRealization(currentPhase, currentPhaseRealization, null),
   };
 }
 
