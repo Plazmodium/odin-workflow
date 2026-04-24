@@ -126,7 +126,7 @@ This is the canonical step-by-step workflow the orchestrator follows for every f
 
 When a project opts into runtime automation policy, the orchestrator must consult the `automation` block returned by `odin.prepare_phase_context` before attempting PR-related actions. `odin.record_pr` and `odin.record_merge` persist facts after external git/GitHub actions; they are not the trusted authorization boundary by themselves.
 
-> **Remember**: Child-agent MCP access depends on harness capabilities. Some harnesses let task-spawned child agents call `odin.*` directly; others require the main orchestrator session to proxy those calls. `recommended_mode` is guidance, `execution_policy` is enforcement, and invocation telemetry alone does not prove a distinct child session.
+> **Remember**: Child-agent MCP access depends on harness capabilities. Some harnesses let task-spawned child agents call `odin.*` directly; others require the main orchestrator session to proxy those calls. `recommended_mode` is guidance, `execution_policy` is enforcement, and invocation telemetry alone does not prove a distinct child session. For the stricter question "did the child run from the canonical Odin phase bundle?", the harness must also use the prompt manifest and record `odin.register_phase_realization(...)`.
 
 ### Feature Is the Unit of Execution
 
@@ -797,6 +797,7 @@ Important distinction:
 - `execution_policy` is the enforcement level
 - invocation telemetry alone does **not** prove a distinct child session ran
 - strict phase ownership is only proven when the harness records execution attestation
+- strict phase-agent realization is only proven when the harness also records prompt-bundle realization against the canonical phase manifest
 
 > **Full Documentation**: See [HYBRID-ORCHESTRATION-PATTERN.md](docs/reference/HYBRID-ORCHESTRATION-PATTERN.md)
 

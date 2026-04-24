@@ -1,8 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ArchiveAdapter } from '../adapters/archive/types.js';
+import type { SkillAdapter } from '../adapters/skills/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
-import type { FeatureRecord, PhaseArtifact, PhaseExecutionAttestation, PhaseResultRecord } from '../types.js';
+import type { RuntimeConfig } from '../config.js';
+import type {
+  FeatureRecord,
+  PhaseArtifact,
+  PhaseExecutionAttestation,
+  PhasePromptRealizationAttestation,
+  PhaseResultRecord,
+} from '../types.js';
 import { handleRecordPhaseResult } from './record-phase-result.js';
 
 function createFeature(overrides: Partial<FeatureRecord> = {}): FeatureRecord {
@@ -20,6 +28,34 @@ function createFeature(overrides: Partial<FeatureRecord> = {}): FeatureRecord {
   };
 }
 
+function createConfig(): RuntimeConfig {
+  return {
+    runtime: { mode: 'in_memory' },
+    automation: {
+      mode: 'guarded',
+      allowed_base_branches: ['main'],
+      require_green_checks: true,
+      require_clean_policy_checks: true,
+      require_no_open_blockers: true,
+      require_watched_claims_verified: true,
+      paused: false,
+      kill_switch: false,
+      merge_strategy: 'squash',
+    },
+  };
+}
+
+function createSkillAdapter(): SkillAdapter {
+  return {
+    resolveSkills: vi.fn(async () => ({
+      resolved: [],
+      fallback_used: false,
+    })),
+    listKnowledgeDomains: vi.fn(async () => []),
+    invalidateCaches: vi.fn(),
+  };
+}
+
 function createTasksArtifact(content: unknown): PhaseArtifact {
   return {
     id: 'artifact_tasks',
@@ -32,6 +68,34 @@ function createTasksArtifact(content: unknown): PhaseArtifact {
   };
 }
 
+function createPromptRealizationAttestation(overrides: Partial<PhasePromptRealizationAttestation> = {}): PhasePromptRealizationAttestation {
+  return {
+    feature_id: 'FEAT-RESULT',
+    phase: '5',
+    phase_role_name: 'builder-agent',
+    prompt_realization_policy: 'phase_bundle_preferred',
+    manifest_id: 'manifest-1',
+    manifest_version: '1',
+    shared_context_hash: 'a'.repeat(64),
+    phase_definition_hash: 'b'.repeat(64),
+    resolved_skill_hashes: ['c'.repeat(64)],
+    required_prompt_sections: ['phase', 'role_summary', 'constraints'],
+    context_bundle_hash: 'd'.repeat(64),
+    nonce: 'nonce-1',
+    actual_mode: 'subagent',
+    proof_status: 'bundle_attested',
+    supervisor_session_id: 'ralph-loop:run-1',
+    worker_session_id: 'ralph-loop:run-1:worker',
+    harness_run_id: 'run-1',
+    attested_by: 'ralph-loop',
+    child_prompt_hash: 'e'.repeat(64),
+    wrapper_hash: null,
+    child_ack_nonce: null,
+    recorded_at: '2026-03-20T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 describe('handleRecordPhaseResult', () => {
   it('normalizes harness actors, completes open invocations, and auto-completes remaining Builder tasks', async () => {
     const adapter: WorkflowStateAdapter = {
@@ -39,6 +103,14 @@ describe('handleRecordPhaseResult', () => {
       listPhaseArtifacts: vi.fn(async () => [
         createTasksArtifact([{ id: 'T1', title: 'Add tests', status: 'pending' }]),
       ]),
+      listLearnings: vi.fn(async () => []),
+      listRelatedLearnings: vi.fn(async () => []),
+      listOpenBlockers: vi.fn(async () => []),
+      listOpenGateRecords: vi.fn(async () => []),
+      listOpenFindings: vi.fn(async () => []),
+      listPendingClaims: vi.fn(async () => []),
+      listClaimVerificationStatus: vi.fn(async () => []),
+      listClaimsNeedingReview: vi.fn(async () => []),
       recordPhaseArtifact: vi.fn(async (artifact: PhaseArtifact) => artifact),
       getPhaseExecutionAttestation: vi.fn(async () => ({
         feature_id: 'FEAT-RESULT',
@@ -54,6 +126,7 @@ describe('handleRecordPhaseResult', () => {
         attestation_source: 'harness',
         recorded_at: '2026-03-20T00:00:00.000Z',
       } satisfies PhaseExecutionAttestation)),
+      getPhasePromptRealization: vi.fn(async () => createPromptRealizationAttestation()),
       findOpenAgentInvocation: vi.fn(async () => ({
         id: 'inv_open',
         feature_id: 'FEAT-RESULT',
@@ -81,7 +154,7 @@ describe('handleRecordPhaseResult', () => {
       computeFeatureEval: vi.fn(async () => null),
     } as unknown as WorkflowStateAdapter;
 
-    const result = await handleRecordPhaseResult(adapter, null, {
+    const result = await handleRecordPhaseResult(adapter, createSkillAdapter(), createConfig(), null, {
       feature_id: 'FEAT-RESULT',
       phase: '5',
       outcome: 'completed',
@@ -120,6 +193,14 @@ describe('handleRecordPhaseResult', () => {
     const adapter: WorkflowStateAdapter = {
       getFeature: vi.fn(async () => createFeature({ current_phase: '9' })),
       listPhaseArtifacts: vi.fn(async () => []),
+      listLearnings: vi.fn(async () => []),
+      listRelatedLearnings: vi.fn(async () => []),
+      listOpenBlockers: vi.fn(async () => []),
+      listOpenGateRecords: vi.fn(async () => []),
+      listOpenFindings: vi.fn(async () => []),
+      listPendingClaims: vi.fn(async () => []),
+      listClaimVerificationStatus: vi.fn(async () => []),
+      listClaimsNeedingReview: vi.fn(async () => []),
       getPhaseExecutionAttestation: vi.fn(async () => ({
         feature_id: 'FEAT-RESULT',
         phase: '9',
@@ -134,10 +215,11 @@ describe('handleRecordPhaseResult', () => {
         attestation_source: 'harness',
         recorded_at: '2026-03-20T00:00:00.000Z',
       } satisfies PhaseExecutionAttestation)),
+      getPhasePromptRealization: vi.fn(async () => null),
       recordPhaseResult: vi.fn(),
     } as unknown as WorkflowStateAdapter;
 
-    const result = await handleRecordPhaseResult(adapter, null, {
+    const result = await handleRecordPhaseResult(adapter, createSkillAdapter(), createConfig(), null, {
       feature_id: 'FEAT-RESULT',
       phase: '9',
       outcome: 'completed',
@@ -168,6 +250,14 @@ describe('handleRecordPhaseResult', () => {
         })
       ),
       listPhaseArtifacts: vi.fn(async () => []),
+      listLearnings: vi.fn(async () => []),
+      listRelatedLearnings: vi.fn(async () => []),
+      listOpenBlockers: vi.fn(async () => []),
+      listOpenGateRecords: vi.fn(async () => []),
+      listOpenFindings: vi.fn(async () => []),
+      listPendingClaims: vi.fn(async () => []),
+      listClaimVerificationStatus: vi.fn(async () => []),
+      listClaimsNeedingReview: vi.fn(async () => []),
       getPhaseExecutionAttestation: vi.fn(async () => ({
         feature_id: 'FEAT-RESULT',
         phase: '9',
@@ -182,6 +272,7 @@ describe('handleRecordPhaseResult', () => {
         attestation_source: 'harness',
         recorded_at: '2026-03-20T00:00:00.000Z',
       } satisfies PhaseExecutionAttestation)),
+      getPhasePromptRealization: vi.fn(async () => null),
       findOpenAgentInvocation: vi.fn(async () => ({
         id: 'inv_release',
         feature_id: 'FEAT-RESULT',
@@ -225,7 +316,7 @@ describe('handleRecordPhaseResult', () => {
       computeFeatureEval: vi.fn(async () => null),
     } as unknown as WorkflowStateAdapter;
 
-    const result = await handleRecordPhaseResult(adapter, archive_adapter, {
+    const result = await handleRecordPhaseResult(adapter, createSkillAdapter(), createConfig(), archive_adapter, {
       feature_id: 'FEAT-RESULT',
       phase: '9',
       outcome: 'completed',
@@ -257,7 +348,16 @@ describe('handleRecordPhaseResult', () => {
     const adapter: WorkflowStateAdapter = {
       getFeature: vi.fn(async () => createFeature()),
       listPhaseArtifacts: vi.fn(async () => []),
+      listLearnings: vi.fn(async () => []),
+      listRelatedLearnings: vi.fn(async () => []),
+      listOpenBlockers: vi.fn(async () => []),
+      listOpenGateRecords: vi.fn(async () => []),
+      listOpenFindings: vi.fn(async () => []),
+      listPendingClaims: vi.fn(async () => []),
+      listClaimVerificationStatus: vi.fn(async () => []),
+      listClaimsNeedingReview: vi.fn(async () => []),
       getPhaseExecutionAttestation: vi.fn(async () => null),
+      getPhasePromptRealization: vi.fn(async () => null),
       findOpenAgentInvocation: vi.fn(async () => ({
         id: 'inv_warn',
         feature_id: 'FEAT-RESULT',
@@ -285,7 +385,7 @@ describe('handleRecordPhaseResult', () => {
       computeFeatureEval: vi.fn(async () => null),
     } as unknown as WorkflowStateAdapter;
 
-    const result = await handleRecordPhaseResult(adapter, null, {
+    const result = await handleRecordPhaseResult(adapter, createSkillAdapter(), createConfig(), null, {
       feature_id: 'FEAT-RESULT',
       phase: '5',
       outcome: 'completed',
@@ -296,8 +396,13 @@ describe('handleRecordPhaseResult', () => {
 
     expect(result.isError).toBeUndefined();
     expect(result.content[0]?.text).toContain('Warning: Phase 5 (builder-agent) prefers a distinct worker session');
+    expect(result.content[0]?.text).toContain('prefers attested realization from the Odin phase bundle');
     expect(result.structuredContent?.execution).toMatchObject({
       warning: expect.stringContaining('prefers a distinct worker session'),
+      error: null,
+    });
+    expect(result.structuredContent?.prompt_realization).toMatchObject({
+      warning: expect.stringContaining('prefers attested realization from the Odin phase bundle'),
       error: null,
     });
   });

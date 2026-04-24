@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.6.3-beta] - 2026-04-24
+
+### Added
+
+- Odin now emits a canonical `phase_prompt_manifest` from `odin.prepare_phase_context(...)` and can persist prompt-realization attestations through `odin.register_phase_realization(...)` so projects can tell whether a child merely existed or actually ran from the canonical Odin phase bundle.
+- The dashboard feature detail page now shows prompt-realization manifest/proof visibility alongside execution attestation, including migration guidance when `phase_prompt_realizations` is missing.
+
+### Changed
+
+- `record_phase_result(...)` now evaluates prompt-realization policy in addition to execution policy, warning or rejecting when a phase requires bundle fidelity proof.
+- Ralph Loop now hashes the child prompt it actually sends and records prompt realization after successful subagent runs.
+- Runtime migrations now include `014_phase_prompt_realizations.sql`, and migration inventories/documentation now distinguish immutable attestation base migrations from later additive repair waves.
+- Root package version, runtime package version, runtime MCP server version, root README badge, and Ralph Loop version updated for this release.
+
 ## [0.6.2-beta] - 2026-04-16
 
 ### Added

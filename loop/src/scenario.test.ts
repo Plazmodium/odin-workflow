@@ -20,12 +20,27 @@ type Stage = 'handoff' | 'closeout' | 'noop';
 function createPreparedContext(phase: string, recommended_mode: 'inline' | 'subagent', acting_agent_name: string) {
   const phase_name = phase === '9' ? 'Release' : 'Builder';
   const role_name = phase === '9' ? 'release-agent' : 'builder-agent';
+  const prompt_realization_policy = phase === '5' || phase === '6' || phase === '7'
+    ? 'phase_bundle_preferred'
+    : 'phase_bundle_optional';
+  const phase_prompt_manifest = {
+    manifest_id: `manifest-${phase}`,
+    phase,
+    phase_role_name: role_name,
+    shared_context_hash: 'a'.repeat(64),
+    phase_definition_hash: 'b'.repeat(64),
+    resolved_skill_hashes: ['c'.repeat(64)],
+    required_prompt_sections: ['phase', 'role_summary', 'constraints'] as const,
+    context_bundle_hash: 'd'.repeat(64),
+    manifest_version: '1',
+    nonce: `nonce-${phase}`,
+  };
 
   return {
     raw: {
       phase: { id: phase, name: phase_name },
       agent: { name: role_name },
-      execution: { recommended_mode, acting_agent_name },
+      execution: { recommended_mode, acting_agent_name, prompt_realization_policy, phase_prompt_manifest },
     },
     phase: {
       id: phase,
@@ -46,8 +61,10 @@ function createPreparedContext(phase: string, recommended_mode: 'inline' | 'suba
       execution_policy: (phase === '5' || phase === '6' || phase === '7')
         ? 'distinct_session_preferred' as const
         : 'inline_allowed' as const,
+      prompt_realization_policy,
       child_state_strategy: recommended_mode === 'subagent' ? 'direct_odin_tools_if_available' as const : 'return_intent_to_parent' as const,
       response_style: 'terse_execution' as const,
+      phase_prompt_manifest,
       prompt_sections: ['phase', 'role_summary', 'constraints'] as const,
     },
   };
@@ -64,6 +81,7 @@ class FakeRuntimeToolClient implements RuntimeToolClient {
   readonly phase_results: RecordPhaseResultInput[] = [];
   readonly phase_executions: Array<{ feature_id: string; phase: string; actual_mode: string }> = [];
   readonly cleared_phase_executions: Array<{ feature_id: string; phase: string }> = [];
+  readonly phase_realizations: Array<{ feature_id: string; phase: string; proof_status: string }> = [];
 
   async pickNextAutonomousPhase(_supervisor_name: string, options?: PickNextAutonomousPhaseOptions): Promise<PickNextAutonomousPhaseResult> {
     const allow_reason = (reason: string): boolean =>
@@ -133,6 +151,10 @@ class FakeRuntimeToolClient implements RuntimeToolClient {
 
   async clearPhaseExecution(input: { feature_id: string; phase: string }): Promise<void> {
     this.cleared_phase_executions.push(input);
+  }
+
+  async registerPhaseRealization(input: { feature_id: string; phase: string; proof_status: string }): Promise<void> {
+    this.phase_realizations.push(input);
   }
 
   async recordPhaseArtifact(): Promise<void> {}

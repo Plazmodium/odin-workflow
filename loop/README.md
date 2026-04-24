@@ -25,6 +25,8 @@ Ralph Loop now also records `odin.register_phase_execution(...)` before it execu
 - actual execution mode
 - whether a distinct worker session was attested
 
+For subagent phases, Ralph Loop can now also record `odin.register_phase_realization(...)` after a successful child run so Odin can tell whether the child was launched from the canonical phase prompt bundle returned by `odin.prepare_phase_context(...)`.
+
 ## Commands
 
 From the full Odin suite repo:
@@ -127,6 +129,7 @@ The child command must write JSON to stdout shaped like:
 Ralph Loop then proxies:
 
 - `odin.register_phase_execution(...)` to attest actual mode and session linkage
+- `odin.register_phase_realization(...)` for subagent phases when a canonical phase prompt manifest was used
 - `odin.record_phase_artifact(...)` for each returned artifact
 - `odin.record_phase_result(...)` for the returned outcome
 - on failed/aborted attempts after registration: `odin.clear_phase_execution(...)` before retry
@@ -134,6 +137,8 @@ Ralph Loop then proxies:
 using `selection.prepared_context.execution.acting_agent_name` as the proxied `created_by` value.
 
 When `selection.prepared_context.execution.response_style = terse_execution`, Ralph Loop adds terse operational-style instructions to the child prompt. This applies to execution chatter and summaries only. Final artifacts are still expected to follow the normal phase templates.
+
+When `selection.prepared_context.execution.phase_prompt_manifest` is present and `prompt_realization_policy` is not optional, Ralph Loop includes the manifest details in the child prompt and records manifest-based realization proof after a successful child run.
 
 ## Operational notes
 

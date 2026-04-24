@@ -1,0 +1,182 @@
+import { computePhasePromptManifestId } from './phase-prompt-manifest.js';
+import { getPhaseAgentInstructions, getPhaseExecutionContract } from './phases.js';
+
+import type {
+  PhaseId,
+  PhasePromptManifest,
+  PhasePromptRealizationAttestation,
+  PromptRealizationPolicy,
+  PromptRealizationProofStatus,
+} from '../types.js';
+
+export const PROMPT_REALIZATION_AUDIT_PHASES: PhaseId[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+export interface PhasePromptRealizationStatusRow {
+  phase: PhaseId;
+  phase_role_name: string;
+  prompt_realization_policy: PromptRealizationPolicy;
+  expected_manifest_id: string | null;
+  attested_manifest_id: string | null;
+  actual_mode: PhasePromptRealizationAttestation['actual_mode'] | null;
+  proof_status: PromptRealizationProofStatus;
+  manifest_match: boolean;
+  child_prompt_hash: string | null;
+  wrapper_hash: string | null;
+  child_ack_nonce: string | null;
+  attested_by: string | null;
+  supervisor_session_id: string | null;
+  worker_session_id: string | null;
+  harness_run_id: string | null;
+}
+
+export interface PromptRealizationAssessment {
+  row: PhasePromptRealizationStatusRow;
+  warning: string | null;
+  error: string | null;
+}
+
+export interface PromptRealizationStatusSummary {
+  rows: PhasePromptRealizationStatusRow[];
+  counts: {
+    bundle_attested: number;
+    bundle_verified: number;
+    matching_manifest: number;
+  };
+  preferred_without_bundle_realization: Array<{ phase: PhaseId; phase_role_name: string }>;
+  required_without_bundle_realization: Array<{ phase: PhaseId; phase_role_name: string }>;
+}
+
+function defaultRow(phase: PhaseId, expected_manifest: PhasePromptManifest | null): PhasePromptRealizationStatusRow {
+  const phase_role_name = getPhaseAgentInstructions(phase).name;
+  const contract = getPhaseExecutionContract(phase, phase_role_name);
+
+  return {
+    phase,
+    phase_role_name,
+    prompt_realization_policy: contract.prompt_realization_policy,
+    expected_manifest_id: expected_manifest?.manifest_id ?? null,
+    attested_manifest_id: null,
+    actual_mode: null,
+    proof_status: 'none',
+    manifest_match: expected_manifest == null,
+    child_prompt_hash: null,
+    wrapper_hash: null,
+    child_ack_nonce: null,
+    attested_by: null,
+    supervisor_session_id: null,
+    worker_session_id: null,
+    harness_run_id: null,
+  };
+}
+
+function expectedManifestIdFromAttestation(
+  attestation: PhasePromptRealizationAttestation,
+): string {
+  return computePhasePromptManifestId({
+    phase: attestation.phase,
+    phase_role_name: attestation.phase_role_name,
+    shared_context_hash: attestation.shared_context_hash,
+    phase_definition_hash: attestation.phase_definition_hash,
+    resolved_skill_hashes: attestation.resolved_skill_hashes,
+    required_prompt_sections: attestation.required_prompt_sections,
+    context_bundle_hash: attestation.context_bundle_hash,
+    manifest_version: attestation.manifest_version,
+    nonce: attestation.nonce,
+  });
+}
+
+function hasPromptBundleProof(row: PhasePromptRealizationStatusRow): boolean {
+  return (
+    row.actual_mode === 'subagent' &&
+    row.proof_status !== 'none' &&
+    row.attested_manifest_id != null &&
+    row.manifest_match
+  );
+}
+
+export function buildPromptRealizationStatusRow(
+  phase: PhaseId,
+  expected_manifest: PhasePromptManifest | null,
+  attestation: PhasePromptRealizationAttestation | null,
+): PhasePromptRealizationStatusRow {
+  const row = defaultRow(phase, expected_manifest);
+  if (attestation == null) {
+    return row;
+  }
+
+  return {
+    ...row,
+    expected_manifest_id:
+      expected_manifest?.manifest_id ?? expectedManifestIdFromAttestation(attestation),
+    attested_manifest_id: attestation.manifest_id,
+    actual_mode: attestation.actual_mode,
+    proof_status: attestation.proof_status,
+    manifest_match:
+      (expected_manifest?.manifest_id ?? expectedManifestIdFromAttestation(attestation)) === attestation.manifest_id,
+    child_prompt_hash: attestation.child_prompt_hash,
+    wrapper_hash: attestation.wrapper_hash,
+    child_ack_nonce: attestation.child_ack_nonce,
+    attested_by: attestation.attested_by,
+    supervisor_session_id: attestation.supervisor_session_id,
+    worker_session_id: attestation.worker_session_id,
+    harness_run_id: attestation.harness_run_id,
+  };
+}
+
+export function assessPromptRealizationPolicy(
+  phase: PhaseId,
+  expected_manifest: PhasePromptManifest | null,
+  attestation: PhasePromptRealizationAttestation | null,
+): PromptRealizationAssessment {
+  const row = buildPromptRealizationStatusRow(phase, expected_manifest, attestation);
+
+  if (row.prompt_realization_policy === 'phase_bundle_optional') {
+    return { row, warning: null, error: null };
+  }
+
+  if (hasPromptBundleProof(row)) {
+    return { row, warning: null, error: null };
+  }
+
+  const missing_message =
+    row.attested_manifest_id == null
+      ? `Phase ${phase} (${row.phase_role_name}) ${row.prompt_realization_policy === 'phase_bundle_required' ? 'requires' : 'prefers'} attested realization from the Odin phase bundle, but no prompt realization attestation was recorded.`
+      : !row.manifest_match
+        ? `Phase ${phase} (${row.phase_role_name}) ${row.prompt_realization_policy === 'phase_bundle_required' ? 'requires' : 'prefers'} the current Odin phase bundle, but the recorded manifest does not match the expected bundle.`
+        : row.actual_mode !== 'subagent'
+          ? `Phase ${phase} (${row.phase_role_name}) ${row.prompt_realization_policy === 'phase_bundle_required' ? 'requires' : 'prefers'} distinct child realization from the Odin phase bundle, but the recorded actual mode was ${row.actual_mode}.`
+          : `Phase ${phase} (${row.phase_role_name}) ${row.prompt_realization_policy === 'phase_bundle_required' ? 'requires' : 'prefers'} provable Odin phase-bundle realization, but the recorded proof is incomplete.`;
+
+  if (row.prompt_realization_policy === 'phase_bundle_required') {
+    return { row, warning: null, error: missing_message };
+  }
+
+  return {
+    row,
+    warning: missing_message,
+    error: null,
+  };
+}
+
+export function summarizePromptRealizationStatus(
+  rows: PhasePromptRealizationStatusRow[],
+): PromptRealizationStatusSummary {
+  const preferred_without_bundle_realization = rows
+    .filter((row) => row.prompt_realization_policy === 'phase_bundle_preferred' && !hasPromptBundleProof(row))
+    .map((row) => ({ phase: row.phase, phase_role_name: row.phase_role_name }));
+
+  const required_without_bundle_realization = rows
+    .filter((row) => row.prompt_realization_policy === 'phase_bundle_required' && !hasPromptBundleProof(row))
+    .map((row) => ({ phase: row.phase, phase_role_name: row.phase_role_name }));
+
+  return {
+    rows,
+    counts: {
+      bundle_attested: rows.filter((row) => row.proof_status === 'bundle_attested').length,
+      bundle_verified: rows.filter((row) => row.proof_status === 'bundle_verified').length,
+      matching_manifest: rows.filter((row) => row.manifest_match && row.attested_manifest_id != null).length,
+    },
+    preferred_without_bundle_realization,
+    required_without_bundle_realization,
+  };
+}

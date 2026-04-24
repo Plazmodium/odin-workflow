@@ -13,10 +13,12 @@ import type {
   PhaseExecutionMode,
   PhaseExecutionPolicy,
   PhaseId,
+  PhasePromptManifest,
   PhasePromptSection,
   PhaseResponseStyle,
   PreparedPhaseContext,
   RegisterPhaseExecutionInput,
+  RegisterPhaseRealizationInput,
   RecordPhaseArtifactInput,
   RecordPhaseResultInput,
   RecordPullRequestInput,
@@ -115,6 +117,12 @@ function asExecutionPolicy(value: unknown): PhaseExecutionPolicy | null {
     : null;
 }
 
+function asPromptRealizationPolicy(value: unknown): PreparedPhaseContext['execution']['prompt_realization_policy'] | null {
+  return value === 'phase_bundle_optional' || value === 'phase_bundle_preferred' || value === 'phase_bundle_required'
+    ? value
+    : null;
+}
+
 function asResponseStyle(value: unknown): PhaseResponseStyle | null {
   return value === 'normal' || value === 'terse_execution' ? value : null;
 }
@@ -147,6 +155,51 @@ function parsePromptSectionArray(value: unknown): PhasePromptSection[] | null {
     ? [entry as PhasePromptSection]
     : []));
   return parsed.length === value.length ? parsed : null;
+}
+
+function parsePhasePromptManifest(value: unknown): PhasePromptManifest | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const manifest_id = asString(value.manifest_id);
+  const phase = asPhaseId(value.phase);
+  const phase_role_name = asString(value.phase_role_name);
+  const shared_context_hash = asString(value.shared_context_hash);
+  const phase_definition_hash = asString(value.phase_definition_hash);
+  const resolved_skill_hashes = parseStringArray(value.resolved_skill_hashes);
+  const required_prompt_sections = parsePromptSectionArray(value.required_prompt_sections);
+  const context_bundle_hash = asString(value.context_bundle_hash);
+  const manifest_version = asString(value.manifest_version);
+  const nonce = asString(value.nonce);
+
+  if (
+    manifest_id == null ||
+    phase == null ||
+    phase_role_name == null ||
+    shared_context_hash == null ||
+    phase_definition_hash == null ||
+    resolved_skill_hashes == null ||
+    required_prompt_sections == null ||
+    context_bundle_hash == null ||
+    manifest_version == null ||
+    nonce == null
+  ) {
+    return null;
+  }
+
+  return {
+    manifest_id,
+    phase,
+    phase_role_name,
+    shared_context_hash,
+    phase_definition_hash,
+    resolved_skill_hashes,
+    required_prompt_sections,
+    context_bundle_hash,
+    manifest_version,
+    nonce,
+  };
 }
 
 /**
@@ -230,8 +283,10 @@ function extractPreparedContext(context: Record<string, unknown> | null): Prepar
   const supported_modes = execution == null ? null : parseExecutionModeArray(execution.supported_modes);
   const recommended_mode = execution == null ? null : asExecutionMode(execution.recommended_mode);
   const execution_policy = execution == null ? null : asExecutionPolicy(execution.execution_policy);
+  const prompt_realization_policy = execution == null ? null : asPromptRealizationPolicy(execution.prompt_realization_policy);
   const child_state_strategy = execution == null ? null : asChildStateStrategy(execution.child_state_strategy);
   const response_style = execution == null ? null : asResponseStyle(execution.response_style);
+  const phase_prompt_manifest = execution == null ? null : parsePhasePromptManifest(execution.phase_prompt_manifest);
   const prompt_sections = execution == null ? null : parsePromptSectionArray(execution.prompt_sections);
 
   if (
@@ -246,8 +301,10 @@ function extractPreparedContext(context: Record<string, unknown> | null): Prepar
     supported_modes == null ||
     recommended_mode == null ||
     execution_policy == null ||
+    prompt_realization_policy == null ||
     child_state_strategy == null ||
     response_style == null ||
+    phase_prompt_manifest == null ||
     prompt_sections == null ||
     supported_modes.length === 0
   ) {
@@ -277,8 +334,10 @@ function extractPreparedContext(context: Record<string, unknown> | null): Prepar
       supported_modes,
       recommended_mode,
       execution_policy,
+      prompt_realization_policy,
       child_state_strategy,
       response_style,
+      phase_prompt_manifest,
       prompt_sections,
     },
   };
@@ -454,6 +513,31 @@ class McpRuntimeToolClient implements RuntimeToolClient {
     }
   }
 
+  async registerPhaseRealization(input: RegisterPhaseRealizationInput): Promise<void> {
+    const result = await this.client.callTool({
+      name: 'odin.register_phase_realization',
+      arguments: {
+        feature_id: input.feature_id,
+        phase: input.phase,
+        manifest: input.manifest,
+        actual_mode: input.actual_mode,
+        supervisor_session_id: input.supervisor_session_id,
+        worker_session_id: input.worker_session_id,
+        harness_run_id: input.harness_run_id,
+        attested_by: input.attested_by,
+        child_prompt_hash: input.child_prompt_hash,
+        wrapper_hash: input.wrapper_hash,
+        child_ack_nonce: input.child_ack_nonce,
+        proof_status: input.proof_status,
+      },
+    });
+
+    const error = extractError(result);
+    if (error != null) {
+      throw new Error(error);
+    }
+  }
+
   async clearPhaseExecution(input: { feature_id: string; phase: ExecutablePhaseId }): Promise<void> {
     const result = await this.client.callTool({
       name: 'odin.clear_phase_execution',
@@ -610,7 +694,7 @@ export async function connectRuntimeClient(options: RuntimeClientOptions): Promi
   });
   const client = new Client({
     name: 'ralph-loop',
-    version: '0.2.2',
+    version: '0.2.3',
   });
   await client.connect(transport);
   return new McpRuntimeToolClient(client, transport);

@@ -4,16 +4,19 @@
  */
 
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import type { SkillAdapter } from '../adapters/skills/types.js';
 import type { RuntimeConfig } from '../config.js';
 import { resolveAutomationDecision } from '../domain/automation-policy.js';
 import { deriveAutonomyFeatureState } from '../domain/autonomous-pickup.js';
 import { buildDevelopmentEvalContext } from '../domain/development-evals.js';
 import { assessPhaseExecutionPolicy, summarizePhaseExecutionStatus } from '../domain/execution-policy.js';
 import { getNextPhaseId, getPhaseContract } from '../domain/phases.js';
+import { assessPromptRealizationPolicy, buildPromptRealizationStatusRow, PROMPT_REALIZATION_AUDIT_PHASES, summarizePromptRealizationStatus } from '../domain/prompt-realization.js';
 import { formatOpenGateSummary } from '../domain/quality-gates.js';
 import type { GetFeatureStatusInput } from '../schemas.js';
 import type { AgentInvocationRecord, PhaseId } from '../types.js';
 import { createErrorResult, createTextResult } from '../utils.js';
+import { buildPhaseContextBundleForFeature } from './prepare-phase-context.js';
 
 const EXPECTED_RELEASE_COVERAGE: Array<{ phase: PhaseId; agent_name: string }> = [
   { phase: '1', agent_name: 'product-agent' },
@@ -62,6 +65,7 @@ function buildInvocationCoverage(
 
 export async function handleGetFeatureStatus(
   adapter: WorkflowStateAdapter,
+  skill_adapter: SkillAdapter,
   config: RuntimeConfig,
   input: GetFeatureStatusInput
 ) {
@@ -84,6 +88,7 @@ export async function handleGetFeatureStatus(
     claims_needing_review,
     invocations,
     execution_attestations,
+    prompt_realizations,
     latest_feature_eval,
   ] =
     await Promise.all([
@@ -98,6 +103,7 @@ export async function handleGetFeatureStatus(
       adapter.listClaimsNeedingReview(input.feature_id),
       adapter.listAgentInvocations(input.feature_id),
       adapter.listPhaseExecutionAttestations(input.feature_id),
+      adapter.listPhasePromptRealizations(input.feature_id),
       adapter.getLatestFeatureEval(input.feature_id),
     ]);
 
@@ -112,6 +118,30 @@ export async function handleGetFeatureStatus(
   const current_phase_execution = assessPhaseExecutionPolicy(
     feature.current_phase,
     execution_attestations.find((attestation) => attestation.phase === feature.current_phase) ?? null,
+  );
+  const expected_current_bundle = feature.current_phase === '10'
+    ? null
+    : await buildPhaseContextBundleForFeature(feature, adapter, skill_adapter, config, {
+        feature_id: input.feature_id,
+        phase: feature.current_phase,
+        include_artifacts: true,
+        include_skills: true,
+        include_learnings: true,
+      }, {
+        open_invocation: false,
+      });
+  const prompt_realization_rows = PROMPT_REALIZATION_AUDIT_PHASES.map((phase) =>
+    buildPromptRealizationStatusRow(
+      phase,
+      phase === feature.current_phase ? expected_current_bundle?.execution.phase_prompt_manifest ?? null : null,
+      prompt_realizations.find((attestation) => attestation.phase === phase) ?? null,
+    )
+  );
+  const prompt_realization_status = summarizePromptRealizationStatus(prompt_realization_rows);
+  const current_phase_prompt_realization = assessPromptRealizationPolicy(
+    feature.current_phase,
+    expected_current_bundle?.execution.phase_prompt_manifest ?? null,
+    prompt_realizations.find((attestation) => attestation.phase === feature.current_phase) ?? null,
   );
   const automation = resolveAutomationDecision({
     config,
@@ -175,6 +205,10 @@ export async function handleGetFeatureStatus(
       phase_execution: {
         current_phase: current_phase_execution,
         summary: execution_status,
+      },
+      prompt_realization: {
+        current_phase: current_phase_prompt_realization,
+        summary: prompt_realization_status,
       },
       development_evals,
       latest_feature_eval,

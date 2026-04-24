@@ -4,15 +4,19 @@
  */
 
 import type { ArchiveAdapter } from '../adapters/archive/types.js';
+import type { SkillAdapter } from '../adapters/skills/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import type { RuntimeConfig } from '../config.js';
 import { resolveWorkflowActorName } from '../domain/actors.js';
 import { assessPhaseExecutionPolicy } from '../domain/execution-policy.js';
 import { getNextPhaseId, getPhaseContract } from '../domain/phases.js';
+import { assessPromptRealizationPolicy } from '../domain/prompt-realization.js';
 import { completeTaskArtifactContent } from '../domain/tasks.js';
 import type { RecordPhaseResultInput } from '../schemas.js';
 import type { FeatureEvalSummary } from '../types.js';
 import { createErrorResult, createId, createTextResult } from '../utils.js';
 import { autoArchiveFeature } from './archive-feature-release.js';
+import { buildPhaseContextBundleForFeature } from './prepare-phase-context.js';
 
 async function completeBuilderTasks(
   adapter: WorkflowStateAdapter,
@@ -44,6 +48,8 @@ async function completeBuilderTasks(
 
 export async function handleRecordPhaseResult(
   adapter: WorkflowStateAdapter,
+  skill_adapter: SkillAdapter,
+  config: RuntimeConfig,
   archive_adapter: ArchiveAdapter | null,
   input: RecordPhaseResultInput
 ) {
@@ -70,13 +76,37 @@ export async function handleRecordPhaseResult(
   const workflow_actor = resolveWorkflowActorName(input.phase, input.created_by);
   const completing_feature = input.phase === '9' && input.outcome === 'completed' && next_phase === '10';
   const execution_attestation = await adapter.getPhaseExecutionAttestation(input.feature_id, input.phase);
+  const prompt_realization = await adapter.getPhasePromptRealization(input.feature_id, input.phase);
+  const expected_bundle = await buildPhaseContextBundleForFeature(feature, adapter, skill_adapter, config, {
+    feature_id: input.feature_id,
+    phase: input.phase,
+    agent_name: workflow_actor,
+    include_artifacts: true,
+    include_skills: true,
+    include_learnings: true,
+  }, {
+    open_invocation: false,
+  });
   const execution_assessment = assessPhaseExecutionPolicy(input.phase, execution_attestation);
+  const prompt_realization_assessment = assessPromptRealizationPolicy(
+    input.phase,
+    expected_bundle.execution.phase_prompt_manifest,
+    prompt_realization,
+  );
 
   if (execution_assessment.error != null) {
     return createErrorResult(execution_assessment.error, {
       feature_id: input.feature_id,
       phase: input.phase,
       execution: execution_assessment.row,
+    });
+  }
+
+  if (prompt_realization_assessment.error != null) {
+    return createErrorResult(prompt_realization_assessment.error, {
+      feature_id: input.feature_id,
+      phase: input.phase,
+      prompt_realization: prompt_realization_assessment.row,
     });
   }
 
@@ -223,14 +253,17 @@ export async function handleRecordPhaseResult(
   }
 
   return createTextResult(
-    execution_assessment.warning == null
+    execution_assessment.warning == null && prompt_realization_assessment.warning == null
       ? `Recorded ${input.outcome} result for phase ${input.phase} on feature ${input.feature_id}.`
-      : `Recorded ${input.outcome} result for phase ${input.phase} on feature ${input.feature_id}. Warning: ${execution_assessment.warning}`,
+      : `Recorded ${input.outcome} result for phase ${input.phase} on feature ${input.feature_id}. Warning: ${[execution_assessment.warning, prompt_realization_assessment.warning].filter((value): value is string => value != null).join(' ')}`,
     {
       feature: updated_feature,
       next_phase,
       execution: {
         ...execution_assessment,
+      },
+      prompt_realization: {
+        ...prompt_realization_assessment,
       },
       ...(feature_eval != null ? { feature_eval } : {}),
       ...(auto_archive != null ? { auto_archive } : {}),
