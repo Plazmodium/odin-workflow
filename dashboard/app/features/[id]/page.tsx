@@ -8,6 +8,7 @@ import {
   getAgentDurations,
   getAgentInvocations,
   getPhaseExecutionAttestations,
+  getPhasePromptRealizations,
   getQualityGates,
   getBlockers,
   getFeatureEval,
@@ -51,12 +52,13 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
   const feature = await getFeatureStatus(id);
   if (!feature) notFound();
 
-  const [phases, agentDurationsResult, invocations, executionAttestationsResult, gates, blockers, eval_, learnings, transitions, iterations, commits, auditLog, phaseOutputs, archive, claims, claimsSummary, securityFindings, securitySummary] =
+  const [phases, agentDurationsResult, invocations, executionAttestationsResult, promptRealizationsResult, gates, blockers, eval_, learnings, transitions, iterations, commits, auditLog, phaseOutputs, archive, claims, claimsSummary, securityFindings, securitySummary] =
     await Promise.all([
       getPhaseDurations(id),
       getAgentDurations(id),
       getAgentInvocations(id),
       getPhaseExecutionAttestations(id, feature.current_phase),
+      getPhasePromptRealizations(id, feature.current_phase),
       getQualityGates(id),
       getBlockers(id),
       getFeatureEval(id),
@@ -73,11 +75,19 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
       getSecuritySummary(id),
     ]);
   const executionAttestations = executionAttestationsResult.attestations;
+  const promptRealizations = promptRealizationsResult.realizations;
   const currentPhaseExecution = executionAttestationsResult.current_phase;
   const currentPhasePolicy = currentPhaseExecution?.execution_policy ?? 'inline_allowed';
   const currentPhaseRecommendedMode = currentPhaseExecution?.recommended_mode ?? 'inline';
   const currentPhaseActualMode = currentPhaseExecution?.actual_mode ?? null;
   const currentPhaseProofStatus = currentPhaseExecution?.proof_status ?? 'none';
+  const currentPhasePromptRealization = promptRealizationsResult.current_phase;
+  const currentPhasePromptPolicy = currentPhasePromptRealization?.prompt_realization_policy ?? 'phase_bundle_optional';
+  const currentPhasePromptManifestId = currentPhasePromptRealization?.attested_manifest_id ?? null;
+  const currentPhasePromptProofStatus = currentPhasePromptRealization?.proof_status ?? 'none';
+  const currentPhasePromptProofVerified =
+    currentPhasePromptProofStatus === 'bundle_attested' || currentPhasePromptProofStatus === 'bundle_verified';
+  const currentPhasePromptWarning = currentPhasePromptRealization?.warning ?? null;
   const currentPhaseAttestation = executionAttestations.find((attestation) => attestation.phase === feature.current_phase) ?? null;
   const currentPhaseWarning = currentPhaseExecution?.warning ?? null;
 
@@ -178,6 +188,36 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
                 </div>
               </div>
             )}
+            <div className="space-y-3 border-t pt-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Prompt realization</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">Policy: {currentPhasePromptPolicy}</Badge>
+                <Badge variant={currentPhasePromptManifestId == null ? 'outline' : 'secondary'}>
+                  Manifest: {currentPhasePromptManifestId ?? 'not recorded'}
+                </Badge>
+                <Badge variant={currentPhasePromptProofVerified ? 'secondary' : 'outline'}>
+                  Proof: {currentPhasePromptProofStatus}
+                </Badge>
+              </div>
+              {currentPhasePromptWarning != null && (
+                <p className="text-amber-600 dark:text-amber-400">{currentPhasePromptWarning}</p>
+              )}
+              {promptRealizationsResult.error != null && (
+                <p className="text-amber-600 dark:text-amber-400">{promptRealizationsResult.error}</p>
+              )}
+              {promptRealizations.length > 0 && (
+                <div className="space-y-2">
+                  {promptRealizations.map((realization) => (
+                    <div key={`${realization.feature_id}:${realization.phase}`} className="flex flex-wrap items-center gap-2 text-xs">
+                      <Badge variant="outline">Phase {realization.phase}</Badge>
+                      <span className="text-muted-foreground">manifest: {realization.manifest_id}</span>
+                      <span className="text-muted-foreground">proof: {realization.proof_status}</span>
+                      <span className="text-muted-foreground">by {realization.attested_by}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 

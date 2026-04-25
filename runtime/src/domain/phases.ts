@@ -10,6 +10,7 @@ import type {
   PhaseExecutionMode,
   PhaseExecutionPolicy,
   PhaseId,
+  PromptRealizationPolicy,
   PhaseResponseStyle,
 } from '../types.js';
 
@@ -207,6 +208,20 @@ const PHASE_EXECUTION_POLICIES: Record<PhaseId, PhaseExecutionPolicy> = {
   '10': 'inline_allowed',
 };
 
+const PHASE_PROMPT_REALIZATION_POLICIES: Record<PhaseId, PromptRealizationPolicy> = {
+  '0': 'phase_bundle_optional',
+  '1': 'phase_bundle_optional',
+  '2': 'phase_bundle_optional',
+  '3': 'phase_bundle_optional',
+  '4': 'phase_bundle_optional',
+  '5': 'phase_bundle_preferred',
+  '6': 'phase_bundle_preferred',
+  '7': 'phase_bundle_preferred',
+  '8': 'phase_bundle_optional',
+  '9': 'phase_bundle_optional',
+  '10': 'phase_bundle_optional',
+};
+
 const PHASE_RESPONSE_STYLES: Record<PhaseId, PhaseResponseStyle> = {
   '0': 'normal',
   '1': 'normal',
@@ -221,7 +236,7 @@ const PHASE_RESPONSE_STYLES: Record<PhaseId, PhaseResponseStyle> = {
   '10': 'normal',
 };
 
-const PHASE_PROMPT_SECTIONS: PhaseExecutionContract['prompt_sections'] = [
+export const PHASE_PROMPT_SECTIONS = [
   'phase',
   'role_summary',
   'constraints',
@@ -232,7 +247,7 @@ const PHASE_PROMPT_SECTIONS: PhaseExecutionContract['prompt_sections'] = [
   'artifacts',
   'skills',
   'learnings',
-];
+] as const satisfies PhaseExecutionContract['prompt_sections'];
 
 /**
  * Retrieve the PhaseContract for a given phase identifier.
@@ -271,8 +286,10 @@ export function getPhaseExecutionContract(phase: PhaseId, acting_agent_name: str
     supported_modes: ['inline', 'subagent'],
     recommended_mode: PHASE_RECOMMENDED_EXECUTION_MODES[phase],
     execution_policy: PHASE_EXECUTION_POLICIES[phase],
+    prompt_realization_policy: PHASE_PROMPT_REALIZATION_POLICIES[phase],
     child_state_strategy: PHASE_CHILD_STATE_STRATEGIES[phase],
     response_style: PHASE_RESPONSE_STYLES[phase],
+    phase_prompt_manifest: null,
     prompt_sections: [...PHASE_PROMPT_SECTIONS],
   };
 }

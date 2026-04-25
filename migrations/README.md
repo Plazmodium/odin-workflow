@@ -45,6 +45,9 @@ Run these migrations in order on a fresh Supabase project:
 
 -- 13. Phase execution attestation repairs
 \i 013_phase_execution_attestations_repairs.sql
+
+-- 14. Phase prompt realization attestation storage
+\i 014_phase_prompt_realizations.sql
 ```
 
 Or via Supabase MCP:
@@ -71,6 +74,7 @@ Or via Supabase MCP:
 | `011_complete_feature_phase_coverage.sql` | completion guard alignment | Replaces `complete_feature()` coverage checks with phase-based semantics |
 | `012_phase_execution_attestations.sql` | execution attestation | Persists actual execution mode and attested supervisor/worker linkage per phase |
 | `013_phase_execution_attestations_repairs.sql` | execution attestation repairs | Backfills missing indexes, policy, and the `updated_at` trigger for attestation storage |
+| `014_phase_prompt_realizations.sql` | prompt realization attestation | Persists phase-bundle realization proof for phase workers launched from the canonical Odin prompt bundle |
 
 ## Schema Summary
 
@@ -165,6 +169,7 @@ These migrations extend Odin for v2 features. **Run AFTER the base migrations (0
 | `011_complete_feature_phase_coverage.sql` | Aligns `complete_feature()` with phase-based invocation coverage so custom actor names do not block release completion |
 | `012_phase_execution_attestations.sql` | Persists actual phase execution mode plus attested supervisor/worker session linkage |
 | `013_phase_execution_attestations_repairs.sql` | Repairs attestation storage objects for existing installs and adds the `updated_at` trigger |
+| `014_phase_prompt_realizations.sql` | Persists phase-bundle realization proof keyed by feature and phase for canonical Odin prompt bundles |
 
 ### v2 Features
 

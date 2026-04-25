@@ -19,6 +19,7 @@ Current supported execution paths:
    - enabled with `RALPH_SUBAGENT_COMMAND_JSON` or `--subagent-command-json`
    - Ralph Loop spawns the configured child command
    - Ralph Loop records `odin.register_phase_execution(...)` so Odin can audit actual mode and attested session linkage
+   - Ralph Loop can also record `odin.register_phase_realization(...)` after a successful child run when a canonical phase prompt manifest was used
    - the child returns artifacts and a final phase outcome on stdout
    - Ralph Loop proxies `odin.record_phase_artifact` / `odin.record_phase_result` from the parent session using `context.execution.acting_agent_name`
    - Ralph Loop also respects `context.execution.response_style` so internal execution chatter can be terse without changing final artifact templates
@@ -118,6 +119,8 @@ It must return JSON on stdout:
 Ralph Loop then proxies the returned artifacts and phase result through `odin.*` using `selection.prepared_context.execution.acting_agent_name` for `created_by`.
 
 It also records `odin.register_phase_execution(...)` before execution so Odin can tell whether a phase was run inline or by an attested child session.
+
+For subagent runs where `context.execution.phase_prompt_manifest` is present and `prompt_realization_policy` is not optional, Ralph Loop can record `odin.register_phase_realization(...)` so Odin can distinguish “child existed” from “child ran from the canonical Odin phase bundle.”
 
 When `selection.prepared_context.execution.response_style = terse_execution`, Ralph Loop adds terse operational-style instructions to the child prompt. This applies to execution chatter and summaries only. Final artifacts are still expected to follow the normal human-readable templates for the phase.
 

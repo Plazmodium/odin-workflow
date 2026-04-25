@@ -288,8 +288,10 @@ If a harness spawns a child agent, that child is acting as the current Odin phas
 - `supported_modes` - currently `inline` and `subagent`
 - `recommended_mode` - guidance only; not enforcement
 - `execution_policy` - whether inline execution is allowed, distinct sessions are preferred, or distinct sessions are required
+- `prompt_realization_policy` - whether using the canonical Odin phase prompt bundle is optional, preferred, or required
 - `child_state_strategy` - whether the harness should prefer direct `odin.*` calls from the child when available or have the child return intent to the parent session
 - `response_style` - whether internal execution chatter should stay `normal` or use `terse_execution`
+- `phase_prompt_manifest` - the canonical manifest describing the shared context, phase definition, resolved skills, prompt sections, and dynamic context bundle used for strict phase-prompt realization attestation
 - `prompt_sections` - the fields the harness should keep in the active prompt
 
 `context.agent.constraints` already includes `context.development_evals.harness_prompt_block`. Keep the dedicated eval block visible if you want a separate eval section, but do not append both verbatim or the same instructions will appear twice.
@@ -312,8 +314,9 @@ Canonical harness flow:
    - inline: parent session performs the phase work directly
    - subagent: parent session spawns a child that acts as the current Odin phase role
 4. Record the actual mode with `odin.register_phase_execution(...)` when you want auditable phase ownership.
-5. Record artifacts, claims, checks, and gates through odin.* tools as work happens.
-6. Close the phase with odin.record_phase_result(...).
+5. If the child is meant to count as a strict Odin phase-agent run, register prompt realization with `odin.register_phase_realization(...)` using the returned `phase_prompt_manifest`.
+6. Record artifacts, claims, checks, and gates through odin.* tools as work happens.
+7. Close the phase with odin.record_phase_result(...).
 ```
 
 If the child agent cannot call `odin.*` directly, keep the same flow but have the child return a clear `State Changes Required` section and the parent session performs those calls on the child's behalf. When proxying, pass `context.execution.acting_agent_name` through to tool fields such as `agent_name` and `created_by` so attribution and invocation tracking stay aligned with the prepared phase context.
@@ -322,7 +325,9 @@ Execution attestation rules:
 
 - invocation open/close telemetry is not proof of distinct-session execution
 - `odin.register_phase_execution(...)` records the harness-attested actual mode plus supervisor/worker session linkage
+- `odin.register_phase_realization(...)` records whether the child was launched from the canonical Odin phase prompt bundle
 - `odin.record_phase_result(...)` may warn or reject based on `execution_policy`
+- `odin.record_phase_result(...)` may also warn or reject based on `prompt_realization_policy`
 - `odin.get_feature_status(...)` exposes expected vs actual vs proven execution state for auditing
 
 `response_style` is a bounded internal execution hint, not a global constitution change:

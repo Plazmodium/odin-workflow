@@ -9,11 +9,12 @@ import type { RuntimeConfig } from '../config.js';
 import { resolveWorkflowActorName } from '../domain/actors.js';
 import { resolveAutomationDecision } from '../domain/automation-policy.js';
 import { appendDevelopmentEvalChecks, buildDevelopmentEvalContext } from '../domain/development-evals.js';
+import { buildPhasePromptManifest } from '../domain/phase-prompt-manifest.js';
 import { getPhaseAgentInstructions, getPhaseContract, getPhaseExecutionContract, isWatchedPhase } from '../domain/phases.js';
 import { formatOpenGateSummary } from '../domain/quality-gates.js';
 import { computeResonance, type ResonanceInput } from '../domain/resonance.js';
 import type { PreparePhaseContextInput } from '../schemas.js';
-import type { ArtifactOutputType, LearningCategory, PhaseArtifact, PhaseContextBundle } from '../types.js';
+import type { ArtifactOutputType, FeatureRecord, LearningCategory, PhaseArtifact, PhaseContextBundle } from '../types.js';
 import { createErrorResult, createTextResult } from '../utils.js';
 
 const ARTIFACT_KEYS: ArtifactOutputType[] = [
@@ -43,25 +44,19 @@ function buildArtifactLineage(artifacts: PhaseArtifact[]): PhaseContextBundle['a
   return lineage;
 }
 
-/**
- * Prepare a PhaseContextBundle containing feature data, workflow state, artifacts lineage, execution/agent contracts, verification settings, skills, development evals, and scored learnings for a given feature and phase.
- *
- * @param input - Parameters controlling which feature/phase to prepare and which optional data to include (e.g., `feature_id`, `phase`, `agent_name`, `include_artifacts`, `include_learnings`, `include_skills`).
- * @returns A text result whose payload `context` is the assembled `PhaseContextBundle` for the requested feature and phase, or an error result if the specified feature cannot be found.
- */
-export async function handlePreparePhaseContext(
+interface BuildPhaseContextOptions {
+  open_invocation?: boolean;
+}
+
+export async function buildPhaseContextBundleForFeature(
+  feature: FeatureRecord,
   adapter: WorkflowStateAdapter,
   skill_adapter: SkillAdapter,
   config: RuntimeConfig,
-  input: PreparePhaseContextInput
-) {
-  const feature = await adapter.getFeature(input.feature_id);
-  if (feature == null) {
-    return createErrorResult(`Feature ${input.feature_id} was not found.`, {
-      feature_id: input.feature_id,
-    });
-  }
-
+  input: PreparePhaseContextInput,
+  options: BuildPhaseContextOptions = {},
+): Promise<PhaseContextBundle> {
+  const open_invocation = options.open_invocation ?? true;
   const all_artifacts = await adapter.listPhaseArtifacts(input.feature_id);
   const artifacts = input.include_artifacts ? all_artifacts : [];
   const [feature_learnings, related_learnings] = input.include_learnings
@@ -104,18 +99,20 @@ export async function handlePreparePhaseContext(
     ? await skill_adapter.resolveSkills({ feature, artifacts: all_artifacts, phase: input.phase })
     : { resolved: [], fallback_used: false };
   const skill_paths = resolved_skills.resolved.map((skill) => `${skill.category}/${skill.name}`);
-  const existing_invocation = await adapter.findOpenAgentInvocation(feature.id, input.phase, actor_name);
+  const existing_invocation = open_invocation
+    ? await adapter.findOpenAgentInvocation(feature.id, input.phase, actor_name)
+    : null;
   const invocation =
     existing_invocation ??
-    (input.phase === '10'
-      ? null
-      : await adapter.startAgentInvocation(
+    (open_invocation && input.phase !== '10'
+      ? await adapter.startAgentInvocation(
           feature.id,
           input.phase,
           actor_name,
           `Phase ${input.phase}: ${phase.name}`,
-          skill_paths.length > 0 ? skill_paths : undefined
-        ));
+          skill_paths.length > 0 ? skill_paths : undefined,
+        )
+      : null);
 
   const bundle: PhaseContextBundle = {
     feature,
@@ -198,8 +195,29 @@ export async function handlePreparePhaseContext(
     ],
   };
 
+  bundle.execution.phase_prompt_manifest = await buildPhasePromptManifest(bundle);
+  return bundle;
+}
+
+export async function handlePreparePhaseContext(
+  adapter: WorkflowStateAdapter,
+  skill_adapter: SkillAdapter,
+  config: RuntimeConfig,
+  input: PreparePhaseContextInput,
+) {
+  const feature = await adapter.getFeature(input.feature_id);
+  if (feature == null) {
+    return createErrorResult(`Feature ${input.feature_id} was not found.`, {
+      feature_id: input.feature_id,
+    });
+  }
+
+  const bundle = await buildPhaseContextBundleForFeature(feature, adapter, skill_adapter, config, input, {
+    open_invocation: true,
+  });
+
   return createTextResult(
-    `Prepared ${phase.name} context for feature ${feature.id}.`,
-    { context: bundle }
+    `Prepared ${bundle.phase.name} context for feature ${feature.id}.`,
+    { context: bundle },
   );
 }

@@ -84,6 +84,12 @@ export const PHASE_EXECUTION_POLICIES = [
 ] as const;
 export const PHASE_EXECUTION_PROOF_STATUSES = ['none', 'attested', 'verified'] as const;
 export const PHASE_EXECUTION_ATTESTATION_SOURCES = ['harness', 'runtime_inferred'] as const;
+export const PROMPT_REALIZATION_POLICIES = [
+  'phase_bundle_optional',
+  'phase_bundle_preferred',
+  'phase_bundle_required',
+] as const;
+export const PROMPT_REALIZATION_PROOF_STATUSES = ['none', 'bundle_attested', 'bundle_verified'] as const;
 
 export type PhaseId = (typeof PHASE_IDS)[number];
 export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
@@ -108,6 +114,8 @@ export type SupervisorEventType = (typeof SUPERVISOR_EVENT_TYPES)[number];
 export type PhaseExecutionPolicy = (typeof PHASE_EXECUTION_POLICIES)[number];
 export type PhaseExecutionProofStatus = (typeof PHASE_EXECUTION_PROOF_STATUSES)[number];
 export type PhaseExecutionAttestationSource = (typeof PHASE_EXECUTION_ATTESTATION_SOURCES)[number];
+export type PromptRealizationPolicy = (typeof PROMPT_REALIZATION_POLICIES)[number];
+export type PromptRealizationProofStatus = (typeof PROMPT_REALIZATION_PROOF_STATUSES)[number];
 
 export type PersistedTargetType = 'skill' | 'agent_definition' | 'agents_md';
 
@@ -492,6 +500,19 @@ export type PhaseChildStateStrategy =
   | 'direct_odin_tools_if_available'
   | 'return_intent_to_parent';
 
+export interface PhasePromptManifest {
+  manifest_id: string;
+  phase: PhaseId;
+  phase_role_name: string;
+  shared_context_hash: string;
+  phase_definition_hash: string;
+  resolved_skill_hashes: string[];
+  required_prompt_sections: PhasePromptSection[];
+  context_bundle_hash: string;
+  manifest_version: string;
+  nonce: string;
+}
+
 interface PhaseExecutionAttestationBase {
   feature_id: string;
   phase: PhaseId;
@@ -515,6 +536,31 @@ export type PhaseExecutionAttestation =
       attested_by: string;
       attestation_source: PhaseExecutionAttestationSource;
     });
+
+export interface PhasePromptRealizationAttestation {
+  feature_id: string;
+  phase: PhaseId;
+  phase_role_name: string;
+  prompt_realization_policy: PromptRealizationPolicy;
+  manifest_id: string;
+  manifest_version: string;
+  shared_context_hash: string;
+  phase_definition_hash: string;
+  resolved_skill_hashes: string[];
+  required_prompt_sections: PhasePromptSection[];
+  context_bundle_hash: string;
+  nonce: string;
+  actual_mode: PhaseExecutionMode;
+  proof_status: Exclude<PromptRealizationProofStatus, 'none'>;
+  supervisor_session_id: string | null;
+  worker_session_id: string | null;
+  harness_run_id: string | null;
+  attested_by: string;
+  child_prompt_hash: string;
+  wrapper_hash: string | null;
+  child_ack_nonce: string | null;
+  recorded_at: string;
+}
 
 export type PhasePromptSection =
   | 'phase'
@@ -548,8 +594,10 @@ export interface PhaseExecutionContract {
   supported_modes: PhaseExecutionMode[];
   recommended_mode: PhaseExecutionMode;
   execution_policy: PhaseExecutionPolicy;
+  prompt_realization_policy: PromptRealizationPolicy;
   child_state_strategy: PhaseChildStateStrategy;
   response_style: PhaseResponseStyle;
+  phase_prompt_manifest: PhasePromptManifest | null;
   prompt_sections: PhasePromptSection[];
 }
 

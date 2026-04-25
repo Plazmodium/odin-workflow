@@ -34,8 +34,9 @@ import {
   GetSkillProposalQueueInputSchema,
   GetSkillProposalsInputSchema,
   PreparePhaseContextInputSchema,
-  PublishSkillProposalInputSchema,
   RegisterPhaseExecutionInputSchema,
+  RegisterPhaseRealizationInputSchema,
+  PublishSkillProposalInputSchema,
   RecordCommitInputSchema,
   RecordEvalPlanInputSchema,
   RecordEvalRunInputSchema,
@@ -73,6 +74,7 @@ import { handleGetSkillProposals } from './tools/get-skill-proposals.js';
 import { handlePickNextAutonomousPhase } from './tools/pick-next-autonomous-phase.js';
 import { handlePreparePhaseContext } from './tools/prepare-phase-context.js';
 import { handleRegisterPhaseExecution } from './tools/register-phase-execution.js';
+import { handleRegisterPhaseRealization } from './tools/register-phase-realization.js';
 import { handlePublishSkillProposal } from './tools/publish-skill-proposal.js';
 import { handleRecordCommit } from './tools/record-commit.js';
 import { handleRecordEvalPlan } from './tools/record-eval-plan.js';
@@ -193,7 +195,7 @@ const formal_verification_adapter = createFormalVerificationAdapter(project_root
 const server = new McpServer(
   {
     name: 'odin',
-    version: '0.6.2-beta',
+    version: '0.6.3-beta',
   },
   {
     capabilities: {
@@ -229,7 +231,7 @@ server.registerTool(
     description: 'Return a richer feature status bundle with workflow counts, invocation coverage, recent activity, and the current automation snapshot.',
     inputSchema: GetFeatureStatusInputSchema,
   },
-  safeToolHandler(async (input) => handleGetFeatureStatus(workflow_state, runtime_config, input))
+  safeToolHandler(async (input) => handleGetFeatureStatus(workflow_state, skill_adapter, runtime_config, input))
 );
 
 server.registerTool(
@@ -290,6 +292,16 @@ server.registerTool(
     inputSchema: RegisterPhaseExecutionInputSchema,
   },
   safeToolHandler(async (input) => handleRegisterPhaseExecution(workflow_state, input))
+);
+
+server.registerTool(
+  'odin.register_phase_realization',
+  {
+    title: 'Register Phase Realization',
+    description: 'Record that a child session was launched from the canonical Odin phase prompt bundle for a feature phase.',
+    inputSchema: RegisterPhaseRealizationInputSchema,
+  },
+  safeToolHandler(async (input) => handleRegisterPhaseRealization(workflow_state, skill_adapter, runtime_config, input))
 );
 
 server.registerTool(
@@ -419,7 +431,7 @@ server.registerTool(
     description: 'Record the outcome of a workflow phase and update workflow state.',
     inputSchema: RecordPhaseResultInputSchema,
   },
-  safeToolHandler(async (input) => handleRecordPhaseResult(workflow_state, archive_adapter, input))
+  safeToolHandler(async (input) => handleRecordPhaseResult(workflow_state, skill_adapter, runtime_config, archive_adapter, input))
 );
 
 server.registerTool(

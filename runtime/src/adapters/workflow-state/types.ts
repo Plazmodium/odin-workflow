@@ -18,6 +18,7 @@ import type {
   PhaseArtifact,
   PhaseExecutionAttestation,
   PhaseId,
+  PhasePromptRealizationAttestation,
   PhaseResultRecord,
   QualityGateRecord,
   RelatedLearningRecord,
@@ -82,6 +83,9 @@ export interface WorkflowStateAdapter {
   clearPhaseExecutionAttestation(feature_id: string, phase: PhaseId): Promise<void>;
   getPhaseExecutionAttestation(feature_id: string, phase: PhaseId): Promise<PhaseExecutionAttestation | null>;
   listPhaseExecutionAttestations(feature_id: string): Promise<PhaseExecutionAttestation[]>;
+  registerPhasePromptRealization(attestation: PhasePromptRealizationAttestation): Promise<PhasePromptRealizationAttestation>;
+  getPhasePromptRealization(feature_id: string, phase: PhaseId): Promise<PhasePromptRealizationAttestation | null>;
+  listPhasePromptRealizations(feature_id: string): Promise<PhasePromptRealizationAttestation[]>;
   recordCommit(commit: Omit<FeatureCommitRecord, 'committed_at'>): Promise<FeatureCommitRecord>;
   recordPullRequest(feature_id: string, pr_url: string, pr_number: number): Promise<{ feature_id: string; pr_url: string; pr_number: number }>;
   recordMerge(feature_id: string, merged_by: string): Promise<{ feature_id: string; merged_at: string; merged_by: string; pr_url?: string; pr_number?: number }>;

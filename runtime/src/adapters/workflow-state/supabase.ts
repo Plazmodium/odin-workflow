@@ -22,6 +22,7 @@ import type {
   PhaseArtifact,
   PhaseExecutionAttestation,
   PhaseId,
+  PhasePromptRealizationAttestation,
   PhaseResultRecord,
   QualityGateRecord,
   RiskLevel,
@@ -150,6 +151,33 @@ function toPhaseExecutionAttestation(row: JsonRecord): PhaseExecutionAttestation
     attestation_source: row.attestation_source == null ? null : String(row.attestation_source) as PhaseExecutionAttestation['attestation_source'],
     recorded_at: String(row.recorded_at),
   } as PhaseExecutionAttestation;
+}
+
+function toPhasePromptRealizationAttestation(row: JsonRecord): PhasePromptRealizationAttestation {
+  return {
+    feature_id: String(row.feature_id),
+    phase: String(row.phase) as PhaseId,
+    phase_role_name: String(row.phase_role_name),
+    prompt_realization_policy: String(row.prompt_realization_policy) as PhasePromptRealizationAttestation['prompt_realization_policy'],
+    manifest_id: String(row.manifest_id),
+    manifest_version: String(row.manifest_version),
+    shared_context_hash: String(row.shared_context_hash),
+    phase_definition_hash: String(row.phase_definition_hash),
+    resolved_skill_hashes: Array.isArray(row.resolved_skill_hashes) ? row.resolved_skill_hashes.map((value) => String(value)) : [],
+    required_prompt_sections: Array.isArray(row.required_prompt_sections) ? row.required_prompt_sections.map((value) => String(value)) as PhasePromptRealizationAttestation['required_prompt_sections'] : [],
+    context_bundle_hash: String(row.context_bundle_hash),
+    nonce: String(row.nonce),
+    actual_mode: String(row.actual_mode) as PhasePromptRealizationAttestation['actual_mode'],
+    proof_status: String(row.proof_status) as PhasePromptRealizationAttestation['proof_status'],
+    supervisor_session_id: row.supervisor_session_id == null ? null : String(row.supervisor_session_id),
+    worker_session_id: row.worker_session_id == null ? null : String(row.worker_session_id),
+    harness_run_id: row.harness_run_id == null ? null : String(row.harness_run_id),
+    attested_by: String(row.attested_by),
+    child_prompt_hash: String(row.child_prompt_hash),
+    wrapper_hash: row.wrapper_hash == null ? null : String(row.wrapper_hash),
+    child_ack_nonce: row.child_ack_nonce == null ? null : String(row.child_ack_nonce),
+    recorded_at: String(row.recorded_at),
+  };
 }
 
 export function shouldTransitionPhaseResult(result: PhaseResultRecord): boolean {
@@ -984,6 +1012,82 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
     }
 
     return (data as JsonRecord[]).map(toPhaseExecutionAttestation);
+  }
+
+  async registerPhasePromptRealization(attestation: PhasePromptRealizationAttestation): Promise<PhasePromptRealizationAttestation> {
+    const { data, error } = await this.client
+      .from('phase_prompt_realizations')
+      .upsert({
+        feature_id: attestation.feature_id,
+        phase: attestation.phase,
+        phase_role_name: attestation.phase_role_name,
+        prompt_realization_policy: attestation.prompt_realization_policy,
+        manifest_id: attestation.manifest_id,
+        manifest_version: attestation.manifest_version,
+        shared_context_hash: attestation.shared_context_hash,
+        phase_definition_hash: attestation.phase_definition_hash,
+        resolved_skill_hashes: attestation.resolved_skill_hashes,
+        required_prompt_sections: attestation.required_prompt_sections,
+        context_bundle_hash: attestation.context_bundle_hash,
+        nonce: attestation.nonce,
+        actual_mode: attestation.actual_mode,
+        proof_status: attestation.proof_status,
+        supervisor_session_id: attestation.supervisor_session_id,
+        worker_session_id: attestation.worker_session_id,
+        harness_run_id: attestation.harness_run_id,
+        attested_by: attestation.attested_by,
+        child_prompt_hash: attestation.child_prompt_hash,
+        wrapper_hash: attestation.wrapper_hash,
+        child_ack_nonce: attestation.child_ack_nonce,
+        recorded_at: attestation.recorded_at,
+      }, {
+        onConflict: 'feature_id,phase',
+      })
+      .select('*')
+      .single();
+
+    if (error != null || data == null) {
+      throw new Error(`Failed to register phase prompt realization: ${error?.message ?? 'No result returned.'}`);
+    }
+
+    return toPhasePromptRealizationAttestation(data as JsonRecord);
+  }
+
+  async getPhasePromptRealization(feature_id: string, phase: PhaseId): Promise<PhasePromptRealizationAttestation | null> {
+    const { data, error } = await this.client
+      .from('phase_prompt_realizations')
+      .select('*')
+      .eq('feature_id', feature_id)
+      .eq('phase', phase)
+      .maybeSingle();
+
+    if (error != null) {
+      throw new Error(`Failed to fetch phase prompt realization: ${error.message}`);
+    }
+
+    if (data == null) {
+      return null;
+    }
+
+    return toPhasePromptRealizationAttestation(data as JsonRecord);
+  }
+
+  async listPhasePromptRealizations(feature_id: string): Promise<PhasePromptRealizationAttestation[]> {
+    const { data, error } = await this.client
+      .from('phase_prompt_realizations')
+      .select('*')
+      .eq('feature_id', feature_id)
+      .order('phase', { ascending: true });
+
+    if (error != null) {
+      throw new Error(`Failed to list phase prompt realizations: ${error.message}`);
+    }
+
+    if (data == null) {
+      return [];
+    }
+
+    return (data as JsonRecord[]).map(toPhasePromptRealizationAttestation);
   }
 
   async recordCommit(commit: Omit<FeatureCommitRecord, 'committed_at'>): Promise<FeatureCommitRecord> {

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { executeReleaseHandoff, type GitHubCommandRunner } from './executors/release-handoff.js';
 import { executeReleaseCloseout } from './executors/release-closeout.js';
@@ -14,68 +14,6 @@ function deriveNoopReason(skipped_summary: Array<{ detail: string }>): string {
   return skipped_summary[0]?.detail ?? 'No autonomous phase is eligible right now.';
 }
 
-/**
- * Builds a structured context object containing the requested prompt sections from a selection's prepared_context.
- *
- * @param selection - The autonomous selection whose `prepared_context.execution.prompt_sections` and `prepared_context.raw` supply the requested data
- * @returns An object mapping each requested prompt section name to its corresponding value. Optional sections (e.g., `development_evals`, `automation`, `verification`, `workflow`, `artifacts`, `skills`, `learnings`) are included only when their `prepared_context.raw` values are defined.
- */
-function buildPromptSectionContext(selection: AutonomousSelection): Record<string, unknown> {
-  const { prepared_context } = selection;
-  const entries: Array<[string, unknown]> = [];
-
-  for (const section of prepared_context.execution.prompt_sections) {
-    switch (section) {
-      case 'phase':
-        entries.push(['phase', prepared_context.raw.phase]);
-        break;
-      case 'role_summary':
-        entries.push(['role_summary', prepared_context.agent.role_summary]);
-        break;
-      case 'constraints':
-        entries.push(['constraints', prepared_context.agent.constraints]);
-        break;
-      case 'development_evals':
-        if (prepared_context.raw.development_evals !== undefined) {
-          entries.push(['development_evals', prepared_context.raw.development_evals]);
-        }
-        break;
-      case 'automation':
-        if (prepared_context.raw.automation !== undefined) {
-          entries.push(['automation', prepared_context.raw.automation]);
-        }
-        break;
-      case 'verification':
-        if (prepared_context.raw.verification !== undefined) {
-          entries.push(['verification', prepared_context.raw.verification]);
-        }
-        break;
-      case 'workflow':
-        if (prepared_context.raw.workflow !== undefined) {
-          entries.push(['workflow', prepared_context.raw.workflow]);
-        }
-        break;
-      case 'artifacts':
-        if (prepared_context.raw.artifacts !== undefined) {
-          entries.push(['artifacts', prepared_context.raw.artifacts]);
-        }
-        break;
-      case 'skills':
-        if (prepared_context.raw.skills !== undefined) {
-          entries.push(['skills', prepared_context.raw.skills]);
-        }
-        break;
-      case 'learnings':
-        if (prepared_context.raw.learnings !== undefined) {
-          entries.push(['learnings', prepared_context.raw.learnings]);
-        }
-        break;
-    }
-  }
-
-  return Object.fromEntries(entries);
-}
-
 function buildResponseStyleInstructions(selection: AutonomousSelection): string[] {
   if (selection.prepared_context.execution.response_style !== 'terse_execution') {
     return [];
@@ -88,6 +26,25 @@ function buildResponseStyleInstructions(selection: AutonomousSelection): string[
     '- short, direct technical wording',
     '- preserve exact code, commands, identifiers, and evidence',
     '- when producing final workflow artifacts, follow the normal template and readable prose expected by the phase',
+  ];
+}
+
+function hashText(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function buildPromptRealizationInstructions(selection: AutonomousSelection): string[] {
+  const manifest = selection.prepared_context.execution.phase_prompt_manifest;
+  if (manifest == null || selection.prepared_context.execution.prompt_realization_policy === 'phase_bundle_optional') {
+    return [];
+  }
+
+  return [
+    'Prompt realization guidance:',
+    `- Prompt realization policy: ${selection.prepared_context.execution.prompt_realization_policy}`,
+    `- Manifest id: ${manifest.manifest_id}`,
+    `- Manifest nonce: ${manifest.nonce}`,
+    '- If your child result protocol supports it, echo the manifest nonce back as phase_prompt_nonce_ack.',
   ];
 }
 
@@ -117,8 +74,8 @@ function asExecutablePhaseId(phase: string): ExecutablePhaseId {
  */
 function buildSubagentPrompt(selection: AutonomousSelection): string {
   const { prepared_context } = selection;
-  const prompt_context = buildPromptSectionContext(selection);
   const response_style_instructions = buildResponseStyleInstructions(selection);
+  const prompt_realization_instructions = buildPromptRealizationInstructions(selection);
   const lines = [
     `You are acting as ${prepared_context.agent.name} for Odin phase ${prepared_context.phase.id}: ${prepared_context.phase.name}.`,
     '',
@@ -133,13 +90,15 @@ function buildSubagentPrompt(selection: AutonomousSelection): string {
     '',
     'Execution guidance:',
     `- Recommended mode: ${prepared_context.execution.recommended_mode}`,
+    `- Prompt realization policy: ${prepared_context.execution.prompt_realization_policy}`,
     `- Acting agent name for proxied odin.* calls: ${prepared_context.execution.acting_agent_name}`,
     `- Response style: ${prepared_context.execution.response_style}`,
     `- Prompt sections: ${prepared_context.execution.prompt_sections.join(', ')}`,
     ...(response_style_instructions.length === 0 ? [] : ['', ...response_style_instructions]),
+    ...(prompt_realization_instructions.length === 0 ? [] : ['', ...prompt_realization_instructions]),
     '',
     'Structured context JSON:',
-    JSON.stringify(prompt_context, null, 2),
+    JSON.stringify(prepared_context.raw, null, 2),
   ];
 
   return lines.join('\n');
@@ -220,14 +179,44 @@ async function executeSubagentSelection(
   supervisor_name: string,
   project_root: string,
   subagent_executor: SubagentExecutor,
+  child_prompt: string,
+  phase_execution_registration: {
+    supervisor_session_id: string;
+    worker_session_id: string;
+    harness_run_id: string;
+  },
 ): Promise<{ phase_outcome: 'completed' | 'blocked' | 'needs_rework'; summary: string }> {
   const result = await subagent_executor.execute({
     project_root,
     supervisor_name,
     selection,
-    prompt: buildSubagentPrompt(selection),
+    prompt: child_prompt,
   });
   const created_by = selection.prepared_context.execution.acting_agent_name;
+  const prompt_manifest = selection.prepared_context.execution.phase_prompt_manifest;
+
+  if (prompt_manifest != null && selection.prepared_context.execution.prompt_realization_policy !== 'phase_bundle_optional') {
+    await client.registerPhaseRealization({
+      feature_id: selection.feature_id,
+      phase: asExecutablePhaseId(selection.phase),
+      manifest: prompt_manifest,
+      actual_mode: 'subagent',
+      supervisor_session_id: phase_execution_registration.supervisor_session_id,
+      worker_session_id: phase_execution_registration.worker_session_id,
+      harness_run_id: phase_execution_registration.harness_run_id,
+      attested_by: supervisor_name,
+      child_prompt_hash: hashText(child_prompt),
+      wrapper_hash: hashText(JSON.stringify({
+        recommended_mode: selection.prepared_context.execution.recommended_mode,
+        prompt_realization_policy: selection.prepared_context.execution.prompt_realization_policy,
+        response_style: selection.prepared_context.execution.response_style,
+        prompt_sections: selection.prepared_context.execution.prompt_sections,
+      })),
+      child_ack_nonce: result.phase_prompt_nonce_ack,
+      proof_status: result.phase_prompt_nonce_ack === prompt_manifest.nonce ? 'bundle_verified' : 'bundle_attested',
+    });
+  }
+
   const artifacts = collapseArtifactsForProxy(selection, result.artifacts ?? []);
 
   for (const artifact of artifacts) {
@@ -360,12 +349,14 @@ export async function runTick(
       }
 
       const attestation = buildExecutionAttestationIds(supervisor_name);
+      const child_prompt = buildSubagentPrompt(pick.selection);
+      const worker_session_id = `${attestation.supervisor_session_id}:worker:${randomUUID()}`;
       await client.registerPhaseExecution({
         feature_id: pick.selection.feature_id,
         phase: executable_phase,
         actual_mode: 'subagent',
         supervisor_session_id: attestation.supervisor_session_id,
-        worker_session_id: `${attestation.supervisor_session_id}:worker:${randomUUID()}`,
+        worker_session_id,
         harness_run_id: attestation.harness_run_id,
         attested_by: supervisor_name,
       });
@@ -375,7 +366,19 @@ export async function runTick(
       };
       execution_attempted = true;
       execution_route = 'subagent';
-      execution_result = await executeSubagentSelection(client, pick.selection, supervisor_name, project_root, subagent_executor);
+      execution_result = await executeSubagentSelection(
+        client,
+        pick.selection,
+        supervisor_name,
+        project_root,
+        subagent_executor,
+        child_prompt,
+        {
+          supervisor_session_id: attestation.supervisor_session_id,
+          worker_session_id,
+          harness_run_id: attestation.harness_run_id,
+        }
+      );
     }
     execution_succeeded = true;
 

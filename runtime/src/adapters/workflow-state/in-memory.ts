@@ -21,6 +21,7 @@ import type {
   PhaseArtifact,
   PhaseExecutionAttestation,
   PhaseId,
+  PhasePromptRealizationAttestation,
   PhaseResultRecord,
   QualityGateRecord,
   RelatedLearningRecord,
@@ -53,6 +54,7 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
   private readonly watcher_reviews = new Map<string, WatcherReviewRecord[]>();
   private readonly invocations = new Map<string, AgentInvocationRecord>();
   private readonly execution_attestations = new Map<string, PhaseExecutionAttestation>();
+  private readonly prompt_realizations = new Map<string, PhasePromptRealizationAttestation>();
   private readonly propagation_targets: Array<{ learning_id: string; target_type: PersistedTargetType; target_path: string | null; relevance: number }> = [];
   private readonly skill_proposals = new Map<string, SkillProposalCandidate>();
   private readonly skill_proposal_records = new Map<string, SkillProposalRecord>();
@@ -452,6 +454,22 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
 
   async listPhaseExecutionAttestations(feature_id: string): Promise<PhaseExecutionAttestation[]> {
     return Array.from(this.execution_attestations.values())
+      .filter((attestation) => attestation.feature_id === feature_id)
+      .sort((left, right) => left.phase.localeCompare(right.phase, undefined, { numeric: true }));
+  }
+
+  async registerPhasePromptRealization(attestation: PhasePromptRealizationAttestation): Promise<PhasePromptRealizationAttestation> {
+    this.prompt_realizations.set(`${attestation.feature_id}:${attestation.phase}`, attestation);
+    this.touchFeature(attestation.feature_id);
+    return attestation;
+  }
+
+  async getPhasePromptRealization(feature_id: string, phase: PhaseId): Promise<PhasePromptRealizationAttestation | null> {
+    return this.prompt_realizations.get(`${feature_id}:${phase}`) ?? null;
+  }
+
+  async listPhasePromptRealizations(feature_id: string): Promise<PhasePromptRealizationAttestation[]> {
+    return Array.from(this.prompt_realizations.values())
       .filter((attestation) => attestation.feature_id === feature_id)
       .sort((left, right) => left.phase.localeCompare(right.phase, undefined, { numeric: true }));
   }

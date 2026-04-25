@@ -81,6 +81,8 @@ export type PhaseExecutionMode = 'inline' | 'subagent';
 export type PhaseExecutionPolicy = 'inline_allowed' | 'distinct_session_preferred' | 'distinct_session_required';
 export type PhaseExecutionProofStatus = 'none' | 'attested' | 'verified';
 export type PhaseExecutionAttestationSource = 'harness' | 'runtime_inferred';
+export type PromptRealizationPolicy = 'phase_bundle_optional' | 'phase_bundle_preferred' | 'phase_bundle_required';
+export type PromptRealizationProofStatus = 'none' | 'bundle_attested' | 'bundle_verified';
 
 // ============================================================
 // Core table row types
@@ -325,6 +327,32 @@ export interface PhaseExecutionAttestation {
   harness_run_id: string | null;
   attested_by: string | null;
   attestation_source: PhaseExecutionAttestationSource | null;
+  recorded_at: string;
+  updated_at: string;
+}
+
+export interface PhasePromptRealization {
+  feature_id: string;
+  phase: Phase;
+  phase_role_name: string;
+  prompt_realization_policy: PromptRealizationPolicy;
+  manifest_id: string;
+  manifest_version: string;
+  shared_context_hash: string;
+  phase_definition_hash: string;
+  resolved_skill_hashes: string[];
+  required_prompt_sections: string[];
+  context_bundle_hash: string;
+  nonce: string;
+  actual_mode: PhaseExecutionMode;
+  proof_status: Exclude<PromptRealizationProofStatus, 'none'>;
+  supervisor_session_id: string | null;
+  worker_session_id: string | null;
+  harness_run_id: string | null;
+  attested_by: string;
+  child_prompt_hash: string;
+  wrapper_hash: string | null;
+  child_ack_nonce: string | null;
   recorded_at: string;
   updated_at: string;
 }

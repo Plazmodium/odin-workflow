@@ -12,12 +12,27 @@ function createPreparedContext(
 ) {
   const phase_name = phase === '9' ? 'Release' : phase === '5' ? 'Builder' : `Phase ${phase}`;
   const role_name = phase === '9' ? 'release-agent' : phase === '5' ? 'builder-agent' : `${phase_name.toLowerCase()}-agent`;
+  const prompt_realization_policy = phase === '5' || phase === '6' || phase === '7'
+    ? 'phase_bundle_preferred'
+    : 'phase_bundle_optional';
+  const phase_prompt_manifest = {
+    manifest_id: `manifest-${phase}`,
+    phase,
+    phase_role_name: role_name,
+    shared_context_hash: 'a'.repeat(64),
+    phase_definition_hash: 'b'.repeat(64),
+    resolved_skill_hashes: ['c'.repeat(64)],
+    required_prompt_sections: ['phase', 'role_summary', 'constraints'] as const,
+    context_bundle_hash: 'd'.repeat(64),
+    manifest_version: '1',
+    nonce: `nonce-${phase}`,
+  };
 
   return {
     raw: {
       phase: { id: phase, name: phase_name },
       agent: { name: role_name },
-      execution: { recommended_mode, acting_agent_name },
+      execution: { recommended_mode, acting_agent_name, prompt_realization_policy, phase_prompt_manifest },
     },
     phase: {
       id: phase,
@@ -38,8 +53,10 @@ function createPreparedContext(
       execution_policy: phase === '5' || phase === '6' || phase === '7'
         ? 'distinct_session_preferred' as const
         : 'inline_allowed' as const,
+      prompt_realization_policy,
       child_state_strategy: recommended_mode === 'subagent' ? 'direct_odin_tools_if_available' as const : 'return_intent_to_parent' as const,
       response_style,
+      phase_prompt_manifest,
       prompt_sections: ['phase', 'role_summary', 'constraints'] as const,
     },
   };
@@ -77,6 +94,7 @@ function createClient(overrides: Partial<RuntimeToolClient> = {}): RuntimeToolCl
     recordSupervisorEvent: vi.fn(async () => undefined),
     registerPhaseExecution: vi.fn(async () => undefined),
     clearPhaseExecution: vi.fn(async () => undefined),
+    registerPhaseRealization: vi.fn(async () => undefined),
     recordPhaseArtifact: vi.fn(async () => undefined),
     recordPhaseResult: vi.fn(async () => undefined),
     archiveFeatureRelease: vi.fn(async () => undefined),
@@ -381,10 +399,10 @@ describe('runTick', () => {
       'Use terse execution style for operational chatter and summaries:'
     );
     expect(execute.mock.calls[0]?.[0]?.prompt).toContain(
-      '"role_summary": "Role summary for Builder."'
+      'Prompt realization guidance:'
     );
-    expect(execute.mock.calls[0]?.[0]?.prompt).not.toContain(
-      '"agent": {'
+    expect(execute.mock.calls[0]?.[0]?.prompt).toContain(
+      '"execution": {'
     );
     expect(client.recordPhaseResult).toHaveBeenCalledWith({
       feature_id: 'FEAT-7',
@@ -395,9 +413,17 @@ describe('runTick', () => {
       created_by: 'builder-agent',
       blockers: [],
     });
+    expect(client.registerPhaseRealization).toHaveBeenCalledWith(
+      expect.objectContaining({
+        feature_id: 'FEAT-7',
+        phase: '5',
+        manifest: expect.objectContaining({ manifest_id: 'manifest-5' }),
+        proof_status: 'bundle_attested',
+      }),
+    );
   });
 
-  it('does not inject terse-style instructions for normal-style subagent phases', async () => {
+  it('does not inject terse-style instructions for normal response-style subagent phases', async () => {
     const subagent_executor: SubagentExecutor = {
       execute: vi.fn(async () => ({
         summary: 'Documentation completed.',
@@ -433,6 +459,7 @@ describe('runTick', () => {
         actual_mode: 'subagent',
       }),
     );
+    expect(client.registerPhaseRealization).not.toHaveBeenCalled();
   });
 
   it('collapses duplicate artifact slots before proxying them to the runtime', async () => {
@@ -472,6 +499,63 @@ describe('runTick', () => {
     });
   });
 
+  it('records verified prompt realization when the child echoes the manifest nonce', async () => {
+    const subagent_executor: SubagentExecutor = {
+      execute: vi.fn(async () => ({
+        summary: 'Builder implementation finished.',
+        outcome: 'completed',
+        next_phase: '6',
+        blockers: [],
+        phase_prompt_nonce_ack: 'nonce-5',
+      })),
+    };
+    const client = createClient({
+      pickNextAutonomousPhase: vi.fn(async () => ({
+        selection: createSelection('5', 'subagent', {
+          feature_id: 'FEAT-7C',
+          feature_name: 'Feature 7C',
+          branch_name: null,
+          release_notes: null,
+        }),
+        skipped_summary: [],
+      })),
+    });
+
+    await runTick(client, 'ralph-loop', '/tmp/project', undefined, subagent_executor);
+
+    expect(client.registerPhaseRealization).toHaveBeenCalledWith(
+      expect.objectContaining({
+        feature_id: 'FEAT-7C',
+        phase: '5',
+        child_ack_nonce: 'nonce-5',
+        proof_status: 'bundle_verified',
+      }),
+    );
+  });
+
+  it('fails without release cleanup when subagent execution is recommended but no child executor is configured', async () => {
+    const client = createClient({
+      pickNextAutonomousPhase: vi.fn(async () => ({
+        selection: createSelection('5', 'subagent', {
+          feature_id: 'FEAT-9',
+          feature_name: 'Feature 9',
+          branch_name: null,
+          release_notes: null,
+        }),
+        skipped_summary: [],
+      })),
+    });
+
+    const result = await runTick(client, 'ralph-loop', '/tmp/project');
+
+    expect(result).toMatchObject({
+      outcome: 'failed',
+      summary: 'Subagent execution is recommended for FEAT-9 phase 5, but Ralph Loop has no child executor configured.',
+    });
+    expect(client.recordReleaseHandoffFailure).not.toHaveBeenCalled();
+    expect(client.recordReleaseCloseoutFailure).not.toHaveBeenCalled();
+  });
+
   it('returns the recorded blocked subagent outcome instead of flattening it to completed', async () => {
     const subagent_executor: SubagentExecutor = {
       execute: vi.fn(async () => ({
@@ -509,26 +593,4 @@ describe('runTick', () => {
     });
   });
 
-  it('fails without release cleanup when subagent execution is recommended but no child executor is configured', async () => {
-    const client = createClient({
-      pickNextAutonomousPhase: vi.fn(async () => ({
-        selection: createSelection('5', 'subagent', {
-          feature_id: 'FEAT-9',
-          feature_name: 'Feature 9',
-          branch_name: null,
-          release_notes: null,
-        }),
-        skipped_summary: [],
-      })),
-    });
-
-    const result = await runTick(client, 'ralph-loop', '/tmp/project');
-
-    expect(result).toMatchObject({
-      outcome: 'failed',
-      summary: 'Subagent execution is recommended for FEAT-9 phase 5, but Ralph Loop has no child executor configured.',
-    });
-    expect(client.recordReleaseHandoffFailure).not.toHaveBeenCalled();
-    expect(client.recordReleaseCloseoutFailure).not.toHaveBeenCalled();
-  });
 });

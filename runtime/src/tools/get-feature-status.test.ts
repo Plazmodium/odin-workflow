@@ -1,14 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { SkillAdapter } from '../adapters/skills/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
 import type { RuntimeConfig } from '../config.js';
+import { buildPhaseContextBundleForFeature } from './prepare-phase-context.js';
 import type {
   ClaimVerificationSummary,
   FeatureEvalSummary,
   FeatureRecord,
   LearningRecord,
-  PhaseArtifact,
   PhaseExecutionAttestation,
+  PhasePromptRealizationAttestation,
+  PhaseArtifact,
   PhaseResultRecord,
   ReviewCheckRecord,
 } from '../types.js';
@@ -177,6 +180,7 @@ function createWorkflowAdapter(feature: FeatureRecord | null): WorkflowStateAdap
         created_at: '2026-03-13T03:00:00.000Z',
       },
     ] as LearningRecord[]),
+    listRelatedLearnings: vi.fn(async () => []),
     listAgentInvocations: vi.fn(async () => [
       {
         id: 'inv_1',
@@ -217,12 +221,24 @@ function createWorkflowAdapter(feature: FeatureRecord | null): WorkflowStateAdap
         recorded_at: '2026-03-13T01:00:00.000Z',
       } satisfies PhaseExecutionAttestation,
     ]),
-  } as unknown as WorkflowStateAdapter;
+    listPhasePromptRealizations: vi.fn(async () => []),
+    } as unknown as WorkflowStateAdapter;
+}
+
+function createSkillAdapter(): SkillAdapter {
+  return {
+    resolveSkills: vi.fn(async () => ({
+      resolved: [],
+      fallback_used: false,
+    })),
+    listKnowledgeDomains: vi.fn(async () => []),
+    invalidateCaches: vi.fn(),
+  };
 }
 
 describe('handleGetFeatureStatus', () => {
   it('returns an error when the feature is missing', async () => {
-    const result = await handleGetFeatureStatus(createWorkflowAdapter(null), {
+    const result = await handleGetFeatureStatus(createWorkflowAdapter(null), createSkillAdapter(), {
       runtime: { mode: 'in_memory' },
     } as RuntimeConfig, {
       feature_id: 'MISSING',
@@ -233,7 +249,51 @@ describe('handleGetFeatureStatus', () => {
   });
 
   it('returns counts, next phase, latest review check, and latest eval summary', async () => {
-    const result = await handleGetFeatureStatus(createWorkflowAdapter(createFeature({ base_branch: 'main' })), createConfig('auto_pr'), {
+    const feature = createFeature({ base_branch: 'main' });
+    const adapter = createWorkflowAdapter(feature);
+    const skillAdapter = createSkillAdapter();
+    const bundle = await buildPhaseContextBundleForFeature(
+      feature,
+      adapter,
+      skillAdapter,
+      createConfig('auto_pr'),
+      {
+        feature_id: 'FEAT-002',
+        phase: '5',
+        include_artifacts: true,
+        include_skills: true,
+        include_learnings: true,
+      },
+      { open_invocation: false },
+    );
+    (adapter.listPhasePromptRealizations as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      {
+        feature_id: 'FEAT-002',
+        phase: '5',
+        phase_role_name: 'builder-agent',
+        prompt_realization_policy: 'phase_bundle_preferred',
+        manifest_id: bundle.execution.phase_prompt_manifest!.manifest_id,
+        manifest_version: bundle.execution.phase_prompt_manifest!.manifest_version,
+        shared_context_hash: bundle.execution.phase_prompt_manifest!.shared_context_hash,
+        phase_definition_hash: bundle.execution.phase_prompt_manifest!.phase_definition_hash,
+        resolved_skill_hashes: bundle.execution.phase_prompt_manifest!.resolved_skill_hashes,
+        required_prompt_sections: bundle.execution.phase_prompt_manifest!.required_prompt_sections,
+        context_bundle_hash: bundle.execution.phase_prompt_manifest!.context_bundle_hash,
+        nonce: bundle.execution.phase_prompt_manifest!.nonce,
+        actual_mode: 'subagent',
+        proof_status: 'bundle_attested',
+        supervisor_session_id: 'ralph-loop:run-1',
+        worker_session_id: 'builder-worker-1',
+        harness_run_id: 'run-1',
+        attested_by: 'ralph-loop',
+        child_prompt_hash: 'e'.repeat(64),
+        wrapper_hash: null,
+        child_ack_nonce: null,
+        recorded_at: '2026-03-13T01:00:00.000Z',
+      } satisfies PhasePromptRealizationAttestation,
+    ]);
+
+    const result = await handleGetFeatureStatus(adapter, skillAdapter, createConfig('auto_pr'), {
       feature_id: 'FEAT-002',
     });
     const status = result.structuredContent as {
@@ -276,7 +336,22 @@ describe('handleGetFeatureStatus', () => {
         };
         summary: {
           counts: { attested: number; subagent_attested: number };
-          preferred_without_distinct_session: Array<{ phase: string; phase_role_name: string }>;
+          preferred_without_distinct_session: Array<{ phase: string }>;
+        };
+      };
+      prompt_realization: {
+        current_phase: {
+          row: {
+            attested_manifest_id: string | null;
+            prompt_realization_policy: string;
+            proof_status: string;
+          };
+          warning: string | null;
+          error: string | null;
+        };
+        summary: {
+          counts: { bundle_attested: number; matching_manifest: number };
+          preferred_without_bundle_realization: Array<{ phase: string }>;
         };
       };
       development_evals: unknown;
@@ -343,6 +418,20 @@ describe('handleGetFeatureStatus', () => {
       phase: '6',
       phase_role_name: 'reviewer-agent',
     });
+    expect(status.prompt_realization.current_phase.row).toMatchObject({
+      prompt_realization_policy: 'phase_bundle_preferred',
+      proof_status: 'bundle_attested',
+    });
+    expect(status.prompt_realization.current_phase.row.attested_manifest_id).toMatch(/^[a-f0-9]{64}$/);
+    expect(status.prompt_realization.current_phase.warning).toBeNull();
+    expect(status.prompt_realization.summary.counts).toMatchObject({
+      bundle_attested: 1,
+      matching_manifest: 1,
+    });
+    expect(status.prompt_realization.summary.preferred_without_bundle_realization).toContainEqual({
+      phase: '6',
+      phase_role_name: 'reviewer-agent',
+    });
     expect(status.development_evals).toMatchObject({
       mode: 'plan_required',
       latest_plan: {
@@ -393,9 +482,10 @@ describe('handleGetFeatureStatus', () => {
       ]),
       listAgentInvocations: vi.fn(async () => []),
       listPhaseExecutionAttestations: vi.fn(async () => []),
+      listPhasePromptRealizations: vi.fn(async () => []),
     } as WorkflowStateAdapter;
 
-    const result = await handleGetFeatureStatus(adapter, createConfig('auto_pr'), {
+    const result = await handleGetFeatureStatus(adapter, createSkillAdapter(), createConfig('auto_pr'), {
       feature_id: 'FEAT-002',
     });
     const status = result.structuredContent as {
@@ -427,9 +517,10 @@ describe('handleGetFeatureStatus', () => {
         },
       ]),
       listPhaseExecutionAttestations: vi.fn(async () => []),
+      listPhasePromptRealizations: vi.fn(async () => []),
     } as WorkflowStateAdapter;
 
-    const result = await handleGetFeatureStatus(adapter, createConfig('auto_pr'), {
+    const result = await handleGetFeatureStatus(adapter, createSkillAdapter(), createConfig('auto_pr'), {
       feature_id: 'FEAT-002',
     });
     const status = result.structuredContent as {
