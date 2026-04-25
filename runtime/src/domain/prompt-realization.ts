@@ -41,9 +41,11 @@ export interface PromptRealizationStatusSummary {
     bundle_attested: number;
     bundle_verified: number;
     matching_manifest: number;
+    unverified_manifest: number;
   };
   preferred_without_bundle_realization: Array<{ phase: PhaseId; phase_role_name: string }>;
   required_without_bundle_realization: Array<{ phase: PhaseId; phase_role_name: string }>;
+  unverified_without_canonical_manifest: Array<{ phase: PhaseId; phase_role_name: string }>;
 }
 
 function defaultRow(phase: PhaseId, expected_manifest: PhasePromptManifest | null): PhasePromptRealizationStatusRow {
@@ -75,7 +77,15 @@ function hasPromptBundleProof(row: PhasePromptRealizationStatusRow): boolean {
     row.actual_mode === 'subagent' &&
     row.proof_status !== 'none' &&
     row.attested_manifest_id != null &&
-    row.manifest_match
+    (row.manifest_match || !row.expected_manifest_available)
+  );
+}
+
+function hasUnverifiedManifest(row: PhasePromptRealizationStatusRow): boolean {
+  return (
+    row.attested_manifest_id != null &&
+    !row.manifest_match &&
+    !row.expected_manifest_available
   );
 }
 
@@ -152,11 +162,15 @@ export function summarizePromptRealizationStatus(
   rows: PhasePromptRealizationStatusRow[],
 ): PromptRealizationStatusSummary {
   const preferred_without_bundle_realization = rows
-    .filter((row) => row.prompt_realization_policy === 'phase_bundle_preferred' && !hasPromptBundleProof(row))
+    .filter((row) => row.prompt_realization_policy === 'phase_bundle_preferred' && !hasPromptBundleProof(row) && !hasUnverifiedManifest(row))
     .map((row) => ({ phase: row.phase, phase_role_name: row.phase_role_name }));
 
   const required_without_bundle_realization = rows
-    .filter((row) => row.prompt_realization_policy === 'phase_bundle_required' && !hasPromptBundleProof(row))
+    .filter((row) => row.prompt_realization_policy === 'phase_bundle_required' && !hasPromptBundleProof(row) && !hasUnverifiedManifest(row))
+    .map((row) => ({ phase: row.phase, phase_role_name: row.phase_role_name }));
+
+  const unverified_without_canonical_manifest = rows
+    .filter((row) => hasUnverifiedManifest(row))
     .map((row) => ({ phase: row.phase, phase_role_name: row.phase_role_name }));
 
   return {
@@ -165,8 +179,10 @@ export function summarizePromptRealizationStatus(
       bundle_attested: rows.filter((row) => row.proof_status === 'bundle_attested').length,
       bundle_verified: rows.filter((row) => row.proof_status === 'bundle_verified').length,
       matching_manifest: rows.filter((row) => row.manifest_match && row.attested_manifest_id != null).length,
+      unverified_manifest: rows.filter((row) => hasUnverifiedManifest(row)).length,
     },
     preferred_without_bundle_realization,
     required_without_bundle_realization,
+    unverified_without_canonical_manifest,
   };
 }

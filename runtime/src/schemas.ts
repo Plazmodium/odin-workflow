@@ -5,6 +5,7 @@
 
 import * as z from 'zod/v4';
 
+import { PHASE_PROMPT_SECTIONS } from './domain/phases.js';
 import {
   ARTIFACT_OUTPUT_TYPES,
   CLAIM_TYPES,
@@ -278,7 +279,7 @@ export const RegisterPhaseRealizationInputSchema = z.object({
     shared_context_hash: z.string().regex(/^[a-f0-9]{64}$/),
     phase_definition_hash: z.string().regex(/^[a-f0-9]{64}$/),
     resolved_skill_hashes: z.array(z.string().regex(/^[a-f0-9]{64}$/)),
-    required_prompt_sections: z.array(z.enum(['phase', 'role_summary', 'constraints', 'development_evals', 'automation', 'verification', 'workflow', 'artifacts', 'skills', 'learnings'])).min(1),
+    required_prompt_sections: z.array(z.enum(PHASE_PROMPT_SECTIONS)).min(1),
     context_bundle_hash: z.string().regex(/^[a-f0-9]{64}$/),
     manifest_version: z.string().min(1),
     nonce: z.string().min(1),

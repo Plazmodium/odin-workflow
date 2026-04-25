@@ -236,7 +236,7 @@ const PHASE_RESPONSE_STYLES: Record<PhaseId, PhaseResponseStyle> = {
   '10': 'normal',
 };
 
-const PHASE_PROMPT_SECTIONS: PhaseExecutionContract['prompt_sections'] = [
+export const PHASE_PROMPT_SECTIONS = [
   'phase',
   'role_summary',
   'constraints',
@@ -247,7 +247,7 @@ const PHASE_PROMPT_SECTIONS: PhaseExecutionContract['prompt_sections'] = [
   'artifacts',
   'skills',
   'learnings',
-];
+] as const satisfies PhaseExecutionContract['prompt_sections'];
 
 /**
  * Retrieve the PhaseContract for a given phase identifier.
