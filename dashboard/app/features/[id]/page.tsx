@@ -81,6 +81,13 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
   const currentPhaseRecommendedMode = currentPhaseExecution?.recommended_mode ?? 'inline';
   const currentPhaseActualMode = currentPhaseExecution?.actual_mode ?? null;
   const currentPhaseProofStatus = currentPhaseExecution?.proof_status ?? 'none';
+  const currentPhasePromptRealization = promptRealizationsResult.current_phase;
+  const currentPhasePromptPolicy = currentPhasePromptRealization?.prompt_realization_policy ?? 'phase_bundle_optional';
+  const currentPhasePromptManifestId = currentPhasePromptRealization?.attested_manifest_id ?? null;
+  const currentPhasePromptProofStatus = currentPhasePromptRealization?.proof_status ?? 'none';
+  const currentPhasePromptProofVerified =
+    currentPhasePromptProofStatus === 'bundle_attested' || currentPhasePromptProofStatus === 'bundle_verified';
+  const currentPhasePromptWarning = currentPhasePromptRealization?.warning ?? null;
   const currentPhaseAttestation = executionAttestations.find((attestation) => attestation.phase === feature.current_phase) ?? null;
   const currentPhaseWarning = currentPhaseExecution?.warning ?? null;
 
@@ -184,16 +191,16 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
             <div className="space-y-3 border-t pt-3">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Prompt realization</p>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">Policy: {promptRealizationsResult.current_phase?.prompt_realization_policy ?? 'phase_bundle_optional'}</Badge>
-                <Badge variant={promptRealizationsResult.current_phase?.attested_manifest_id == null ? 'outline' : 'secondary'}>
-                  Manifest: {promptRealizationsResult.current_phase?.attested_manifest_id ?? 'not recorded'}
+                <Badge variant="secondary">Policy: {currentPhasePromptPolicy}</Badge>
+                <Badge variant={currentPhasePromptManifestId == null ? 'outline' : 'secondary'}>
+                  Manifest: {currentPhasePromptManifestId ?? 'not recorded'}
                 </Badge>
-                <Badge variant={promptRealizationsResult.current_phase?.proof_status === 'bundle_attested' || promptRealizationsResult.current_phase?.proof_status === 'bundle_verified' ? 'secondary' : 'outline'}>
-                  Proof: {promptRealizationsResult.current_phase?.proof_status ?? 'none'}
+                <Badge variant={currentPhasePromptProofVerified ? 'secondary' : 'outline'}>
+                  Proof: {currentPhasePromptProofStatus}
                 </Badge>
               </div>
-              {promptRealizationsResult.current_phase?.warning != null && (
-                <p className="text-amber-600 dark:text-amber-400">{promptRealizationsResult.current_phase.warning}</p>
+              {currentPhasePromptWarning != null && (
+                <p className="text-amber-600 dark:text-amber-400">{currentPhasePromptWarning}</p>
               )}
               {promptRealizationsResult.error != null && (
                 <p className="text-amber-600 dark:text-amber-400">{promptRealizationsResult.error}</p>

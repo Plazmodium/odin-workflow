@@ -1,4 +1,3 @@
-import { computePhasePromptManifestId } from './phase-prompt-manifest.js';
 import { getPhaseAgentInstructions, getPhaseExecutionContract } from './phases.js';
 
 import type {
@@ -15,6 +14,7 @@ export interface PhasePromptRealizationStatusRow {
   phase: PhaseId;
   phase_role_name: string;
   prompt_realization_policy: PromptRealizationPolicy;
+  expected_manifest_available: boolean;
   expected_manifest_id: string | null;
   attested_manifest_id: string | null;
   actual_mode: PhasePromptRealizationAttestation['actual_mode'] | null;
@@ -54,6 +54,7 @@ function defaultRow(phase: PhaseId, expected_manifest: PhasePromptManifest | nul
     phase,
     phase_role_name,
     prompt_realization_policy: contract.prompt_realization_policy,
+    expected_manifest_available: expected_manifest != null,
     expected_manifest_id: expected_manifest?.manifest_id ?? null,
     attested_manifest_id: null,
     actual_mode: null,
@@ -67,22 +68,6 @@ function defaultRow(phase: PhaseId, expected_manifest: PhasePromptManifest | nul
     worker_session_id: null,
     harness_run_id: null,
   };
-}
-
-function expectedManifestIdFromAttestation(
-  attestation: PhasePromptRealizationAttestation,
-): string {
-  return computePhasePromptManifestId({
-    phase: attestation.phase,
-    phase_role_name: attestation.phase_role_name,
-    shared_context_hash: attestation.shared_context_hash,
-    phase_definition_hash: attestation.phase_definition_hash,
-    resolved_skill_hashes: attestation.resolved_skill_hashes,
-    required_prompt_sections: attestation.required_prompt_sections,
-    context_bundle_hash: attestation.context_bundle_hash,
-    manifest_version: attestation.manifest_version,
-    nonce: attestation.nonce,
-  });
 }
 
 function hasPromptBundleProof(row: PhasePromptRealizationStatusRow): boolean {
@@ -106,13 +91,11 @@ export function buildPromptRealizationStatusRow(
 
   return {
     ...row,
-    expected_manifest_id:
-      expected_manifest?.manifest_id ?? expectedManifestIdFromAttestation(attestation),
     attested_manifest_id: attestation.manifest_id,
     actual_mode: attestation.actual_mode,
     proof_status: attestation.proof_status,
     manifest_match:
-      (expected_manifest?.manifest_id ?? expectedManifestIdFromAttestation(attestation)) === attestation.manifest_id,
+      expected_manifest != null && expected_manifest.manifest_id === attestation.manifest_id,
     child_prompt_hash: attestation.child_prompt_hash,
     wrapper_hash: attestation.wrapper_hash,
     child_ack_nonce: attestation.child_ack_nonce,
@@ -138,14 +121,21 @@ export function assessPromptRealizationPolicy(
     return { row, warning: null, error: null };
   }
 
-  const missing_message =
-    row.attested_manifest_id == null
-      ? `Phase ${phase} (${row.phase_role_name}) ${row.prompt_realization_policy === 'phase_bundle_required' ? 'requires' : 'prefers'} attested realization from the Odin phase bundle, but no prompt realization attestation was recorded.`
-      : !row.manifest_match
-        ? `Phase ${phase} (${row.phase_role_name}) ${row.prompt_realization_policy === 'phase_bundle_required' ? 'requires' : 'prefers'} the current Odin phase bundle, but the recorded manifest does not match the expected bundle.`
-        : row.actual_mode !== 'subagent'
-          ? `Phase ${phase} (${row.phase_role_name}) ${row.prompt_realization_policy === 'phase_bundle_required' ? 'requires' : 'prefers'} distinct child realization from the Odin phase bundle, but the recorded actual mode was ${row.actual_mode}.`
-          : `Phase ${phase} (${row.phase_role_name}) ${row.prompt_realization_policy === 'phase_bundle_required' ? 'requires' : 'prefers'} provable Odin phase-bundle realization, but the recorded proof is incomplete.`;
+  const policyVerb = row.prompt_realization_policy === 'phase_bundle_required' ? 'requires' : 'prefers';
+  const prefix = `Phase ${phase} (${row.phase_role_name}) ${policyVerb}`;
+  let missing_message: string;
+
+  if (row.attested_manifest_id == null) {
+    missing_message = `${prefix} attested realization from the Odin phase bundle, but no prompt realization attestation was recorded.`;
+  } else if (!row.expected_manifest_available) {
+    missing_message = `${prefix} the current Odin phase bundle, but no canonical manifest was available for comparison.`;
+  } else if (!row.manifest_match) {
+    missing_message = `${prefix} the current Odin phase bundle, but the recorded manifest does not match the expected bundle.`;
+  } else if (row.actual_mode !== 'subagent') {
+    missing_message = `${prefix} distinct child realization from the Odin phase bundle, but the recorded actual mode was ${row.actual_mode}.`;
+  } else {
+    missing_message = `${prefix} provable Odin phase-bundle realization, but the recorded proof is incomplete.`;
+  }
 
   if (row.prompt_realization_policy === 'phase_bundle_required') {
     return { row, warning: null, error: missing_message };

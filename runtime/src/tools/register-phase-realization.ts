@@ -44,26 +44,6 @@ export async function handleRegisterPhaseRealization(
   const phase_role_name = getPhaseAgentInstructions(input.phase).name;
   const execution = getPhaseExecutionContract(input.phase, phase_role_name);
   const execution_attestation = await adapter.getPhaseExecutionAttestation(input.feature_id, input.phase);
-  const expected_bundle = await buildPhaseContextBundleForFeature(feature, adapter, skill_adapter, config, {
-    feature_id: input.feature_id,
-    phase: input.phase,
-    include_artifacts: true,
-    include_skills: true,
-    include_learnings: true,
-  }, {
-    open_invocation: false,
-  });
-  const expected_manifest = expected_bundle.execution.phase_prompt_manifest;
-
-  if (expected_manifest == null) {
-    return createErrorResult(
-      `Phase ${input.phase} does not expose a canonical phase prompt manifest.`,
-      {
-        feature_id: input.feature_id,
-        phase: input.phase,
-      },
-    );
-  }
 
   if (execution_attestation == null) {
     return createErrorResult(
@@ -83,6 +63,27 @@ export async function handleRegisterPhaseRealization(
         phase: input.phase,
         execution_actual_mode: execution_attestation.actual_mode,
         realization_actual_mode: input.actual_mode,
+      },
+    );
+  }
+
+  const expected_bundle = await buildPhaseContextBundleForFeature(feature, adapter, skill_adapter, config, {
+    feature_id: input.feature_id,
+    phase: input.phase,
+    include_artifacts: true,
+    include_skills: true,
+    include_learnings: true,
+  }, {
+    open_invocation: false,
+  });
+  const expected_manifest = expected_bundle.execution.phase_prompt_manifest;
+
+  if (expected_manifest == null) {
+    return createErrorResult(
+      `Phase ${input.phase} does not expose a canonical phase prompt manifest.`,
+      {
+        feature_id: input.feature_id,
+        phase: input.phase,
       },
     );
   }
@@ -116,7 +117,6 @@ export async function handleRegisterPhaseRealization(
     required_prompt_sections: input.manifest.required_prompt_sections,
     context_bundle_hash: input.manifest.context_bundle_hash,
     manifest_version: input.manifest.manifest_version,
-    nonce: input.manifest.nonce,
   });
 
   if (input.manifest.manifest_id !== expected_manifest_id) {
@@ -129,6 +129,7 @@ export async function handleRegisterPhaseRealization(
     );
   }
 
+  // Defense in depth against SHA collisions or future regressions in computePhasePromptManifestId.
   const static_hashes = await computeStaticPhasePromptHashes(input.phase);
   if (input.manifest.shared_context_hash !== static_hashes.shared_context_hash) {
     return createErrorResult(
@@ -218,8 +219,8 @@ export async function handleRegisterPhaseRealization(
     harness_run_id: normalizeSessionId(input.harness_run_id),
     attested_by: input.attested_by,
     child_prompt_hash: input.child_prompt_hash,
-    wrapper_hash: input.wrapper_hash?.trim() ?? null,
-    child_ack_nonce: input.child_ack_nonce?.trim() ?? null,
+    wrapper_hash: normalizeSessionId(input.wrapper_hash),
+    child_ack_nonce: normalizeSessionId(input.child_ack_nonce),
     recorded_at: new Date().toISOString(),
   };
 

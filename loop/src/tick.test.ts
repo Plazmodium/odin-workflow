@@ -423,7 +423,7 @@ describe('runTick', () => {
     );
   });
 
-  it('does not inject terse-style instructions for normal-style subagent phases', async () => {
+  it('does not inject terse-style instructions for normal response-style subagent phases', async () => {
     const subagent_executor: SubagentExecutor = {
       execute: vi.fn(async () => ({
         summary: 'Documentation completed.',

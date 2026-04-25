@@ -13,43 +13,15 @@ const bundled_migration_011_path = resolve(tools_dir, '../../migrations/011_comp
 const bundled_migration_012_path = resolve(tools_dir, '../../migrations/012_phase_execution_attestations.sql');
 const bundled_migration_014_path = resolve(tools_dir, '../../migrations/014_phase_prompt_realizations.sql');
 
-function resolveCanonicalMigration011Path(): string {
+function resolveCanonicalMigrationPath(filename: string): string {
   const candidates = [
-    resolve(tools_dir, '../../../../database/supabase-migrations/011_complete_feature_phase_coverage.sql'),
-    resolve(tools_dir, '../../../migrations/011_complete_feature_phase_coverage.sql'),
+    resolve(tools_dir, `../../../../database/supabase-migrations/${filename}`),
+    resolve(tools_dir, `../../../migrations/${filename}`),
   ];
 
   const match = candidates.find((candidate) => existsSync(candidate));
   if (match == null) {
-    throw new Error(`Could not find canonical migration 011 at any expected path: ${candidates.join(', ')}`);
-  }
-
-  return match;
-}
-
-function resolveCanonicalMigration012Path(): string {
-  const candidates = [
-    resolve(tools_dir, '../../../../database/supabase-migrations/012_phase_execution_attestations.sql'),
-    resolve(tools_dir, '../../../migrations/012_phase_execution_attestations.sql'),
-  ];
-
-  const match = candidates.find((candidate) => existsSync(candidate));
-  if (match == null) {
-    throw new Error(`Could not find canonical migration 012 at any expected path: ${candidates.join(', ')}`);
-  }
-
-  return match;
-}
-
-function resolveCanonicalMigration014Path(): string {
-  const candidates = [
-    resolve(tools_dir, '../../../../database/supabase-migrations/014_phase_prompt_realizations.sql'),
-    resolve(tools_dir, '../../../migrations/014_phase_prompt_realizations.sql'),
-  ];
-
-  const match = candidates.find((candidate) => existsSync(candidate));
-  if (match == null) {
-    throw new Error(`Could not find canonical migration 014 at any expected path: ${candidates.join(', ')}`);
+    throw new Error(`Could not find canonical migration at any expected path: ${candidates.join(', ')}`);
   }
 
   return match;
@@ -196,7 +168,7 @@ describe('bootstrapExistingSchema', () => {
 describe('migration 011', () => {
   it('drops get_feature_status before replacing its row type and stays aligned with the canonical SQL', () => {
     const bundled_sql = readFileSync(bundled_migration_011_path, 'utf8');
-    const canonical_sql = readFileSync(resolveCanonicalMigration011Path(), 'utf8');
+    const canonical_sql = readFileSync(resolveCanonicalMigrationPath('011_complete_feature_phase_coverage.sql'), 'utf8');
 
     expect(bundled_sql).toContain('DROP FUNCTION IF EXISTS get_feature_status(TEXT);');
     expect(bundled_sql).toBe(canonical_sql);
@@ -206,7 +178,7 @@ describe('migration 011', () => {
 describe('migration 012', () => {
   it('stays aligned with the canonical SQL', () => {
     const bundled_sql = readFileSync(bundled_migration_012_path, 'utf8');
-    const canonical_sql = readFileSync(resolveCanonicalMigration012Path(), 'utf8');
+    const canonical_sql = readFileSync(resolveCanonicalMigrationPath('012_phase_execution_attestations.sql'), 'utf8');
 
     expect(bundled_sql).toContain('CREATE TABLE phase_execution_attestations');
     expect(bundled_sql).toBe(canonical_sql);
@@ -242,7 +214,7 @@ describe('migration 013', () => {
 describe('migration 014', () => {
   it('stays aligned with the canonical SQL', () => {
     const bundled_sql = readFileSync(bundled_migration_014_path, 'utf8');
-    const canonical_sql = readFileSync(resolveCanonicalMigration014Path(), 'utf8');
+    const canonical_sql = readFileSync(resolveCanonicalMigrationPath('014_phase_prompt_realizations.sql'), 'utf8');
 
     expect(bundled_sql).toContain('CREATE TABLE phase_prompt_realizations');
     expect(bundled_sql).toBe(canonical_sql);

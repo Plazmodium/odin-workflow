@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 import type { PhaseArtifact, PhaseContextBundle, PhaseId, PhasePromptManifest, ResolvedSkill } from '../types.js';
 
 const MANIFEST_VERSION = '1';
+let cachedDefinitionsRoot: string | null = null;
+const staticHashCache = new Map<PhaseId, { shared_context_hash: string; phase_definition_hash: string }>();
 
 const PHASE_DEFINITION_FILES: Partial<Record<PhaseId, string>> = {
   '0': 'planning.md',
@@ -41,7 +43,7 @@ function stableStringify(value: unknown): string {
 
   if (value != null && typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => compareStrings(left, right))
       .map(([key, child]) => `${JSON.stringify(key)}:${stableStringify(child)}`);
     return `{${entries.join(',')}}`;
   }
@@ -53,7 +55,15 @@ function hashValue(value: unknown): string {
   return createHash('sha256').update(stableStringify(value)).digest('hex');
 }
 
-type PhasePromptManifestSeed = Omit<PhasePromptManifest, 'manifest_id'>;
+type PhasePromptManifestSeed = Omit<PhasePromptManifest, 'manifest_id' | 'nonce'>;
+
+function compareStrings(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function normalizeText(text: string): string {
+  return text.replace(/\r\n/g, '\n');
+}
 
 export function computePhasePromptManifestId(seed: PhasePromptManifestSeed): string {
   return hashValue({
@@ -69,6 +79,10 @@ export function computePhasePromptManifestId(seed: PhasePromptManifestSeed): str
 }
 
 function resolveAgentDefinitionsRoot(): string {
+  if (cachedDefinitionsRoot != null) {
+    return cachedDefinitionsRoot;
+  }
+
   const current_file = fileURLToPath(import.meta.url);
   const package_root = resolve(dirname(current_file), '..', '..', '..');
   let cursor = package_root;
@@ -79,6 +93,7 @@ function resolveAgentDefinitionsRoot(): string {
     const builder = join(candidate, 'builder.md');
 
     if (existsSync(shared_context) && existsSync(builder)) {
+      cachedDefinitionsRoot = candidate;
       return candidate;
     }
 
@@ -96,7 +111,7 @@ function resolveAgentDefinitionsRoot(): string {
 function buildArtifactProjection(artifacts: Partial<Record<PhaseArtifact['output_type'], PhaseArtifact>>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(artifacts)
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => compareStrings(left, right))
       .map(([output_type, artifact]) => [
         output_type,
         artifact == null
@@ -178,7 +193,7 @@ function buildSkillHashes(skills: ResolvedSkill[]): string[] {
         content: skill.content,
       }),
     }))
-    .sort((left, right) => left.name.localeCompare(right.name))
+    .sort((left, right) => compareStrings(left.name, right.name))
     .map((skill) => skill.hash);
 }
 
@@ -223,6 +238,11 @@ export async function computeStaticPhasePromptHashes(phase: PhaseId): Promise<{
   shared_context_hash: string;
   phase_definition_hash: string;
 }> {
+  const cached = staticHashCache.get(phase);
+  if (cached != null) {
+    return cached;
+  }
+
   const phase_definition_file = PHASE_DEFINITION_FILES[phase];
   if (phase_definition_file == null) {
     throw new Error(`Phase ${phase} does not have a phase definition file for prompt manifest generation.`);
@@ -234,8 +254,11 @@ export async function computeStaticPhasePromptHashes(phase: PhaseId): Promise<{
     readFile(join(definitions_root, phase_definition_file), 'utf8'),
   ]);
 
-  return {
-    shared_context_hash: hashValue(shared_context_raw),
-    phase_definition_hash: hashValue(phase_definition_raw),
+  const hashes = {
+    shared_context_hash: hashValue(normalizeText(shared_context_raw)),
+    phase_definition_hash: hashValue(normalizeText(phase_definition_raw)),
   };
+
+  staticHashCache.set(phase, hashes);
+  return hashes;
 }

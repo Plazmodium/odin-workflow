@@ -90,6 +90,7 @@ export async function handleGetFeatureStatus(
     execution_attestations,
     prompt_realizations,
     latest_feature_eval,
+    expected_current_bundle,
   ] =
     await Promise.all([
       adapter.listPhaseArtifacts(input.feature_id),
@@ -105,6 +106,15 @@ export async function handleGetFeatureStatus(
       adapter.listPhaseExecutionAttestations(input.feature_id),
       adapter.listPhasePromptRealizations(input.feature_id),
       adapter.getLatestFeatureEval(input.feature_id),
+      feature.current_phase === '10'
+        ? Promise.resolve(null)
+        : buildPhaseContextBundleForFeature(feature, adapter, skill_adapter, config, {
+            feature_id: input.feature_id,
+            phase: feature.current_phase,
+            include_artifacts: true,
+            include_skills: true,
+            include_learnings: true,
+          }, { open_invocation: false }),
     ]);
 
   const current_phase = getPhaseContract(feature.current_phase);
@@ -119,17 +129,6 @@ export async function handleGetFeatureStatus(
     feature.current_phase,
     execution_attestations.find((attestation) => attestation.phase === feature.current_phase) ?? null,
   );
-  const expected_current_bundle = feature.current_phase === '10'
-    ? null
-    : await buildPhaseContextBundleForFeature(feature, adapter, skill_adapter, config, {
-        feature_id: input.feature_id,
-        phase: feature.current_phase,
-        include_artifacts: true,
-        include_skills: true,
-        include_learnings: true,
-      }, {
-        open_invocation: false,
-      });
   const prompt_realization_rows = PROMPT_REALIZATION_AUDIT_PHASES.map((phase) =>
     buildPromptRealizationStatusRow(
       phase,
