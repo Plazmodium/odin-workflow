@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/Odin.png" alt="Odin Logo" width="128" height="128">
+  <img src="assets/Odin.png" alt="Odin Logo" width="500" height="500">
 </p>
 
 <h1 align="center">Odin</h1>
