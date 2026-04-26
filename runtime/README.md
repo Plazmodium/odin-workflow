@@ -102,11 +102,11 @@ Odin supports three useful setup stages:
 - no persistent workflow state
 - good for validating MCP wiring and prompt flow
 
-2. **Direct PostgreSQL for migrations**
+1. **Direct PostgreSQL for migrations**
 - powers `odin.apply_migrations`
 - uses `DATABASE_URL`
 
-3. **Supabase for persistent workflow state**
+1. **Supabase for persistent workflow state**
 - powers the main persisted Odin runtime
 - uses `SUPABASE_URL` and `SUPABASE_SECRET_KEY`
 - add `SUPABASE_ACCESS_TOKEN` when you want migration management through Supabase APIs

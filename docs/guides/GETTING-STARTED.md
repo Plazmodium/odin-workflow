@@ -125,13 +125,13 @@ cp .env.example .env
 
 Then fill in either:
 
-- `DATABASE_URL` for direct PostgreSQL migrations
-- `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, and optionally `SUPABASE_ACCESS_TOKEN` for Supabase-backed usage
+- `DATABASE_URL` for direct PostgreSQL migrations, or
+- `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, and `SUPABASE_ACCESS_TOKEN` for Supabase-backed usage where you also want the AI agent to run `odin.apply_migrations` through the Supabase Management API
 
 Now ask the AI agent to run the packaged migrations:
 
 ```text
-If Odin database credentials are configured, run `odin.apply_migrations` and tell me what was applied. If they are not configured, tell me exactly what is missing and leave Odin in `in_memory` mode.
+If Odin database credentials are configured, run `odin.apply_migrations` and tell me what was applied. If the required variables for the path I chose are not configured, tell me exactly which variable names are missing and leave Odin in `in_memory` mode.
 ```
 
 Most users do not need to run SQL files manually.
