@@ -2,6 +2,10 @@
 
 Ralph Loop is the user-facing Odin supervisor that runs alongside the Odin runtime.
 
+This is optional advanced automation. It is not required for a normal first-time Odin setup.
+
+Start with [../docs/guides/GETTING-STARTED.md](../docs/guides/GETTING-STARTED.md) and come back here when you want bounded automation around safe phase pickup or PR handoff.
+
 It does **not** replace the runtime. Instead it:
 
 - asks the runtime which feature/phase is safe to run next

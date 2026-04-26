@@ -1,54 +1,139 @@
 # Odin Runtime
 
-A single-install MCP server that gives your AI coding agent an 11-phase development workflow with built-in quality gates, skill resolution, review checks, learnings, and release archival.
+`@plazmodium/odin` is the Odin MCP runtime package. It gives your AI coding tool one MCP server named `odin` with the 11-phase workflow, migrations, review checks, learnings, and workflow-state integration.
 
-## Quick Start
+This README is the package setup and reference guide. If you want the user-first onboarding flow, start with the repo [README.md](../README.md) or [docs/guides/GETTING-STARTED.md](../docs/guides/GETTING-STARTED.md).
 
-### 1. Install
+## Day 1 Setup
 
-Preferred published-package flow:
+Run `init` from the root of the project where Odin should create `.odin/`.
 
-```bash
-npx -y @plazmodium/odin init --project-root /path/to/your/project --tool opencode --write-mcp
+### Auto-configured tools
+
+| Tool | Command | Written file |
+|------|---------|--------------|
+| **Codex** | `npx -y @plazmodium/odin init --tool codex --write-mcp` | `.codex/config.toml` |
+| **OpenCode** | `npx -y @plazmodium/odin init --tool opencode --write-mcp` | `opencode.json` |
+| **Claude Code** | `npx -y @plazmodium/odin init --tool claude-code --write-mcp` | `.mcp.json` |
+| **Amp** | `npx -y @plazmodium/odin init --tool amp --write-mcp` | `.mcp.json` |
+
+### Generic snippet path
+
+| Tool type | Command | Result |
+|-----------|---------|--------|
+| **Cursor** | `npx -y @plazmodium/odin init --tool generic` | Prints the MCP server block to paste into Cursor |
+| **Junie / other tools** | `npx -y @plazmodium/odin init --tool generic` | Prints the MCP server block when your tool can wire a local MCP server |
+
+Important:
+
+- `--project-root` is optional. If you omit it, `init` uses your current working directory.
+- `runtime.mode: in_memory` is the default bootstrap mode so you can verify MCP wiring before adding external services.
+- Normal users do not need to clone `odin-workflow` to use the package.
+
+## What `init` Creates
+
+- `.odin/config.yaml` - runtime configuration
+- `.odin/ODIN.md` - workflow instructions for your AI agent
+- `.odin/agents/definitions/` - copied phase-agent prompt definitions
+- `.odin/skills/` - project-local skill overrides
+- `.env.example` - environment template
+- your MCP config file when auto-config is supported for that tool
+
+Odin writes all of those files into the target project root.
+
+## After `init`
+
+1. Restart your AI tool so it reloads MCP servers.
+2. Confirm the `odin` server is available.
+3. Tell the AI agent to use `.odin/ODIN.md` as its workflow guide.
+4. If database credentials are configured, ask the AI agent to run `odin.apply_migrations`.
+
+Suggested first prompt:
+
+```text
+Confirm the `odin` MCP tools are available. Then use `.odin/ODIN.md` as your workflow guide, summarize what Odin added to this repo, and tell me whether this project is still in `in_memory` mode or ready for migrations.
 ```
 
-Maintainer repo-checkout flow:
+Suggested migrations prompt:
 
-```bash
-cd runtime
-npm install
-npm run build
+```text
+If Odin database credentials are configured, run `odin.apply_migrations`. If they are not configured, tell me what is missing and leave Odin in `in_memory` mode.
 ```
 
-### 2. Bootstrap your project
+Important:
+`.odin/ODIN.md` is for the AI agent. Humans should not treat it as the onboarding guide.
 
-```bash
-# Published-package MCP command snippets
-npx -y @plazmodium/odin init --project-root /path/to/your/project --tool amp --write-mcp
-npx -y @plazmodium/odin init --project-root /path/to/your/project --tool opencode --write-mcp
+## One-Time Setup vs Ongoing Use
 
-# Source-checkout snippets while working on Odin from this repo
-npm run init:project -- --project-root /path/to/your/project --tool amp --distribution source --write-mcp
-npm run init:project -- --project-root /path/to/your/project --tool codex --distribution source --write-mcp
+- `odin init` is a one-time project bootstrap step.
+- You do not repeat `init` for every feature.
+- In the normal flow, your AI tool's orchestrating session creates the feature branch first and then records the feature in Odin.
+
+Suggested start prompt:
+
+```text
+Use Odin in this repository. Confirm the `odin` MCP tools are available, use `.odin/ODIN.md` as your workflow guide, and help me start a new feature for: <plain English feature request>. If you need my author name, initials, or any other missing metadata, ask me before starting.
 ```
 
-This creates:
-- `.odin/config.yaml` — runtime configuration (commit this)
-- `.odin/skills/` — project-local skill overrides (commit this)
-- `.env.example` — required environment variables (commit this)
-- Your harness config file (`opencode.json`, `.mcp.json`, or `.codex/config.toml`, depending on tool)
+### Manual fallback: `odin start-feature`
 
-Important: Odin bootstraps with `runtime.mode: in_memory` by default so MCP wiring can work without external services. Switch `.odin/config.yaml` to `runtime.mode: supabase` when you are ready for persistent workflow state.
+Most users do not need this command directly. It exists as a helper when you want to start the feature record manually or your harness does not automate that step yet.
 
-If you are developing Odin from this repo, use the repo-checkout `--distribution source` flow shown above.
+From your project root:
 
-If you are the maintainer preparing that publish, use [`../docs/guides/NPM-PUBLISH.md`](../docs/guides/NPM-PUBLISH.md).
+```bash
+npx -y @plazmodium/odin start-feature \
+  --id AUTH-001 \
+  --name "Login" \
+  --complexity-level 2 \
+  --severity ROUTINE \
+  --author "Jane Doe" \
+  --dev-initials jd
+```
 
-### Manual MCP wiring
+`start-feature` defaults `--project-root` to the current directory, creates or switches to the feature branch first, then records the feature through the runtime.
 
-If you do not want Odin to write your harness config for you, add the MCP server manually.
+## Database Paths
 
-For Claude Code / Amp:
+Odin supports three useful setup stages:
+
+1. **`in_memory`**
+- zero-dependency first run
+- no persistent workflow state
+- good for validating MCP wiring and prompt flow
+
+1. **Direct PostgreSQL for migrations**
+- powers `odin.apply_migrations`
+- uses `DATABASE_URL`
+
+1. **Supabase for persistent workflow state**
+- powers the main persisted Odin runtime
+- uses `SUPABASE_URL` and `SUPABASE_SECRET_KEY`
+- add `SUPABASE_ACCESS_TOKEN` when you want migration management through Supabase APIs
+
+### `.env`
+
+Use the project root `.env` or `.env.local` that lives next to `.odin/` and your MCP config.
+
+Example:
+
+```env
+# Option A: direct PostgreSQL for odin.apply_migrations
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+
+# Option B: Supabase persistent runtime
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SECRET_KEY=your-secret-key
+SUPABASE_ACCESS_TOKEN=your-management-api-access-token
+```
+
+Restart the Odin MCP server after changing `.env`, `.env.local`, or `.odin/config.yaml`.
+
+## Manual MCP Wiring
+
+Use this only when you do not want `init --write-mcp` to write the config for you.
+
+### Claude Code / Amp
 
 ```json
 {
@@ -64,7 +149,7 @@ For Claude Code / Amp:
 }
 ```
 
-For OpenCode:
+### OpenCode
 
 ```json
 {
@@ -87,7 +172,7 @@ For OpenCode:
 }
 ```
 
-For Codex:
+### Codex
 
 ```toml
 [mcp_servers.odin]
@@ -96,112 +181,22 @@ args = ["-y", "@plazmodium/odin", "mcp"]
 env = { ODIN_PROJECT_ROOT = "/absolute/path/to/your/project" }
 ```
 
-For Cursor, use the same command, args, and env values in the MCP Servers settings UI.
+### Cursor / generic tools
 
-### 3. Add your database credentials
+Use the same `command`, `args`, and `env` values in whatever MCP settings surface your tool exposes.
 
-```bash
-cp .env.example .env
-# Edit .env with your database credentials
-```
+For Junie and other emerging tools, use the same generic server block when your environment exposes local MCP server wiring.
 
-Use the project root `.env` or `.env.local` file that lives next to `opencode.json` / `.mcp.json` / `.odin/`. Odin does not read env files from nested app directories.
+## Minimal Runtime Config
 
-Runtime config is loaded once at server startup. If you change `.env`, `.env.local`, or `.odin/config.yaml`, restart the Odin MCP server before retrying tools.
-
-Odin uses two database paths today:
-
-- **Direct PostgreSQL** (any provider — Neon, Railway, self-hosted, local Supabase Postgres, etc.) for `odin.apply_migrations`:
-  ```env
-  DATABASE_URL=postgresql://user:password@host:5432/dbname
-  ```
-
-- **Supabase runtime + management API** for full persistent Odin workflow state plus archival:
-  ```env
-  SUPABASE_URL=https://your-project.supabase.co
-  SUPABASE_SECRET_KEY=your-secret-key
-  SUPABASE_ACCESS_TOKEN=your-management-api-access-token
-  ```
-
-`DATABASE_URL` takes priority inside `odin.apply_migrations`. It does not replace Supabase-backed workflow state for the main runtime.
-
-### 4. Start using Odin
-
-Recommended feature-start flow:
-
-```bash
-npx -y @plazmodium/odin start-feature \
-  --project-root /path/to/your/project \
-  --id AUTH-001 \
-  --name "Login" \
-  --complexity-level 2 \
-  --severity ROUTINE \
-  --author "Jane Doe" \
-  --dev-initials jd
-```
-
-This command creates or switches to the feature branch first, then calls `odin.start_feature` so the runtime record matches the real git workspace.
-
-Your AI agent now has these tools available:
-
-| Tool | Purpose |
-|------|---------|
-| `odin.start_feature` | Record a feature in the workflow after the branch already exists |
-| `odin.get_next_phase` | Ask "what should happen next?" |
-| `odin.pick_next_autonomous_phase` | Let Ralph Loop pick the next safe feature/phase and return prepared context |
-| `odin.prepare_phase_context` | Get the full working bundle for a phase, including harness execution guidance |
-| `odin.get_development_eval_status` | Inspect focused development-eval state for a feature |
-| `odin.record_phase_artifact` | Register a phase output (PRD, spec, tasks, etc.) |
-| `odin.submit_claim` | Submit a watched-agent claim for policy and watcher verification |
-| `odin.record_commit` | Persist git commit metadata for a feature |
-| `odin.record_pr` | Persist pull request metadata for dashboard/git tracking and return the current automation snapshot |
-| `odin.record_merge` | Persist that a human merged the feature PR and return the current automation snapshot |
-| `odin.record_release_handoff` | Close the active Release invocation after PR handoff while keeping the feature in phase 9 |
-| `odin.record_release_handoff_failure` | Close the active Release invocation after a failed PR handoff attempt so Ralph Loop can retry later |
-| `odin.record_release_closeout_failure` | Close the active Release invocation after a failed release closeout attempt so Ralph Loop can retry later |
-| `odin.record_quality_gate` | Persist an explicit workflow quality gate decision |
-| `odin.record_supervisor_event` | Persist Ralph Loop tick/no-op/failure/completion events for operator visibility |
-| `odin.record_eval_plan` | Persist a structured Architect `eval_plan` artifact |
-| `odin.record_eval_run` | Persist a structured Reviewer/Integrator `eval_run` artifact |
-| `odin.record_phase_result` | Record phase completion, blocking, or rework |
-| `odin.run_review_checks` | Run security/review scans via Semgrep |
-| `odin.run_policy_checks` | Run deterministic policy checks for submitted claims |
-| `odin.verify_design` | Run formal design verification (TLA+ model checking) on a `.machine.ts` DSL file |
-| `odin.capture_learning` | Capture a reusable learning with semantic domain matching |
-| `odin.get_skill_proposal_queue` | Inspect repeated unresolved learning topics that may warrant a generated skill draft |
-| `odin.get_skill_proposals` | List drafted, approved, rejected, or published skill proposal records |
-| `odin.record_skill_proposal_draft` | Persist a drafted generated-skill proposal and run deterministic validation |
-| `odin.record_skill_proposal_decision` | Approve or reject a drafted skill proposal |
-| `odin.publish_skill_proposal` | Publish an approved skill proposal into `.odin/skills/generated/` |
-| `odin.sync_skill_proposal_candidates` | Persist the current deterministic proposal queue for later review/approval workflows |
-| `odin.get_feature_status` | Inspect feature state with workflow details, invocation coverage, and the current automation snapshot |
-| `odin.verify_claims` | Check claim verification status |
-| `odin.get_claims_needing_review` | List claims waiting for watcher review |
-| `odin.record_watcher_review` | Record the watcher verdict for an escalated claim |
-| `odin.archive_feature_release` | Archive release artifacts to Supabase Storage |
-| `odin.explore_knowledge` | Explore knowledge clusters, cross-domain bridges, and domain stats |
-| `odin.apply_migrations` | Apply pending database migrations (auto-detects existing schema) |
-
-## Dashboard
-
-`@plazmodium/odin` ships the MCP runtime only. It does **not** bundle the Next.js dashboard.
-
-If you want the dashboard UI for feature health, learnings, claims, and eval visibility, use the full Odin repository and run the dashboard app from `dashboard/`.
-
-The dashboard is a separate app and is not included in the npm tarball.
-
-## Configuration
-
-Odin uses two files:
-
-**`.odin/config.yaml`** (committed) — project-level config with env var interpolation:
+`.odin/config.yaml` starts like this:
 
 ```yaml
 runtime:
-  mode: in_memory       # quick-start mode; switch to "supabase" for persistent workflow state
+  mode: in_memory
 
 database:
-  url: ${DATABASE_URL}  # used by odin.apply_migrations for direct PostgreSQL
+  url: ${DATABASE_URL}
 
 supabase:
   url: ${SUPABASE_URL}
@@ -227,271 +222,56 @@ automation:
   merge_strategy: squash
 
 formal_verification:
-  provider: none           # set to "tla-precheck" after installing Java 17+ and `npm install -D tla-precheck`
+  provider: none
   timeout_seconds: 120
 
 archive:
   provider: none
 ```
 
-**`.env`** (uncommitted) — secret values:
+## Common `odin.*` Tools
 
-```env
-# Option A: Direct PostgreSQL for odin.apply_migrations
-DATABASE_URL=postgresql://user:password@host:5432/dbname
+These are the runtime calls most users notice first:
 
-# Option B: Supabase runtime + management API
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SECRET_KEY=your-secret-key
-SUPABASE_ACCESS_TOKEN=your-management-api-access-token
-```
+| Tool | Purpose |
+|------|---------|
+| `odin.apply_migrations` | Apply packaged schema migrations |
+| `odin.start_feature` | Record a feature in the workflow |
+| `odin.get_next_phase` | Ask what should happen next |
+| `odin.prepare_phase_context` | Build the next phase bundle for the agent |
+| `odin.record_phase_artifact` | Save phase outputs |
+| `odin.record_phase_result` | Advance or block the phase |
+| `odin.run_review_checks` | Run review/security checks |
+| `odin.get_feature_status` | Inspect workflow status |
 
-### Runtime Modes
+## Optional Features
 
-- **`supabase`** — Full persistent workflow state backed by Supabase. Requires `SUPABASE_URL` and `SUPABASE_SECRET_KEY`. Enable `archive.provider: supabase` when you want release archival too.
-- **`in_memory`** — Zero-dependency smoke-test mode. State is lost when the process exits. Useful for testing MCP wiring and prompt flow before provisioning Supabase.
+### Supabase persistence
 
-> **Note on `DATABASE_URL`**: today it powers `odin.apply_migrations`, including local PostgreSQL or local Supabase Postgres access. The main Odin workflow runtime still uses the Supabase workflow-state adapter when `runtime.mode: supabase`.
+Switch `.odin/config.yaml` to `runtime.mode: supabase` when you want persistent workflow state.
 
-### Automation Modes
+### TLA+ design verification
 
-- **`guarded`** — default; humans remain the PR creation/review/merge boundary
-- **`auto_pr`** — opt-in; autonomous PR recording is allowed only on allowlisted base branches with clean blockers/gates/policy checks
-- **`auto_merge`** — reserved for future use and intentionally unsupported today; runtime startup fails fast if configured
-
-Notes:
-
-- `allowed_base_branches: []` is intentionally deny-by-default for autonomous PR actions
-- `paused: true` temporarily stops autonomous actions without changing the configured mode
-- `kill_switch: true` hard-stops autonomous actions until a human re-enables them
-- `odin.prepare_phase_context` includes an `automation` block so agents/orchestrators can inspect the effective policy and blocking reasons before attempting PR actions
-- `odin.get_feature_status` also returns the current `automation` snapshot and invocation-coverage summaries for out-of-band orchestration checks or release status reads
-- `odin.pick_next_autonomous_phase` gives a queue-safe read path for Ralph Loop style orchestration without inventing a second workflow engine inside the runtime
-- `odin.record_release_handoff` lets an external loop runner archive/create/record a PR, then close the active Release invocation cleanly while waiting for human merge
-- `odin.record_supervisor_event` lets an external loop runner publish operational state into `audit_log` without coupling itself directly to Supabase
-- `odin.record_pr` and `odin.record_merge` return the current `automation` snapshot with the recorded metadata so orchestrators can keep policy state alongside persisted PR/merge facts
-- PR creation and merge execution still happen outside the runtime via git/GitHub tooling, so the trusted enforcement boundary in this release is the orchestrator consulting `context.automation` before it acts; the record tools persist facts after the external action happens
-- after a merge is recorded, `odin.record_phase_result({ phase: '9', outcome: 'completed', next_phase: '10' })` now uses the runtime-owned completion flow instead of a raw status flip
-
-## Harness Execution Modes
-
-Odin phase agents are **logical phase roles**, not runtime-owned worker processes.
-
-- `context.agent.name` is the canonical Odin phase role for the selected phase
-- `context.execution.phase_role_name` repeats that canonical role explicitly
-- `context.execution.acting_agent_name` is the resolved acting label used for invocation tracking in the current run
-
-If a harness spawns a child agent, that child is acting as the current Odin phase role. The runtime still does not launch or supervise that child itself.
-
-`odin.prepare_phase_context(...)` now returns an `execution` block with:
-
-- `supported_modes` - currently `inline` and `subagent`
-- `recommended_mode` - guidance only; not enforcement
-- `execution_policy` - whether inline execution is allowed, distinct sessions are preferred, or distinct sessions are required
-- `prompt_realization_policy` - whether using the canonical Odin phase prompt bundle is optional, preferred, or required
-- `child_state_strategy` - whether the harness should prefer direct `odin.*` calls from the child when available or have the child return intent to the parent session
-- `response_style` - whether internal execution chatter should stay `normal` or use `terse_execution`
-- `phase_prompt_manifest` - the canonical manifest describing the shared context, phase definition, resolved skills, prompt sections, and dynamic context bundle used for strict phase-prompt realization attestation
-- `prompt_sections` - the fields the harness should keep in the active prompt
-
-`context.agent.constraints` already includes `context.development_evals.harness_prompt_block`. Keep the dedicated eval block visible if you want a separate eval section, but do not append both verbatim or the same instructions will appear twice.
-
-Canonical harness flow:
-
-```text
-1. Call odin.prepare_phase_context({ feature_id, phase, agent_name }).
-2. Build the prompt from:
-   - context.agent.name
-   - context.agent.role_summary
-   - context.agent.constraints
-   - context.automation
-   - context.verification
-   - context.workflow
-   - context.artifacts
-   - context.skills.resolved
-   - context.learnings
-3. Choose execution mode:
-   - inline: parent session performs the phase work directly
-   - subagent: parent session spawns a child that acts as the current Odin phase role
-4. Record the actual mode with `odin.register_phase_execution(...)` when you want auditable phase ownership.
-5. If the child is meant to count as a strict Odin phase-agent run, register prompt realization with `odin.register_phase_realization(...)` using the returned `phase_prompt_manifest`.
-6. Record artifacts, claims, checks, and gates through odin.* tools as work happens.
-7. Close the phase with odin.record_phase_result(...).
-```
-
-If the child agent cannot call `odin.*` directly, keep the same flow but have the child return a clear `State Changes Required` section and the parent session performs those calls on the child's behalf. When proxying, pass `context.execution.acting_agent_name` through to tool fields such as `agent_name` and `created_by` so attribution and invocation tracking stay aligned with the prepared phase context.
-
-Execution attestation rules:
-
-- invocation open/close telemetry is not proof of distinct-session execution
-- `odin.register_phase_execution(...)` records the harness-attested actual mode plus supervisor/worker session linkage
-- `odin.register_phase_realization(...)` records whether the child was launched from the canonical Odin phase prompt bundle
-- `odin.record_phase_result(...)` may warn or reject based on `execution_policy`
-- `odin.record_phase_result(...)` may also warn or reject based on `prompt_realization_policy`
-- `odin.get_feature_status(...)` exposes expected vs actual vs proven execution state for auditing
-
-`response_style` is a bounded internal execution hint, not a global constitution change:
-
-- use it for harness/child operational chatter and short execution summaries
-- do not silently apply it to direct user chat by default
-- do not use it as a reason to rewrite durable human-facing artifacts like PRDs, specs, tasks, docs, changelogs, or release notes into compressed prose
-
-## Optional: TLA+ Design Verification
-
-`odin.verify_design` is optional and stays disabled while `formal_verification.provider` is `none`.
-
-Install it in the **target project Odin runs against**, not in the runtime package:
+Install `tla-precheck` in the target project if you want `odin.verify_design` for state-heavy features:
 
 ```bash
-# In your target project root
 npm install -D tla-precheck
 ```
 
-Requirements and setup:
+This also requires Java 17+ locally.
 
-- Install **Java 17+** locally for the TLC model checker
-- Install `tla-precheck` as a dev dependency in the target project so Odin can resolve it from `node_modules/.bin`
-- Enable it in `.odin/config.yaml`
+### Dashboard
 
-```yaml
-formal_verification:
-  provider: tla-precheck
-  timeout_seconds: 120
-```
+`@plazmodium/odin` ships the runtime only. The dashboard app lives in the full repo under `dashboard/`.
 
-Typical usage:
+## Maintainers
 
-1. Create a state-machine file such as `specs/BILLING-001/subscription.machine.ts`
-2. Ask Odin to run `odin.verify_design` with that relative `machine_path`
-3. Review the result in Architect/Guardian before implementation
+If you are developing Odin itself from a repo checkout, use [docs/guides/DEVELOPING-ODIN.md](../docs/guides/DEVELOPING-ODIN.md).
 
-If Java or `tla-precheck` is missing, Odin returns an `UNAVAILABLE` / `NOT_CONFIGURED` result for design verification instead of enabling it silently.
+## More Reading
 
-## Development Evals
-
-Odin also supports a lightweight **Development Evals** workflow track:
-
-- Architect records `eval_plan` via `odin.record_eval_plan` (or `odin.record_phase_artifact`)
-- Guardian records `eval_readiness` via `odin.record_quality_gate`
-- Reviewer records `eval_run` via `odin.record_eval_run` (or `odin.record_phase_artifact`)
-- Integrator may append a later `eval_run` via `odin.record_eval_run` when runtime verification materially changes the result
-
-These artifacts are surfaced in `odin.prepare_phase_context` and `odin.get_feature_status`.
-
-When Development Evals are relevant, `odin.prepare_phase_context` returns a richer `development_evals` block with:
-
-- `expected_artifacts` — which eval artifact(s) this phase is expected to produce now
-- `expected_gate` — which eval gate this phase is expected to decide now
-- `status_summary` — current eval state the harness should keep visible
-- `harness_prompt_block` — phase-specific prompt lines the harness should append verbatim to the active agent prompt
-
-Recommended harness behavior:
-
-```text
-1. Call odin.prepare_phase_context(...)
-2. Build the agent prompt from:
-   - context.agent.name
-   - context.agent.role_summary
-   - context.agent.constraints
-3. Choose inline vs subagent execution using context.execution.recommended_mode as guidance
-4. If the child cannot call odin.* directly, proxy the required state changes from the parent session and pass `context.execution.acting_agent_name` through to `agent_name` / `created_by`
-5. Keep context.development_evals.status_summary visible to the operator
-6. Do not treat eval instructions as a replacement for formal verification, Semgrep, tests, runtime checks, or watcher checks
-```
-
-Canonical eval-aware orchestration snippet:
-
-```text
-When orchestrating Odin phases:
-1. Call odin.prepare_phase_context({ feature_id, phase, agent_name }).
-2. Build the active agent prompt from:
-   - context.agent.name
-   - context.agent.role_summary
-   - context.agent.constraints
-3. Use context.execution.recommended_mode as the default inline/subagent choice, but keep Release strongly parent-session controlled.
-4. If the child cannot call odin.* directly, have it return state-change intent and let the parent session proxy those calls with `context.execution.acting_agent_name` as the relevant `agent_name` / `created_by` value.
-5. Use odin.get_development_eval_status({ feature_id }) when you need focused eval state.
-6. Record eval artifacts/gates with odin.record_eval_plan, odin.record_eval_run, and odin.record_quality_gate.
-7. Never let Development Evals override odin.verify_design, odin.run_review_checks, tests, runtime verification, or watcher checks.
-```
-
-If the harness wants a focused eval-only read path instead of parsing `odin.get_feature_status`, call:
-
-```text
-odin.get_development_eval_status({ feature_id: "FEAT-001" })
-```
-
-This returns the current Development Eval mode, latest `eval_plan`, latest `eval_run`, open `eval_readiness` gate (if any), and recent eval artifact history.
-
-**Important**: Development Evals are additive. They do **not** replace `odin.verify_design`, `odin.run_review_checks`, Builder/Integrator test verification, or watched-claim verification.
-
-## Project-Local Skills
-
-Drop skill files into `.odin/skills/` to override or extend built-in skills:
-
-```text
-.odin/skills/
-  my-framework/
-    SKILL.md
-```
-
-Odin resolves project-local skills with higher precedence than built-in skills when names match.
-
-Approved generated skills publish into `.odin/skills/generated/` so they are visible to the normal project-local skill resolver without mutating Odin's packaged built-ins.
-
-## Memory Palace: Semantic Learning Propagation
-
-Odin's learning system uses **semantic domain matching** to automatically route learnings to the right knowledge targets (skills, agent definitions, AGENTS.md).
-
-### How it works
-
-1. **Capture with tags**: When calling `odin.capture_learning`, agents provide `domain_tags` — conceptual keywords describing what the learning is about (e.g., `["nextjs", "fetch-cache", "supabase"]`)
-2. **Domain matching**: The runtime matches tags against a **knowledge domain registry** derived from skill frontmatter. Each skill's `name`, `compatible_with`, `depends_on`, `category`, and `description` generate keyword tiers (strong + weak)
-3. **Auto-targeting**: Matches passing both gates (≥ 1 strong keyword hit AND ≥ 0.60 relevance) are auto-declared as propagation targets. Weaker matches are returned as suggestions
-4. **Cross-feature corridors**: `odin.prepare_phase_context` retrieves related learnings from other features that share propagation targets, with tag intersection fallback
-5. **Resonance ranking**: Related learnings are ranked by domain density, corroboration (same-category learnings from different features), and recency — never modifying `confidence_score`
-6. **Proposal surfacing**: Repeated unresolved tags can be inspected via `odin.get_skill_proposal_queue` to identify candidate topics for governed skill drafting
-7. **Proposal persistence**: `odin.sync_skill_proposal_candidates` snapshots the current candidate queue into workflow state so later approval/draft flows and dashboard surfaces can build on stable relational state
-8. **Governed skill workflow**: draft generation, approval, and publish happen through `odin.record_skill_proposal_draft`, `odin.record_skill_proposal_decision`, and `odin.publish_skill_proposal` rather than automatic built-in self-modification
-
-### Exploration
-
-Use `odin.explore_knowledge` to inspect knowledge clusters:
-- Learnings grouped by domain
-- Cross-domain bridges (learnings appearing in multiple domains)
-- Domain density stats
-- Unmatched tags (tags that matched zero domains)
-
-### Adding a domain
-
-Adding a new skill with proper frontmatter (`name`, `description`, `category`, `compatible_with`, `depends_on`) **automatically creates a new knowledge domain** — zero configuration, zero migration.
-
-## Development
-
-```bash
-npm run type-check    # Check types without emitting
-npm run build         # Compile TypeScript to dist/
-npm test              # Run tests
-npm start             # Start the MCP server (stdio)
-npm run dev           # Watch mode
-```
-
-## Architecture
-
-Odin presents **one MCP server** (`odin`) to your AI agent. Internally it uses adapter seams for different concerns:
-
-- **WorkflowStateAdapter** — Supabase-backed feature/phase state
-- **SqlExecutor** — Provider-agnostic SQL execution (direct PostgreSQL or Supabase Management API)
-- **ArchiveAdapter** — Supabase Storage for release archives (direct upload, no Edge Function needed)
-- **ReviewAdapter** — Semgrep for security/code review
-- **FormalVerificationAdapter** — TLA+ model checking via [tla-precheck](https://github.com/kingbootoshi/tla-precheck) (opt-in)
-- **SkillAdapter** — Filesystem-based skill resolution (built-in + project-local)
-
-Providers are internal implementation details — your agent only sees `odin.*` tools.
-
-## Requirements
-
-- Node.js >= 18
-- PostgreSQL database — any provider: Supabase, Neon, Railway, self-hosted, etc. (for `supabase` runtime mode)
-- Semgrep (optional, for review checks — falls back to Docker if local binary not found)
-- Java 17+ and [tla-precheck](https://github.com/kingbootoshi/tla-precheck) (optional, for formal design verification — install as a devDependency in your target project)
+- [docs/guides/GETTING-STARTED.md](../docs/guides/GETTING-STARTED.md)
+- [docs/guides/example-workflow.md](../docs/guides/example-workflow.md)
+- [docs/guides/SUPABASE-SETUP.md](../docs/guides/SUPABASE-SETUP.md)
+- [../loop/README.md](../loop/README.md)
+- [../dashboard/README.md](../dashboard/README.md)

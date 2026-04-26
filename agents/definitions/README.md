@@ -2,6 +2,8 @@
 
 This directory contains the prompt definitions for all Odin agents. Each agent is a specialized prompt that handles a specific phase of the 11-phase SDD workflow.
 
+This is internal workflow reference material. You do not need to read this README to install Odin or start your first feature.
+
 ## Agent Overview (v2)
 
 | Agent | Phase | File | Description |
