@@ -2,6 +2,10 @@
 
 This directory contains the consolidated database schema for Odin plus post-consolidation v2 migrations. The base 4 files replace the original 28 development migrations, providing a clean starting point for new installations.
 
+Most users should not start here. The normal path is to configure credentials in your project and ask your AI agent to run `odin.apply_migrations` for you.
+
+Use this README when you want the manual SQL/reference view of the schema package.
+
 ## Quick Start
 
 Run these migrations in order on a fresh Supabase project:

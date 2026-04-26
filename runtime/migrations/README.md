@@ -2,6 +2,8 @@
 
 These SQL migration files define the Odin database schema. They are applied sequentially by the `odin.apply_migrations` tool using either direct PostgreSQL (`DATABASE_URL`) or the Supabase Management API (`SUPABASE_URL` + `SUPABASE_ACCESS_TOKEN`).
 
+This is reference material for the packaged migration files. Most users should ask their AI agent to run `odin.apply_migrations` instead of working through these files manually.
+
 ## Usage
 
 The `odin.apply_migrations` tool will:

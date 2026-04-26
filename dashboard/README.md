@@ -2,6 +2,10 @@
 
 Web-based dashboard for the Odin SDD Framework. Visualizes system health, feature progress, learnings evolution, EVALS performance, **claim verification**, and **security findings** from your Supabase database.
 
+This dashboard is optional. It is not part of the basic Odin quickstart and is most relevant once your project is using Supabase-backed persistence.
+
+If you are just trying Odin for the first time, start with [../docs/guides/GETTING-STARTED.md](../docs/guides/GETTING-STARTED.md).
+
 ## Pages
 
 | Route | Description |

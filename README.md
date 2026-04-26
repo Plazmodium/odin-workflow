@@ -14,482 +14,184 @@
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
 </p>
 
-## Framework Guide
+Odin is a workflow layer for AI coding tools. It runs as one MCP server named `odin` and gives your assistant a spec-first feature flow, persistent workflow state, review checks, and reusable learnings.
 
-Start with [ODIN.md](ODIN.md). It is the shipped guide for how Odin works.
+If you already code with Codex, Claude Code, OpenCode, Amp, Cursor, Junie, or similar tools, Odin is meant to sharpen that workflow instead of replacing it.
 
-## What Odin Solves
+## Philosophy
 
-When developers use AI coding assistants without proper specifications:
-- AI hallucinates business logic and data structures
-- code contradicts requirements within the same session
-- developers spend more time fixing AI mistakes than coding
-- no single source of truth exists between spec and implementation
+Odin is built on a simple idea: AI coding works best when the work is clear, grounded, and accountable.
 
-Odin fixes that with a spec-first workflow, adaptive complexity, explicit quality gates, persistent learnings, health metrics, and workflow verification.
+- **Spec first**: make the requirement explicit before code starts drifting.
+- **Feature first**: move one coherent feature through a workflow instead of scattering work across ad-hoc tasks.
+- **Use the tools you already like**: Odin plugs into your existing AI tool instead of trying to replace it.
+- **Make decisions visible**: phases, artifacts, checks, and gates should be explicit rather than hidden in prompt history.
+- **Keep the human at the right boundary**: AI should accelerate delivery, not erase judgment, review, or responsibility.
 
-## Feature-Oriented By Design
+## What Odin Changes
 
-Odin is built around a simple idea: ship software **by feature**, not by scattering dozens of tiny concurrent coding tasks across the codebase.
+- Your AI agent works from a defined feature workflow instead of ad-hoc prompting.
+- Specs, tasks, phase outputs, and quality gates become explicit.
+- Odin can persist workflow state, learnings, and release history when you are ready for Supabase.
+- You keep your current AI tool. Odin plugs into it as an MCP server.
 
-A feature in Odin moves through a defined workflow:
-- a branch is created for the feature
-- requirements and specification are made explicit
-- implementation happens against that approved spec
-- verification runs through the workflow
-- a human reviews the result at the pull request stage
+## Who This Is For
 
-By default, Odin runs in a `guarded` automation mode: agents can prepare and record work, but the human boundary remains at PR creation/review/merge unless a project explicitly opts into limited `auto_pr` behavior.
+- **Using Odin in your own project**: start with the quickstart below.
+- **Developing Odin itself**: use [docs/guides/DEVELOPING-ODIN.md](docs/guides/DEVELOPING-ODIN.md).
 
-This is intentional. Odin is not trying to become a swarm scheduler, IDE replacement, or background agent platform. Its job is to help an AI coding assistant build a **coherent feature slice** with clear contracts, strong guardrails, and a clean human checkpoint at the end.
+## How Odin Fits In
 
-### What Odin Optimizes For
-
-- **Feature-level flow** — one feature branch, one feature spec, one feature moving through the workflow
-- **Spec discipline** — implementation follows an approved spec instead of drifting through ad-hoc prompts
-- **Clear accountability** — each phase produces artifacts, checks, and state transitions that can be inspected later
-- **Human review at the right boundary** — by default the PR is the final approval point for integration and merge decisions
-- **Low coordination overhead** — less time orchestrating agent swarms, more time getting a feature to done
-
-### What Odin Does Not Try To Be
-
-Odin is **not** designed around:
-- parallel sub-agents editing different parts of the same feature at the same time
-- intra-feature task swarms with isolated worktrees and merge-back coordination
-- continuous spec mutation while implementation is already underway
-- autonomous branch merging by agents
-- replacing normal software development structure with constant micro-dispatch
-
-Those patterns can be powerful in some systems, but they also add coordination state, conflict handling, and workflow complexity. Odin deliberately stays narrower.
-
-### Where Parallelism Belongs In Odin
-
-If work should happen in parallel, Odin prefers parallelism at the **feature level**, not inside a single feature.
-
-That means:
-- split large initiatives into multiple independent features
-- give each feature its own branch and workflow
-- review each feature as a coherent unit
-
-This keeps Odin aligned with how many teams already build software: define the feature, implement the feature, review the feature, merge the feature.
-
-In short: **Odin is a feature workflow system, not a sub-task swarm orchestrator.**
-
-## What Odin Includes
-
-- **11-phase workflow** with Product and Reviewer added to the core path
-- **11 workflow and support agents** with explicit responsibilities
-- **Watcher verification** using deterministic policy checks plus LLM escalation for watched phases
-- **Semgrep-backed review phase** with severity-based blocking behavior
-- **Supabase-backed learnings and EVALS** for workflow state, memory, and health
-- **Odin MCP Runtime** — single-install TypeScript MCP server as the agent control plane
-- **Memory Palace** — semantic learning propagation with domain matching, cross-feature knowledge corridors, and resonance scoring
-- **Governed skill proposals** — repeated unresolved learnings surface draft-ready skill candidates with deterministic validation, approval, and project-local publish flow
-- **TLA+ formal verification** — opt-in design verification for state machine specs via tla-precheck
-- **Dashboard support** for claims, watcher verification, security findings, and the 11-phase model
-- **Internal terse execution profile** — Builder / Reviewer / Integrator / Release can use bounded terse operational chatter while PRDs, specs, tasks, docs, changelogs, and release notes stay in normal human-readable prose
-- **Strict phase execution attestation** — Odin can now record expected policy vs actual mode vs attested session linkage so live projects can audit whether a distinct phase-owned worker actually ran
-- **Phase-prompt realization attestation** — Odin can now distinguish "a child session existed" from "the child session was launched from the canonical Odin phase bundle"
-
-## Prerequisites
-
-- **Node.js 18+** and **npm**
-- **AI coding assistant** with MCP support (Amp, Claude Code, Cursor, etc.)
-- **Supabase project** if you want persistent workflow state, archival, and the dashboard
-- **PostgreSQL database** only if you want to use direct `DATABASE_URL` for `odin.apply_migrations`
-
-> **Runtime contract**: today the full persistent Odin runtime uses the Supabase workflow-state adapter. Direct PostgreSQL via `DATABASE_URL` currently powers `odin.apply_migrations`, including local PostgreSQL or local Supabase Postgres setups.
+```mermaid
+flowchart LR
+    U[You describe a feature] --> T[Your AI tool<br/>Codex, Claude Code, OpenCode,<br/>Amp, Cursor, Junie, etc.]
+    T --> O[Odin MCP server]
+    O --> W[Branch-first feature workflow<br/>specs, phases, checks, artifacts]
+    W --> R[Your project repo]
+    O -. optional later .-> S[(Supabase persistence)]
+    R --> H[Human review and PR handoff]
+```
 
 ## Quick Start
 
-### 1. Clone the repo
+Run the bootstrap command from the root of the project where you want Odin to live.
 
-```bash
-git clone https://github.com/Plazmodium/odin-workflow.git
-cd odin-workflow
-```
+Important:
+Odin writes `.odin/` into the directory you run this command from, unless you pass `--project-root` explicitly.
 
-### 2. Install & bootstrap the Odin Runtime
+### Pick your tool
 
-Preferred published-package flow:
+| Tool | Command | What happens |
+|------|---------|--------------|
+| **Codex** | `npx -y @plazmodium/odin init --tool codex --write-mcp` | Writes `.codex/config.toml` for you |
+| **OpenCode** | `npx -y @plazmodium/odin init --tool opencode --write-mcp` | Writes `opencode.json` for you |
+| **Claude Code** | `npx -y @plazmodium/odin init --tool claude-code --write-mcp` | Writes `.mcp.json` for you |
+| **Amp** | `npx -y @plazmodium/odin init --tool amp --write-mcp` | Writes `.mcp.json` for you |
+| **Cursor** | `npx -y @plazmodium/odin init --tool generic` | Prints the MCP server snippet for you to paste into Cursor |
+| **Junie / other tools** | `npx -y @plazmodium/odin init --tool generic` | Prints the MCP server snippet if your tool can wire a local MCP server |
 
-```bash
-npx -y @plazmodium/odin init --project-root /path/to/your/project --tool opencode --write-mcp
-```
+What `init` does:
 
-Maintainer repo-checkout flow:
+- creates `.odin/config.yaml`
+- copies Odin's agent-facing workflow files into `.odin/`
+- writes `.env.example`
+- writes your MCP config when auto-config is supported for that tool
+- defaults Odin to `runtime.mode: in_memory` so you can try it without external services first
 
-```bash
-cd runtime
-npm install
-npm run build
-```
+### What gets created in your project
 
-Run the bootstrap commands from `odin-workflow/runtime`:
+- `.odin/config.yaml` - Odin runtime config
+- `.odin/ODIN.md` - workflow instructions for your AI agent
+- `.odin/agents/definitions/` - the phase-agent prompt definitions Odin uses
+- `.odin/skills/` - project-local skill overrides
+- `.env.example` - environment variable template
+- tool config such as `opencode.json`, `.mcp.json`, or `.codex/config.toml` when auto-config is supported
 
-```bash
-# For Amp / Claude Code / OpenCode from this repo checkout:
-npm run init:project -- --project-root /path/to/your/project --tool amp --distribution source --write-mcp
+At minimum, commit `.odin/` and `.env.example`. Keep `.env` local.
 
-# For Codex from this repo checkout:
-npm run init:project -- --project-root /path/to/your/project --tool codex --distribution source --write-mcp
-```
+## After `init`
 
-If you prefer to run the bootstrap from inside your target project directory, call the built CLI directly:
+1. Restart your AI tool so it reloads MCP servers.
+2. Confirm the `odin` MCP server is available.
+3. Tell your AI agent to use `.odin/ODIN.md` as its workflow guide.
 
-```bash
-cd /path/to/your/project
-node /absolute/path/to/odin-workflow/runtime/dist/cli.js init --tool amp --distribution source --write-mcp
-```
-
-This creates `.odin/config.yaml`, `.odin/ODIN.md`, `.odin/agents/definitions/`, `.odin/skills/`, `.env.example`, and your harness config file. For OpenCode, that file is `opencode.json`. Secrets stay in `.env` — never in the MCP config.
-
-Important: Odin now bootstraps with `runtime.mode: in_memory` by default so you can verify MCP wiring before provisioning external services. Switch `.odin/config.yaml` to `runtime.mode: supabase` when you are ready for persistent workflow state.
-
-If you are developing Odin itself from this repo, use the repo-checkout `--distribution source` flow shown above.
-
-### 3. Optional: Ralph Loop
-
-Ralph Loop is the external Odin supervisor for bounded autonomous polling.
-
-Current supported paths:
-- Release auto-PR handoff when `automation.mode: auto_pr` allows it
-- Release closeout after a human merge is recorded
-- Optional child-command execution for phases 5-8 when `--subagent-command-json` / `RALPH_SUBAGENT_COMMAND_JSON` is configured
-- Phase-specific `response_style` hints so internal execution chatter can be terse without turning final artifacts into caveman prose
-- Phase-specific `execution_policy` plus attested inline/subagent execution tracking through `odin.register_phase_execution`
-- Phase-prompt realization manifests plus attestation so strict runs can prove the child used the actual Odin phase prompt bundle, not just any generic worker
-
-From the repo root:
-
-```bash
-npm run ralph:tick -- --project-root /path/to/your/project
-npm run ralph:watch -- --project-root /path/to/your/project --interval-ms 30000
-```
-
-See `loop/README.md` and `docs/guides/RALPH-LOOP.md` for the operator runbook, child-command protocol, response-style behavior, prerequisites, and smoke steps.
-
-For Claude Code / Amp, use:
-
-```json
-{
-  "mcpServers": {
-    "odin": {
-      "command": "npx",
-      "args": ["-y", "@plazmodium/odin", "mcp"],
-      "env": {
-        "ODIN_PROJECT_ROOT": "/absolute/path/to/your/project"
-      }
-    }
-  }
-}
-```
-
-For Claude Code / Amp from a repo checkout today, use:
-
-```json
-{
-  "mcpServers": {
-    "odin": {
-      "command": "node",
-      "args": ["/absolute/path/to/odin-workflow/runtime/dist/server.js"],
-      "env": {
-        "ODIN_PROJECT_ROOT": "/absolute/path/to/your/project"
-      }
-    }
-  }
-}
-```
-
-For OpenCode, use:
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "odin": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "@plazmodium/odin",
-        "mcp"
-      ],
-      "enabled": true,
-      "environment": {
-        "ODIN_PROJECT_ROOT": "/absolute/path/to/your/project"
-      }
-    }
-  }
-}
-```
-
-For OpenCode from a repo checkout today, use:
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "odin": {
-      "type": "local",
-      "command": [
-        "node",
-        "/absolute/path/to/odin-workflow/runtime/dist/server.js"
-      ],
-      "enabled": true,
-      "environment": {
-        "ODIN_PROJECT_ROOT": "/absolute/path/to/your/project"
-      }
-    }
-  }
-}
-```
-
-| Tool | Where to add it |
-|------|----------------|
-| **Amp** | `settings.json` → `mcpServers` |
-| **Claude Code** | `.mcp.json` → `mcpServers` |
-| **OpenCode** | `opencode.json` → `mcp` |
-| **Cursor** | Settings → MCP Servers |
-| **Codex** | `.codex/config.toml` (`[mcp_servers.odin]`) |
-
-See [runtime/README.md](runtime/README.md) for full configuration, available tools, adapter architecture, and the recommended harness flow using `.odin/ODIN.md` plus `odin.prepare_phase_context`.
-
-Maintainers preparing the npm release should use [docs/guides/NPM-PUBLISH.md](docs/guides/NPM-PUBLISH.md).
-
-### 4. Add your database credentials
-
-```bash
-cp .env.example .env
-# Edit .env with your database credentials
-```
-
-Use the project root `.env` or `.env.local` file that lives next to your MCP config and `.odin/`. Odin does not read env files from nested app directories.
-
-Runtime config is loaded once at server startup. If you change `.env`, `.env.local`, or `.odin/config.yaml`, restart the Odin MCP server before retrying tools.
-
-Choose one:
-
-- **Direct PostgreSQL** for `odin.apply_migrations` (any provider, including local PostgreSQL):
-  ```env
-  DATABASE_URL=postgresql://user:password@host:5432/dbname
-  ```
-
-- **Supabase** for full persistent runtime state plus archival:
-  ```env
-  SUPABASE_URL=https://your-project.supabase.co
-  SUPABASE_SECRET_KEY=your-secret-key
-  SUPABASE_ACCESS_TOKEN=your-management-api-access-token
-  ```
-
-`DATABASE_URL` takes priority inside `odin.apply_migrations`. It does not replace the Supabase workflow-state adapter for the main Odin runtime. For Supabase, generate the access token at [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens).
-
-### Optional: Enable TLA+ design verification
-
-If you want `odin.verify_design` for state-heavy features, install `tla-precheck` in the **target project root** that Odin runs against:
-
-```bash
-npm install -D tla-precheck
-```
-
-- Requires **Java 17+** locally
-- Leave `formal_verification.provider: none` if you do not need it; Odin still loads normally
-- To enable it, set this in `.odin/config.yaml`:
-
-```yaml
-formal_verification:
-  provider: tla-precheck
-  timeout_seconds: 120
-```
-
-Typical flow: write a `.machine.ts` file for a stateful design, then call `odin.verify_design` with the file's relative `machine_path` during Architect/Guardian work.
-
-### 5. Apply database migrations
-
-Odin applies its schema automatically via the runtime:
-
-```
-Use odin.apply_migrations to set up the database schema.
-```
-
-The tool auto-detects existing schemas on first run. Use `dry_run: true` to preview. See [docs/guides/SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) for manual setup or troubleshooting.
-
-### 6. Start using Odin
-
-Point your AI tool at [ODIN.md](ODIN.md) and use it as the framework guide for real feature work.
-
-## The 11-Phase Workflow
-
-| Phase | Agent | Responsibility | Watched? |
-|-------|-------|----------------|----------|
-| 0 | Planning | Human request / planning setup | No |
-| 1 | Product | PRD generation | No |
-| 2 | Discovery | Technical context gathering | No |
-| 3 | Architect | Technical specification | No |
-| 4 | Guardian | PRD + spec review | No |
-| 5 | Builder | Implementation | Yes |
-| 6 | Reviewer | SAST/security review | No |
-| 7 | Integrator | Build and runtime verification | Yes |
-| 8 | Documenter | Documentation updates | No |
-| 9 | Release | PR creation and archival | Yes |
-| 10 | Complete | Feature complete | No |
-
-Every feature goes through all 11 phases. Complexity level changes the depth of each phase, not whether the phase runs.
-
-### Development Evals Summary
-
-- **Product** defines success, non-goals, and failure shape
-- **Discovery** captures happy-path, negative, and regression-seed scenarios
-- **Architect** records `eval_plan` for L2/L3 work; L1 still needs minimal acceptance or regression coverage
-- **Guardian** decides `eval_readiness` before Builder starts when required
-- **Reviewer** records `eval_run`; **Integrator** resolves any `partial` eval state with runtime evidence
-- Development Evals are additive only - they do not replace `odin.verify_design`, `odin.run_review_checks`, tests, runtime verification, or Watcher checks
-
-See [ODIN.md](ODIN.md) for the full protocol.
-
-## Adaptive Complexity
-
-| Level | Name | Use When |
-|-------|------|----------|
-| **L1** | The Nut | Bug fixes, tiny tweaks, single-file changes |
-| **L2** | The Feature | Standard features, APIs, UI work |
-| **L3** | The Epic | Multi-file systems, major refactors, large workflow changes |
-
-## Agents
-
-All workflow agents live in `agents/definitions/`:
-
-- `planning.md`
-- `product.md`
-- `discovery.md`
-- `architect.md`
-- `guardian.md`
-- `builder.md`
-- `reviewer.md`
-- `integrator.md`
-- `documenter.md`
-- `release.md`
-- `watcher.md`
-- `_shared-context.md`
-
-See [agents/definitions/README.md](agents/definitions/README.md) for the agent index.
-
-## Skills System
-
-Skills live in `agents/skills/` and are organized by domain:
-
-- frontend
-- backend
-- database
-- testing
-- devops
-- api
-- architecture
-- generic-dev
-
-See [docs/reference/SKILLS-SYSTEM.md](docs/reference/SKILLS-SYSTEM.md).
-
-## Dashboard
-
-The dashboard lives in `dashboard/` and supports the full Odin workflow:
-
-- 11-phase feature timeline
-- watcher verification panel
-- security findings panel
-- learnings and EVALS visualization
-
-Use the Vercel button for a quick deploy:
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Plazmodium/odin-workflow/tree/main/dashboard&env=SUPABASE_URL,SUPABASE_SECRET_KEY,NEXT_PUBLIC_SUPABASE_URL&envDescription=Supabase%20credentials&project-name=odin-dashboard)
-
-> **Note:** This deploys the official Odin dashboard to your Vercel account. If you've forked/cloned this repo and made customizations, connect your fork directly via the [Vercel dashboard](https://vercel.com/new) instead.
-
-Or deploy manually — see [dashboard/README.md](dashboard/README.md).
-
-## Project Structure
+Suggested first prompt:
 
 ```text
-odin-workflow/
-├── ODIN.md
-├── README.md
-├── agents/
-│   ├── definitions/
-│   └── skills/
-├── runtime/               # Odin MCP Runtime (TypeScript)
-├── docs/
-│   ├── framework/
-│   ├── guides/
-│   └── reference/
-├── dashboard/
-├── migrations/
-├── templates/
-└── examples/
+Confirm the `odin` MCP tools are available in this project. Then use `.odin/ODIN.md` as your workflow guide for future feature work and tell me what Odin added to this repo.
 ```
+
+Important:
+`.odin/ODIN.md` is for the AI agent. It is not the human onboarding doc.
+
+## Database Setup
+
+You can try Odin immediately in `in_memory` mode without Supabase.
+
+When you are ready for database-backed tools:
+
+1. Copy `.env.example` to `.env`.
+2. Add your database credentials.
+3. Ask your AI agent to run `odin.apply_migrations` for you.
+
+Suggested prompt:
+
+```text
+If Odin database credentials are configured, run `odin.apply_migrations` and summarize what was applied. If they are not configured yet, tell me exactly what is missing and keep Odin in `in_memory` mode for now.
+```
+
+Use Supabase when you want persistent workflow state, archival, and the dashboard. Use direct `DATABASE_URL` when you only need `odin.apply_migrations` against PostgreSQL.
+
+## Start Your First Feature
+
+Bootstrap is a one-time project setup step. You do not run it again for every feature.
+
+The normal way to start is back in your AI tool, not with a manual CLI command.
+
+Suggested prompt:
+
+```text
+Use Odin in this repository. Confirm the `odin` MCP tools are available, use `.odin/ODIN.md` as your workflow guide, and help me start a new feature for: <plain English feature request>. If you need my author name, initials, or any other missing metadata, ask me before starting.
+```
+
+In the normal flow, the orchestrating AI session handles the branch-first + `odin.start_feature` workflow for you.
+
+If your setup does not automate that yet, the manual `odin start-feature` helper is still available in [runtime/README.md](runtime/README.md) as a fallback/operator path.
+
+## Optional Later
+
+- **Supabase persistence**: for persistent runtime state, archival, and the dashboard
+- **Ralph Loop**: for optional bounded automation around safe phase pickup and PR handoff
+- **Manual MCP wiring**: if you do not want `init --write-mcp` to write your tool config
+- **TLA+ design verification**: if you want `odin.verify_design` for state-heavy features
 
 ## Documentation
 
-| Document | Description |
+| Document | Use it when |
 |----------|-------------|
-| [ODIN.md](ODIN.md) | **Start here** — Complete framework guide |
-| [SDD-framework.md](docs/framework/SDD-framework.md) | Spec-Driven Development explained |
-| [multi-agent-protocol.md](docs/framework/multi-agent-protocol.md) | Multi-agent architecture |
-| [SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) | Database setup guide |
-| [example-workflow.md](docs/guides/example-workflow.md) | Complete worked example |
-| [SKILLS-SYSTEM.md](docs/reference/SKILLS-SYSTEM.md) | Skills documentation |
-| [HYBRID-ORCHESTRATION-PATTERN.md](docs/reference/HYBRID-ORCHESTRATION-PATTERN.md) | Why agents can't use MCP directly |
+| [docs/guides/GETTING-STARTED.md](docs/guides/GETTING-STARTED.md) | You want the full first-run guide |
+| [runtime/README.md](runtime/README.md) | You want package setup details, config reference, or manual MCP wiring |
+| [docs/guides/example-workflow.md](docs/guides/example-workflow.md) | You want a current end-to-end worked example |
+| [docs/guides/SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) | You want the deeper database setup path |
+| [loop/README.md](loop/README.md) | You want optional Ralph Loop automation |
+| [dashboard/README.md](dashboard/README.md) | You want the optional dashboard app |
+| [docs/guides/DEVELOPING-ODIN.md](docs/guides/DEVELOPING-ODIN.md) | You are developing or publishing Odin itself |
 
-## Key Concepts
+## What Odin Includes
 
-### Spec-First Development
-Never write implementation code without an approved specification. The spec is the contract.
+- 11-phase feature workflow with explicit phase outputs and checkpoints
+- one MCP runtime server named `odin`
+- review checks via Semgrep
+- learnings capture and propagation
+- optional Supabase-backed persistence and archives
+- optional dashboard for feature health, claims, learnings, and eval visibility
+- optional TLA+ design verification for state-machine-heavy work
 
-### Context Pulling (not Pushing)
-AI agents fetch what they need via MCP instead of you copy-pasting files into prompts.
+## Tool Notes
 
-### Quality Gates
-Guardian agent reviews every spec before implementation. No code without approval.
+Odin ships auto-config flows today for:
 
-### Learnings System
-Capture insights during development. High-confidence learnings (>=0.80) propagate to preserve knowledge.
+- Codex
+- OpenCode
+- Claude Code
+- Amp
 
-### EVALS
-Monitor feature health (efficiency + quality) and system health over time.
+For Cursor and other tools, `--tool generic` prints the server block you need to wire manually.
 
-## AI Tool Compatibility
-
-| Tool | MCP Support | Agent Spawning | Status |
-|------|-------------|----------------|--------|
-| **Amp** | Native | Task tool | Full support |
-| **Claude Code** | Native | Task tool | Full support |
-| **OpenCode** | Native | Task tool | Full support |
-| **Cursor** | Recent | Composer | Full support |
-| **Codex CLI** | Yes | Custom agents | Full support |
-| **Windsurf** | Limited | Cascade | Partial |
-| **Continue.dev** | Yes | Custom agents | Full support |
-| **Aider** | No | None | Manual mode |
+For Junie and other emerging agent tools, use the same generic path when your environment exposes local MCP server configuration.
 
 ## Status
 
-Odin is in active beta. The current workflow is implemented and dogfooded.
+Odin is in active beta.
 
-### What Works
+What works today:
 
-- 11-phase workflow with database-enforced sequential phase transitions
-- Odin MCP Runtime — single-install TypeScript MCP server (30 tools, including self-service migrations and governed skill-proposal workflow)
-- Memory Palace — semantic learning propagation with domain matching, cross-feature knowledge corridors, and resonance scoring
-- Governed skill proposal pipeline — repeated unresolved tags move through candidate, draft, approval, and publish into `.odin/skills/generated/`
-- TLA+ formal verification — opt-in design verification for state machine specs
-- Dashboard with 11-phase timeline, watcher verification, security findings, learnings
-- 36+ skills across frontend, backend, database, testing, devops, API, architecture
-
-## Contributing
-
-As Odin is currently in beta, contributions are closed for now. If you have feedback, ideas, or find issues, please [open an issue](https://github.com/Plazmodium/odin-workflow/issues) and we'll look into it.
+- 11-phase workflow with sequential phase transitions
+- `odin.start_feature`, `odin.prepare_phase_context`, `odin.record_phase_artifact`, `odin.record_phase_result`, and related workflow tools
+- `odin.apply_migrations` for packaged schema setup
+- Supabase-backed workflow state for persistent runs
+- dashboard support for feature, claim, learning, and eval visibility
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
-
----
-
-**Odin evolves through dogfooding.** This framework follows its own specification-driven process.
+MIT - see [LICENSE](LICENSE)
