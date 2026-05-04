@@ -1,6 +1,8 @@
 # Odin Runtime
 
-`@plazmodium/odin` is the Odin MCP runtime package. It gives your AI coding tool one MCP server named `odin` with the 11-phase workflow, migrations, review checks, learnings, and workflow-state integration.
+`@plazmodium/odin` is the Odin MCP server package. It gives your AI coding tool one MCP server named `odin` with the 11-phase workflow, migrations, review checks, learnings, and workflow-state integration.
+
+In this package, "runtime" means the local MCP-facing server that exposes Odin workflow tools. Agent execution belongs to the host session, child-agent harness, or Ralph Loop.
 
 This README is the package setup and reference guide. If you want the user-first onboarding flow, start with the repo [README.md](../README.md) or [docs/guides/GETTING-STARTED.md](../docs/guides/GETTING-STARTED.md).
 

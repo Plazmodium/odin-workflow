@@ -438,7 +438,7 @@ Builder/Integrator/Release emit claims
         LLM Watcher (semantic)
 ```
 
-The watcher flow runs through Odin's MCP runtime surface:
+The watcher flow runs through Odin's MCP tool surface:
 
 ```
 odin.submit_claim({ ... })
