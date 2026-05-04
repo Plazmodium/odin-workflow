@@ -5,7 +5,7 @@
 <h1 align="center">Odin</h1>
 
 <p align="center">
-  <strong>Specification-Driven Development for AI-Assisted Coding</strong>
+  <strong>Make AI-Assisted Development Reliable Before Code Is Written</strong>
 </p>
 
 <p align="center">
@@ -14,24 +14,54 @@
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
 </p>
 
-Odin is a workflow layer for AI coding tools. It runs as one MCP server named `odin` and gives your assistant a spec-first feature flow, persistent workflow state, review checks, and reusable learnings.
+Odin helps AI coding agents stop guessing from loose prompts. It turns feature intent into an explicit workflow so requirements, phase checkpoints, implementation work, and review artifacts stay visible as work moves from idea to release.
 
-If you already code with Codex, Claude Code, OpenCode, Amp, Cursor, Junie, or similar tools, Odin is meant to sharpen that workflow instead of replacing it.
+Odin runs as one local MCP server named `odin` and plugs into tools you already use: Codex, Claude Code, OpenCode, Amp, Cursor, Junie, and similar AI coding environments.
 
-## Philosophy
+## Why Odin
 
-Odin is built on a simple idea: AI coding works best when the work is clear, grounded, and accountable.
+AI-assisted development often breaks down in the same way:
 
-- **Spec first**: make the requirement explicit before code starts drifting.
+```text
+idea -> prompt -> plausible code -> fix -> fix -> reconstruct intent
+```
+
+The problem is not only that specs are missing. It is that intent lives in chat history, readiness is implicit, and the agent can start building before the work is clear.
+
+Odin makes the intended path explicit:
+
+```text
+idea -> spec -> refine -> build -> verify -> release
+```
+
+The core idea: AI does not reliably preserve intent on its own. Odin makes intent external, structured, and enforceable.
+
+## What Odin Is
+
+Odin is a specification-driven workflow layer for AI-assisted coding. It is not a replacement IDE, agent, or task tracker.
+
+It gives your assistant a branch-first feature workflow with checkpoints that answer:
+
+- What are we trying to build?
+- Is the feature ready to implement?
+- What phase are we in?
+- What evidence did we produce?
+- What still needs human judgment?
+
+## Principles
+
+- **Intent before implementation**: make the requirement explicit before code starts drifting.
+- **Readiness over motion**: prefer a clear feature boundary over fast but premature code generation.
 - **Feature first**: move one coherent feature through a workflow instead of scattering work across ad-hoc tasks.
-- **Use the tools you already like**: Odin plugs into your existing AI tool instead of trying to replace it.
-- **Make decisions visible**: phases, artifacts, checks, and gates should be explicit rather than hidden in prompt history.
+- **Enforcement over suggestion**: phases, artifacts, checks, and gates should be explicit rather than hidden in prompt history.
+- **Use the tools you already like**: Odin plugs into your existing AI tool instead of replacing it.
 - **Keep the human at the right boundary**: AI should accelerate delivery, not erase judgment, review, or responsibility.
 
 ## What Odin Changes
 
-- Your AI agent works from a defined feature workflow instead of ad-hoc prompting.
-- Specs, tasks, phase outputs, and quality gates become explicit.
+- Your AI agent works from durable specs and phase artifacts instead of ad-hoc prompt history.
+- Implementation starts from an explicit feature workflow, not just because an agent can write code.
+- Specs, tasks, phase outputs, quality gates, review checks, and reusable learnings become explicit.
 - Odin can persist workflow state, learnings, and release history when you are ready for Supabase.
 - You keep your current AI tool. Odin plugs into it as an MCP server.
 
@@ -46,7 +76,7 @@ Odin is built on a simple idea: AI coding works best when the work is clear, gro
 flowchart LR
     U[You describe a feature] --> T[Your AI tool<br/>Codex, Claude Code, OpenCode,<br/>Amp, Cursor, Junie, etc.]
     T --> O[Odin MCP server]
-    O --> W[Branch-first feature workflow<br/>specs, phases, checks, artifacts]
+    O --> W[Checkpointed feature workflow<br/>specs, phases, checks, artifacts]
     W --> R[Your project repo]
     O -. optional later .-> S[(Supabase persistence)]
     R --> H[Human review and PR handoff]
@@ -54,7 +84,7 @@ flowchart LR
 
 ## Quick Start
 
-Run the bootstrap command from the root of the project where you want Odin to live.
+Run the bootstrap command from the root of the project where you want Odin to live. This is one-time setup for each target project.
 
 Important:
 Odin writes `.odin/` into the directory you run this command from, unless you pass `--project-root` explicitly.
@@ -94,6 +124,8 @@ At minimum, commit `.odin/` and `.env.example`. Keep `.env` local.
 1. Restart your AI tool so it reloads MCP servers.
 2. Confirm the `odin` MCP server is available.
 3. Tell your AI agent to use `.odin/ODIN.md` as its workflow guide.
+
+From this point on, you normally work through your AI tool. The AI tool calls Odin's MCP server; you do not rerun `init` for every feature.
 
 Suggested first prompt:
 
@@ -140,7 +172,8 @@ If your setup does not automate that yet, the manual `odin start-feature` helper
 
 ## Optional Later
 
-- **Supabase persistence**: for persistent runtime state, archival, and the dashboard
+- **Supabase persistence**: for persistent runtime state, archival, and dashboard data
+- **Dashboard visibility**: this repo also includes an optional dashboard for feature health, claims, learnings, and eval status
 - **Ralph Loop**: for optional bounded automation around safe phase pickup and PR handoff
 - **Manual MCP wiring**: if you do not want `init --write-mcp` to write your tool config
 - **TLA+ design verification**: if you want `odin.verify_design` for state-heavy features
@@ -182,7 +215,7 @@ For Junie and other emerging agent tools, use the same generic path when your en
 
 ## Status
 
-Odin is in active beta.
+Odin is in active beta. The core workflow and MCP tools are usable today, while onboarding, integrations, and automation are still evolving.
 
 What works today:
 
