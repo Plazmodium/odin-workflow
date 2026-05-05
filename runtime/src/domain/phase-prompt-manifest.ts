@@ -7,8 +7,7 @@ import { fileURLToPath } from 'node:url';
 import type { PhaseArtifact, PhaseContextBundle, PhaseId, PhasePromptManifest, ResolvedSkill } from '../types.js';
 
 const MANIFEST_VERSION = '1';
-let cachedDefinitionsRoot: string | null = null;
-const staticHashCache = new Map<PhaseId, { shared_context_hash: string; phase_definition_hash: string }>();
+const staticHashCache = new Map<string, { shared_context_hash: string; phase_definition_hash: string }>();
 
 const PHASE_DEFINITION_FILES: Partial<Record<PhaseId, string>> = {
   '0': 'planning.md',
@@ -78,24 +77,29 @@ export function computePhasePromptManifestId(seed: PhasePromptManifestSeed): str
   });
 }
 
-function resolveAgentDefinitionsRoot(): string {
-  if (cachedDefinitionsRoot != null) {
-    return cachedDefinitionsRoot;
-  }
+function isValidDefinitionsRoot(candidate: string): boolean {
+  return existsSync(join(candidate, '_shared-context.md')) && existsSync(join(candidate, 'builder.md'));
+}
 
+function uniquePaths(paths: string[]): string[] {
+  return paths.filter((path, index, values) => values.indexOf(path) === index);
+}
+
+function resolveAgentDefinitionsRoot(): string {
   const current_file = fileURLToPath(import.meta.url);
   const package_root = resolve(dirname(current_file), '..', '..', '..');
+  const candidates: string[] = [];
+
+  if (process.env.ODIN_PROJECT_ROOT != null && process.env.ODIN_PROJECT_ROOT.trim().length > 0) {
+    candidates.push(join(resolve(process.env.ODIN_PROJECT_ROOT), '.odin', 'agents', 'definitions'));
+  }
+
+  candidates.push(join(process.cwd(), '.odin', 'agents', 'definitions'));
+
   let cursor = package_root;
-
   for (let depth = 0; depth < 6; depth++) {
-    const candidate = join(cursor, 'agents', 'definitions');
-    const shared_context = join(candidate, '_shared-context.md');
-    const builder = join(candidate, 'builder.md');
-
-    if (existsSync(shared_context) && existsSync(builder)) {
-      cachedDefinitionsRoot = candidate;
-      return candidate;
-    }
+    candidates.push(join(cursor, 'assets', 'agents', 'definitions'));
+    candidates.push(join(cursor, 'agents', 'definitions'));
 
     const parent = resolve(cursor, '..');
     if (parent === cursor) {
@@ -105,7 +109,15 @@ function resolveAgentDefinitionsRoot(): string {
     cursor = parent;
   }
 
-  throw new Error('Could not resolve Odin agents/definitions directory for phase prompt manifest generation.');
+  const checked = uniquePaths(candidates);
+  const resolved_root = checked.find(isValidDefinitionsRoot);
+  if (resolved_root != null) {
+    return resolved_root;
+  }
+
+  throw new Error(
+    `Could not resolve Odin agents/definitions directory for phase prompt manifest generation. Checked: ${checked.join(', ')}.`
+  );
 }
 
 function buildArtifactProjection(artifacts: Partial<Record<PhaseArtifact['output_type'], PhaseArtifact>>): Record<string, unknown> {
@@ -238,7 +250,9 @@ export async function computeStaticPhasePromptHashes(phase: PhaseId): Promise<{
   shared_context_hash: string;
   phase_definition_hash: string;
 }> {
-  const cached = staticHashCache.get(phase);
+  const definitions_root = resolveAgentDefinitionsRoot();
+  const cache_key = `${definitions_root}:${phase}`;
+  const cached = staticHashCache.get(cache_key);
   if (cached != null) {
     return cached;
   }
@@ -248,7 +262,6 @@ export async function computeStaticPhasePromptHashes(phase: PhaseId): Promise<{
     throw new Error(`Phase ${phase} does not have a phase definition file for prompt manifest generation.`);
   }
 
-  const definitions_root = resolveAgentDefinitionsRoot();
   const [shared_context_raw, phase_definition_raw] = await Promise.all([
     readFile(join(definitions_root, '_shared-context.md'), 'utf8'),
     readFile(join(definitions_root, phase_definition_file), 'utf8'),
@@ -259,6 +272,6 @@ export async function computeStaticPhasePromptHashes(phase: PhaseId): Promise<{
     phase_definition_hash: hashValue(normalizeText(phase_definition_raw)),
   };
 
-  staticHashCache.set(phase, hashes);
+  staticHashCache.set(cache_key, hashes);
   return hashes;
 }
