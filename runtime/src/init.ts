@@ -5,9 +5,12 @@
  * Version: 0.1.0
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import YAML from 'yaml';
 
 const PUBLISHED_PACKAGE_NAME = '@plazmodium/odin';
 
@@ -76,6 +79,18 @@ interface InitOptions {
   distribution: DistributionMode;
   writeMcp: boolean;
   help: boolean;
+}
+
+interface ManagedAssetManifest {
+  version: 1;
+  files: Record<string, string>;
+}
+
+interface ManagedAssetSyncResult {
+  written: number;
+  kept: number;
+  conflicts: string[];
+  manifest_path: string;
 }
 
 const VALID_TOOLS: readonly HarnessTool[] = ['opencode', 'claude-code', 'amp', 'codex', 'generic'];
@@ -166,7 +181,51 @@ function ensureDir(path: string): void {
   }
 }
 
-function ensureConfig(projectRoot: string, force: boolean): { path: string; changed: boolean } {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function mergeMissingDefaults(
+  defaults: Record<string, unknown>,
+  existing: Record<string, unknown>,
+): { value: Record<string, unknown>; changed: boolean } {
+  let changed = false;
+  const merged: Record<string, unknown> = { ...existing };
+
+  for (const [key, defaultValue] of Object.entries(defaults)) {
+    const existingValue = merged[key];
+    if (existingValue == null) {
+      merged[key] = defaultValue;
+      changed = true;
+      continue;
+    }
+
+    if (isRecord(defaultValue) && isRecord(existingValue)) {
+      const child = mergeMissingDefaults(defaultValue, existingValue);
+      if (child.changed) {
+        merged[key] = child.value;
+        changed = true;
+      }
+    }
+  }
+
+  return { value: merged, changed };
+}
+
+function parseYamlRecord(path: string, content: string): Record<string, unknown> {
+  const parsed = YAML.parse(content) as unknown;
+  if (parsed == null) {
+    return {};
+  }
+
+  if (!isRecord(parsed)) {
+    throw new Error(`Cannot patch ${path} because the config root is not a mapping/object.`);
+  }
+
+  return parsed;
+}
+
+function ensureConfig(projectRoot: string, force: boolean): { path: string; changed: boolean; warning?: string } {
   const odinDir = join(projectRoot, '.odin');
   const configPath = join(odinDir, 'config.yaml');
   const skillsDir = join(odinDir, 'skills');
@@ -183,7 +242,160 @@ function ensureConfig(projectRoot: string, force: boolean): { path: string; chan
     return { path: configPath, changed: true };
   }
 
+  try {
+    const existing = parseYamlRecord(configPath, readFileSync(configPath, 'utf8'));
+    const defaults = parseYamlRecord('Odin config template', CONFIG_TEMPLATE);
+    const patched = mergeMissingDefaults(defaults, existing);
+    if (patched.changed) {
+      writeFileSync(configPath, YAML.stringify(patched.value), 'utf8');
+      return { path: configPath, changed: true };
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown config parse failure';
+    return {
+      path: configPath,
+      changed: false,
+      warning: `Could not patch ${configPath}; left it unchanged. Fix the config and rerun Odin init. ${message}`,
+    };
+  }
+
   return { path: configPath, changed: false };
+}
+
+function hashContent(content: string): string {
+  return createHash('sha256').update(content).digest('hex');
+}
+
+function readManagedAssetManifest(path: string): ManagedAssetManifest {
+  if (!existsSync(path)) {
+    return { version: 1, files: {} };
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as Partial<ManagedAssetManifest>;
+    if (parsed.version === 1 && isRecord(parsed.files)) {
+      return {
+        version: 1,
+        files: Object.fromEntries(
+          Object.entries(parsed.files).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+        ),
+      };
+    }
+  } catch {
+    // Treat malformed manifests as absent; conflict checks still protect edited files.
+  }
+
+  return { version: 1, files: {} };
+}
+
+function collectFiles(root: string): string[] {
+  const files: string[] = [];
+
+  function visit(current: string): void {
+    const entries = readdirSync(current, { withFileTypes: true });
+    for (const entry of entries) {
+      const absolute = join(current, entry.name);
+      if (entry.isDirectory()) {
+        visit(absolute);
+        continue;
+      }
+
+      if (entry.isFile()) {
+        files.push(absolute);
+      }
+    }
+  }
+
+  visit(root);
+  return files;
+}
+
+function relativeAssetPath(assetRoot: string, file: string): string {
+  return file.slice(assetRoot.length + 1).replace(/\\/g, '/');
+}
+
+function resolveAssetRoot(): string {
+  const currentFile = fileURLToPath(import.meta.url);
+  const packageRoot = resolve(dirname(currentFile), '..');
+  const candidates = [
+    join(packageRoot, 'assets'),
+    join(packageRoot, '..', 'assets'),
+    join(packageRoot, '..'),
+  ];
+
+  const found = candidates.find((candidate) => existsSync(join(candidate, 'ODIN.md')) && existsSync(join(candidate, 'agents')));
+  if (found == null) {
+    throw new Error(`Could not resolve packaged Odin assets. Checked: ${candidates.join(', ')}.`);
+  }
+
+  return found;
+}
+
+function ensureManagedAssets(projectRoot: string, force: boolean): ManagedAssetSyncResult {
+  const assetRoot = resolveAssetRoot();
+  const odinDir = join(projectRoot, '.odin');
+  const manifestPath = join(odinDir, 'managed-assets.json');
+  const manifest = readManagedAssetManifest(manifestPath);
+  const nextManifest: ManagedAssetManifest = { version: 1, files: { ...manifest.files } };
+  const sourceTargets = [
+    { source: join(assetRoot, 'ODIN.md'), targetPrefix: '.odin' },
+    { source: join(assetRoot, 'agents', 'definitions'), targetPrefix: '.odin/agents/definitions' },
+    { source: join(assetRoot, 'agents', 'skills'), targetPrefix: '.odin/skills' },
+  ];
+  let written = 0;
+  let kept = 0;
+  const conflicts: string[] = [];
+
+  ensureDir(odinDir);
+
+  for (const target of sourceTargets) {
+    const sourceFiles = existsSync(target.source)
+      ? target.source.endsWith('ODIN.md')
+        ? [target.source]
+        : collectFiles(target.source)
+      : [];
+
+    for (const sourceFile of sourceFiles) {
+      const relativePath = sourceFile === target.source
+        ? 'ODIN.md'
+        : relativeAssetPath(target.source, sourceFile);
+      const managedPath = target.source.endsWith('ODIN.md')
+        ? '.odin/ODIN.md'
+        : `${target.targetPrefix}/${relativePath}`;
+      const destination = join(projectRoot, managedPath);
+      const sourceContent = readFileSync(sourceFile, 'utf8');
+      const sourceHash = hashContent(sourceContent);
+      const previousHash = manifest.files[managedPath];
+
+      if (!existsSync(destination) || force) {
+        ensureDir(dirname(destination));
+        writeFileSync(destination, sourceContent, 'utf8');
+        nextManifest.files[managedPath] = sourceHash;
+        written += 1;
+        continue;
+      }
+
+      const currentContent = readFileSync(destination, 'utf8');
+      const currentHash = hashContent(currentContent);
+      if (currentHash === sourceHash) {
+        nextManifest.files[managedPath] = sourceHash;
+        kept += 1;
+        continue;
+      }
+
+      if (previousHash != null && currentHash === previousHash) {
+        writeFileSync(destination, sourceContent, 'utf8');
+        nextManifest.files[managedPath] = sourceHash;
+        written += 1;
+        continue;
+      }
+
+      conflicts.push(managedPath);
+    }
+  }
+
+  writeFileSync(manifestPath, `${JSON.stringify(nextManifest, null, 2)}\n`, 'utf8');
+  return { written, kept, conflicts, manifest_path: manifestPath };
 }
 
 function ensureEnvExample(projectRoot: string, force: boolean): { path: string; changed: boolean } {
@@ -452,11 +664,27 @@ function main(): void {
   }
 
   const config = ensureConfig(options.projectRoot, options.force);
+  const managedAssets = ensureManagedAssets(options.projectRoot, options.force);
   const envExample = ensureEnvExample(options.projectRoot, options.force);
   const mcpSnippet = createMcpJsonSnippet(options.projectRoot, options.distribution);
+  const tomlConfigPath = join(options.projectRoot, '.odin', 'config.toml');
 
   console.log('Odin runtime project bootstrap complete.');
   console.log(`- ${config.changed ? 'wrote' : 'kept'} ${config.path}`);
+  if (config.warning != null) {
+    console.log(`- warning: ${config.warning}`);
+  }
+  if (existsSync(tomlConfigPath)) {
+    console.log(`- kept ${tomlConfigPath} (Odin runtime reads .odin/config.yaml; .odin/config.toml is not active runtime config)`);
+  }
+  console.log(
+    `- synced Odin managed assets: ${managedAssets.written} written, ${managedAssets.kept} kept (${managedAssets.manifest_path})`
+  );
+  if (managedAssets.conflicts.length > 0) {
+    console.log(
+      `- skipped ${managedAssets.conflicts.length} locally modified Odin managed asset(s); rerun with --force to overwrite: ${managedAssets.conflicts.join(', ')}`
+    );
+  }
   console.log(`- ${envExample.changed ? 'updated' : 'kept'} ${envExample.path}`);
   console.log(`- runtime quick-start mode: in_memory`);
   console.log(`- MCP command mode: ${options.distribution}`);
