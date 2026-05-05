@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.7.0-beta] - 2026-05-05
+
+### Fixed
+
+- Runtime phase prompt manifest generation now resolves target-project `.odin/agents/definitions` before package/source fallbacks.
+- `odin init` now packages and syncs Odin workflow assets, agent definitions, and skills while preserving locally edited managed files.
+
+### Changed
+
+- `odin init` now patches missing `.odin/config.yaml` defaults non-destructively when Odin adds new runtime config keys.
+
 ## [0.6.3-beta] - 2026-04-24
 
 ### Added
