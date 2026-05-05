@@ -231,6 +231,8 @@ archive:
   provider: none
 ```
 
+Odin runtime reads `.odin/config.yaml`. A `.odin/config.toml` file is not active runtime config; `.codex/config.toml` is only Codex MCP host wiring.
+
 ## Common `odin.*` Tools
 
 These are the runtime calls most users notice first:

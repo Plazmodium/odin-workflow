@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
@@ -20,6 +20,10 @@ function runInit(args: string): string {
   return execSync(`node ${initScript} ${args}`, { encoding: 'utf8', timeout: 10000 });
 }
 
+function hashContent(content: string): string {
+  return createHash('sha256').update(content).digest('hex');
+}
+
 describe('odin-runtime-init', () => {
   let tmpDir: string;
 
@@ -31,13 +35,19 @@ describe('odin-runtime-init', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('creates .odin/config.yaml, .odin/skills/.gitkeep, and .env.example', () => {
+  it('creates config, managed Odin assets, skills, and .env.example', () => {
     const output = runInit(`--project-root ${tmpDir}`);
 
     expect(existsSync(join(tmpDir, '.odin', 'config.yaml'))).toBe(true);
     expect(existsSync(join(tmpDir, '.odin', 'skills', '.gitkeep'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.odin', 'ODIN.md'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.odin', 'agents', 'definitions', '_shared-context.md'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.odin', 'agents', 'definitions', 'builder.md'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.odin', 'skills', 'testing', 'vitest', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.odin', 'managed-assets.json'))).toBe(true);
     expect(existsSync(join(tmpDir, '.env.example'))).toBe(true);
     expect(output).toContain('Odin runtime project bootstrap complete');
+    expect(output).toContain('synced Odin managed assets');
     expect(output).toContain('runtime quick-start mode: in_memory');
     expect(output).toContain('odin.get_development_eval_status');
     expect(output).toContain('Canonical eval-aware orchestration snippet');
@@ -53,15 +63,18 @@ describe('odin-runtime-init', () => {
     expect(config).toContain('mode: guarded');
   });
 
-  it('does not overwrite existing config without --force', () => {
+  it('patches existing config with missing defaults without overwriting custom values', () => {
     const configDir = join(tmpDir, '.odin');
     mkdirSync(configDir, { recursive: true });
-    writeFileSync(join(configDir, 'config.yaml'), 'custom: true\n', 'utf8');
+    writeFileSync(join(configDir, 'config.yaml'), 'runtime:\n  mode: supabase\ncustom: true\n', 'utf8');
 
     runInit(`--project-root ${tmpDir}`);
 
     const content = readFileSync(join(configDir, 'config.yaml'), 'utf8');
-    expect(content).toBe('custom: true\n');
+    expect(content).toContain('mode: supabase');
+    expect(content).toContain('custom: true');
+    expect(content).toContain('skills:');
+    expect(content).toContain('automation:');
   });
 
   it('overwrites existing config with --force', () => {
@@ -74,6 +87,44 @@ describe('odin-runtime-init', () => {
     const content = readFileSync(join(configDir, 'config.yaml'), 'utf8');
     expect(content).toContain('runtime:');
     expect(content).not.toContain('custom: true');
+  });
+
+  it('reports that .odin/config.toml is not active runtime config', () => {
+    const configDir = join(tmpDir, '.odin');
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(join(configDir, 'config.toml'), '[runtime]\nmode = "in_memory"\n', 'utf8');
+
+    const output = runInit(`--project-root ${tmpDir}`);
+
+    expect(output).toContain('.odin/config.toml is not active runtime config');
+  });
+
+  it('updates managed skills on rerun and preserves locally edited skills', () => {
+    runInit(`--project-root ${tmpDir}`);
+
+    const managedPath = '.odin/skills/testing/vitest/SKILL.md';
+    const skillPath = join(tmpDir, managedPath);
+    const manifestPath = join(tmpDir, '.odin', 'managed-assets.json');
+    const currentSkill = readFileSync(skillPath, 'utf8');
+    const oldSkill = '---\nname: vitest\ncategory: testing\n---\nold managed skill\n';
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      files: Record<string, string>;
+    };
+
+    writeFileSync(skillPath, oldSkill, 'utf8');
+    manifest.files[managedPath] = hashContent(oldSkill);
+    writeFileSync(manifestPath, `${JSON.stringify({ version: 1, files: manifest.files }, null, 2)}\n`, 'utf8');
+
+    runInit(`--project-root ${tmpDir}`);
+    expect(readFileSync(skillPath, 'utf8')).toBe(currentSkill);
+
+    const localEdit = `${currentSkill}\nlocal edit\n`;
+    writeFileSync(skillPath, localEdit, 'utf8');
+
+    const output = runInit(`--project-root ${tmpDir}`);
+
+    expect(readFileSync(skillPath, 'utf8')).toBe(localEdit);
+    expect(output).toContain('locally modified Odin managed asset');
   });
 
   it('appends missing env vars to existing .env.example', () => {

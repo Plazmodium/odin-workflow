@@ -195,7 +195,7 @@ const formal_verification_adapter = createFormalVerificationAdapter(project_root
 const server = new McpServer(
   {
     name: 'odin',
-    version: '0.6.3-beta',
+    version: '0.7.0-beta',
   },
   {
     capabilities: {

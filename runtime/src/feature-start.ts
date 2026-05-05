@@ -264,7 +264,7 @@ export async function connectFeatureStartClient(projectRoot: string): Promise<Fe
   });
   const client = new Client({
     name: 'odin-feature-start',
-    version: '0.6.3-beta',
+    version: '0.7.0-beta',
   });
   await client.connect(transport);
 
