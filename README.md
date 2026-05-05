@@ -187,13 +187,14 @@ If your setup does not automate that yet, the manual `odin start-feature` helper
 | [docs/guides/example-workflow.md](docs/guides/example-workflow.md) | You want a current end-to-end worked example |
 | [docs/guides/SUPABASE-SETUP.md](docs/guides/SUPABASE-SETUP.md) | You want the deeper database setup path |
 | [loop/README.md](loop/README.md) | You want optional Ralph Loop automation |
+| [docs/reference/ODIN-MCP-BOUNDARY.md](docs/reference/ODIN-MCP-BOUNDARY.md) | You want the boundary between Odin's MCP server and agent execution |
 | [dashboard/README.md](dashboard/README.md) | You want the optional dashboard app |
 | [docs/guides/DEVELOPING-ODIN.md](docs/guides/DEVELOPING-ODIN.md) | You are developing or publishing Odin itself |
 
 ## What Odin Includes
 
 - 11-phase feature workflow with explicit phase outputs and checkpoints
-- one MCP runtime server named `odin`
+- one local MCP server named `odin` for workflow and state operations
 - review checks via Semgrep
 - learnings capture and propagation
 - optional Supabase-backed persistence and archives
