@@ -769,7 +769,7 @@ Check `workflow.invocation_coverage.pre_release_missing` before PR handoff and `
 
 ### State Management
 
-Odin state is managed through the **Odin MCP Runtime** (`odin` server) — a single-install TypeScript MCP server that provides all workflow tools (`odin.start_feature`, `odin.prepare_phase_context`, `odin.record_phase_artifact`, etc.).
+Odin state is managed through the **Odin MCP server** (`odin`) — a single-install TypeScript MCP server that provides all workflow tools (`odin.start_feature`, `odin.prepare_phase_context`, `odin.record_phase_artifact`, etc.).
 
 Current runtime contract:
 - **Persistent workflow state** uses the Supabase workflow-state adapter when `runtime.mode: supabase`
@@ -846,7 +846,7 @@ Keep only Context & Goals and Acceptance Criteria.
 | `filesystem` | Direct file access | Recommended |
 | `github` | Pull issues, PRs, tickets | Optional |
 
-The `odin` server is the Odin MCP Runtime. It provides all `odin.*` tools, manages persistent workflow state through Supabase in `runtime.mode: supabase`, and supports migration-only direct PostgreSQL access through `odin.apply_migrations`. See [runtime/README.md](runtime/README.md) for setup.
+The `odin` server is Odin's local MCP server surface. It provides all `odin.*` tools, manages persistent workflow state through Supabase in `runtime.mode: supabase`, and supports migration-only direct PostgreSQL access through `odin.apply_migrations`. See [runtime/README.md](runtime/README.md) for setup.
 
 **Docker Gateway Toolkit:**
 
@@ -883,7 +883,7 @@ odin/
 ├── agents/
 │   ├── definitions/           # 12 agent prompts + shared context
 │   └── skills/                # 36+ domain skills
-├── runtime/                   # Odin MCP Runtime (TypeScript)
+├── runtime/                   # Odin MCP server package (TypeScript)
 │   ├── src/                   # Source code
 │   └── migrations/            # Bundled database migrations
 ├── docs/
@@ -917,9 +917,9 @@ odin/
 
 ---
 
-## Quick Reference: Odin Runtime Tools
+## Quick Reference: Odin MCP Tools
 
-All workflow operations use `odin.*` tools provided by the Odin MCP Runtime.
+All workflow operations use `odin.*` tools provided by the Odin MCP server.
 
 ### Setup & Migrations
 
