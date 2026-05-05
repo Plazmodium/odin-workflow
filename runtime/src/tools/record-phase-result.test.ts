@@ -45,6 +45,17 @@ function createConfig(): RuntimeConfig {
   };
 }
 
+function createStrictConfig(): RuntimeConfig {
+  return {
+    ...createConfig(),
+    attestation: {
+      mode: 'strict',
+      require_execution_phases: ['5', '6', '7', '9'],
+      require_prompt_realization_phases: ['5', '6', '7', '9'],
+    },
+  };
+}
+
 function createSkillAdapter(): SkillAdapter {
   return {
     resolveSkills: vi.fn(async () => ({
@@ -405,5 +416,125 @@ describe('handleRecordPhaseResult', () => {
       warning: expect.stringContaining('prefers attested realization from the Odin phase bundle'),
       error: null,
     });
+  });
+
+  it('blocks strict phase completion when an expected artifact path is missing', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => createFeature({ current_phase: '8' })),
+      listPhaseArtifacts: vi.fn(async () => [
+        {
+          id: 'artifact_documentation',
+          feature_id: 'FEAT-RESULT',
+          phase: '8',
+          output_type: 'documentation',
+          content: { summary: 'Docs updated' },
+          created_by: 'documenter-agent',
+          created_at: '2026-03-20T00:00:00.000Z',
+        },
+      ]),
+      listLearnings: vi.fn(async () => []),
+      listRelatedLearnings: vi.fn(async () => []),
+      listOpenBlockers: vi.fn(async () => []),
+      listOpenGateRecords: vi.fn(async () => []),
+      listOpenFindings: vi.fn(async () => []),
+      listPendingClaims: vi.fn(async () => []),
+      listClaimVerificationStatus: vi.fn(async () => []),
+      listClaimsNeedingReview: vi.fn(async () => []),
+      getPhaseExecutionAttestation: vi.fn(async () => null),
+      getPhasePromptRealization: vi.fn(async () => null),
+      recordPhaseResult: vi.fn(async () => createFeature({ current_phase: '9' })),
+    } as unknown as WorkflowStateAdapter;
+
+    const result = await handleRecordPhaseResult(adapter, createSkillAdapter(), createStrictConfig(), null, {
+      feature_id: 'FEAT-RESULT',
+      phase: '8',
+      outcome: 'completed',
+      summary: 'Documentation complete',
+      created_by: 'opencode',
+      blockers: [],
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('documentation-report\\.md');
+    expect(result.structuredContent?.artifact_completion).toMatchObject({
+      mode: 'strict',
+      missing: [
+        expect.objectContaining({
+          output_type: 'documentation',
+          artifact_path_pattern: 'documentation-report\\.md$',
+        }),
+      ],
+    });
+    expect(adapter.recordPhaseResult).not.toHaveBeenCalled();
+  });
+
+  it('blocks strict phases without execution attestation unless an override reason is supplied', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => createFeature()),
+      listPhaseArtifacts: vi.fn(async () => []),
+      listLearnings: vi.fn(async () => []),
+      listRelatedLearnings: vi.fn(async () => []),
+      listOpenBlockers: vi.fn(async () => []),
+      listOpenGateRecords: vi.fn(async () => []),
+      listOpenFindings: vi.fn(async () => []),
+      listPendingClaims: vi.fn(async () => []),
+      listClaimVerificationStatus: vi.fn(async () => []),
+      listClaimsNeedingReview: vi.fn(async () => []),
+      getPhaseExecutionAttestation: vi.fn(async () => null),
+      getPhasePromptRealization: vi.fn(async () => null),
+      recordPhaseResult: vi.fn(async () => createFeature({ current_phase: '6' })),
+      findOpenAgentInvocation: vi.fn(async () => null),
+      startAgentInvocation: vi.fn(async () => ({
+        id: 'inv_strict',
+        feature_id: 'FEAT-RESULT',
+        phase: '5',
+        agent_name: 'builder-agent',
+        operation: 'Phase 5: Builder (fallback)',
+        skills_used: [],
+        started_at: '2026-03-20T00:00:00.000Z',
+        ended_at: null,
+        duration_ms: null,
+      })),
+      completeAgentInvocation: vi.fn(async () => ({
+        id: 'inv_strict',
+        feature_id: 'FEAT-RESULT',
+        phase: '5',
+        agent_name: 'builder-agent',
+        operation: 'Phase 5: Builder (fallback)',
+        skills_used: [],
+        started_at: '2026-03-20T00:00:00.000Z',
+        ended_at: '2026-03-20T00:05:00.000Z',
+        duration_ms: 300000,
+      })),
+      recordQualityGate: vi.fn(async () => 1),
+      computeFeatureEval: vi.fn(async () => null),
+    } as unknown as WorkflowStateAdapter;
+
+    const blocked = await handleRecordPhaseResult(adapter, createSkillAdapter(), createStrictConfig(), null, {
+      feature_id: 'FEAT-RESULT',
+      phase: '5',
+      outcome: 'completed',
+      summary: 'Builder finished implementation',
+      created_by: 'opencode',
+      blockers: [],
+    });
+
+    expect(blocked.isError).toBe(true);
+    expect(blocked.content[0]?.text).toContain('requires a distinct worker session');
+    expect(adapter.recordPhaseResult).not.toHaveBeenCalled();
+
+    const overridden = await handleRecordPhaseResult(adapter, createSkillAdapter(), createStrictConfig(), null, {
+      feature_id: 'FEAT-RESULT',
+      phase: '5',
+      outcome: 'completed',
+      summary: 'Builder finished implementation',
+      created_by: 'opencode',
+      blockers: [],
+      attestation_override_reason: 'Manual emergency workflow; child session was unavailable.',
+    });
+
+    expect(overridden.isError).toBeUndefined();
+    expect(overridden.content[0]?.text).toContain('Override accepted');
+    expect(adapter.recordPhaseResult).toHaveBeenCalledTimes(1);
   });
 });

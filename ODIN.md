@@ -547,7 +547,17 @@ The runtime handles everything: runs Semgrep, records findings, and reports resu
 
 ## Product Agent (PRD Generation)
 
-The Product agent (Phase 1) generates PRDs before technical specification.
+The Product agent (Phase 1) generates PRDs before technical discovery and technical specification.
+
+### Product/Discovery Boundary
+
+| Phase | Owns | Must Avoid |
+|-------|------|------------|
+| Product | User value, target users, success criteria, non-goals, user-visible failure shape | Technical design, system constraints, task breakdown |
+| Discovery | Technical requirements, existing-system context, constraints, unknowns, should/should-not scenarios | Rewriting Product intent, choosing implementation architecture |
+| Architect | Implementation design, decomposition, task breakdown, eval plan when required | Re-opening Product scope without explicit rework |
+
+For L1 work, Product and Discovery may be brief, but both artifacts should still make the audit boundary clear. A Product PRD exemption says why the change matters; Discovery says what technical facts, constraints, and scenarios Architect must use.
 
 ### Complexity-Gated Output
 
@@ -597,12 +607,14 @@ The `dev_initials` and `author` parameters in `odin.start_feature` identify the 
 1. **Orchestrator creates the git branch FIRST**: `git checkout -b {dev_initials}/feature/{FEATURE-ID}` — this must succeed before anything is recorded in the database
 2. **Only after the branch exists**, call `odin.start_feature` to record the feature
 3. Transition to Phase 1 (Product) — all work happens on the feature branch
-4. Each phase: `odin.prepare_phase_context` → agent work → `odin.record_phase_artifact` → `odin.record_phase_result`
+4. Each phase: `odin.prepare_phase_context` → agent work → either individual records (`odin.record_phase_artifact`, claims/evals, `odin.record_phase_result`) or one `odin.complete_phase_bundle` call
 5. `odin.prepare_phase_context` starts the phase invocation timer; `odin.record_phase_result` completes it
 6. Release phase inspects `context.automation` from `odin.prepare_phase_context`
 7. In `guarded`, prepare the PR handoff for a human; in `auto_pr`, create the PR via `gh pr create` only when policy allows it, then record it with `odin.record_pr`
 8. Human reviews and merges the PR (NEVER the agent)
 9. After the human merges the PR, record the merge with `odin.record_merge`
+
+`odin.record_phase_artifact` accepts optional `artifact_path` metadata. Use it for durable files such as `documentation-report.md` so strict projects can enforce expected completion artifacts by filename.
 
 > **CRITICAL**: Create the git branch BEFORE calling `odin.start_feature`. If branch creation fails (e.g., branch already exists, git error), do NOT create the feature — you would have a dead DB record with no branch. The branch is the real artifact; the DB record is tracking.
 

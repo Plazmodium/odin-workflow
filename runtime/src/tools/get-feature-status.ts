@@ -10,6 +10,7 @@ import { resolveAutomationDecision } from '../domain/automation-policy.js';
 import { deriveAutonomyFeatureState } from '../domain/autonomous-pickup.js';
 import { buildDevelopmentEvalContext } from '../domain/development-evals.js';
 import { assessPhaseExecutionPolicy, summarizePhaseExecutionStatus } from '../domain/execution-policy.js';
+import { assessPhaseExpectedArtifacts } from '../domain/phase-artifacts.js';
 import { getNextPhaseId, getPhaseContract } from '../domain/phases.js';
 import { assessPromptRealizationPolicy, buildPromptRealizationStatusRow, PROMPT_REALIZATION_AUDIT_PHASES, summarizePromptRealizationStatus } from '../domain/prompt-realization.js';
 import { formatOpenGateSummary } from '../domain/quality-gates.js';
@@ -61,6 +62,26 @@ function buildInvocationCoverage(
     pre_completion_complete: pre_completion_missing.length === 0,
     pre_completion_missing,
   };
+}
+
+function deriveReleaseStage(feature: { current_phase: PhaseId; pr_url?: string; merged_at?: string; completed_at?: string; release_handoff_at?: string; release_closeout_at?: string }) {
+  if (feature.release_closeout_at != null || feature.completed_at != null || feature.current_phase === '10') {
+    return 'closed' as const;
+  }
+
+  if (feature.current_phase !== '9') {
+    return 'not_in_release' as const;
+  }
+
+  if (feature.merged_at != null) {
+    return 'merged_closeout_ready' as const;
+  }
+
+  if (feature.release_handoff_at != null || feature.pr_url != null) {
+    return 'handoff_created_waiting_merge' as const;
+  }
+
+  return 'handoff_ready' as const;
 }
 
 export async function handleGetFeatureStatus(
@@ -123,17 +144,20 @@ export async function handleGetFeatureStatus(
   const latest_review_check = review_checks.at(-1) ?? null;
   const open_gates = open_gate_records.map(formatOpenGateSummary);
   const development_evals = buildDevelopmentEvalContext(feature, feature.current_phase, artifacts, open_gate_records);
+  const artifact_completion = assessPhaseExpectedArtifacts(feature.current_phase, artifacts, config.attestation);
   const invocation_coverage = buildInvocationCoverage(invocations);
-  const execution_status = summarizePhaseExecutionStatus(execution_attestations);
+  const execution_status = summarizePhaseExecutionStatus(execution_attestations, config.attestation);
   const current_phase_execution = assessPhaseExecutionPolicy(
     feature.current_phase,
     execution_attestations.find((attestation) => attestation.phase === feature.current_phase) ?? null,
+    config.attestation,
   );
   const prompt_realization_rows = PROMPT_REALIZATION_AUDIT_PHASES.map((phase) =>
     buildPromptRealizationStatusRow(
       phase,
       phase === feature.current_phase ? expected_current_bundle?.execution.phase_prompt_manifest ?? null : null,
       prompt_realizations.find((attestation) => attestation.phase === phase) ?? null,
+      config.attestation,
     )
   );
   const prompt_realization_status = summarizePromptRealizationStatus(prompt_realization_rows);
@@ -141,6 +165,7 @@ export async function handleGetFeatureStatus(
     feature.current_phase,
     expected_current_bundle?.execution.phase_prompt_manifest ?? null,
     prompt_realizations.find((attestation) => attestation.phase === feature.current_phase) ?? null,
+    config.attestation,
   );
   const automation = resolveAutomationDecision({
     config,
@@ -172,7 +197,14 @@ export async function handleGetFeatureStatus(
       release: {
         pr_url: feature.pr_url ?? null,
         pr_number: feature.pr_number ?? null,
+        stage: deriveReleaseStage(feature),
+        handoff_created_at: feature.release_handoff_at ?? null,
+        handoff_created_by: feature.release_handoff_by ?? null,
+        handoff_summary: feature.release_handoff_summary ?? null,
         merged_at: feature.merged_at ?? null,
+        closeout_created_at: feature.release_closeout_at ?? null,
+        closeout_created_by: feature.release_closeout_by ?? null,
+        closeout_summary: feature.release_closeout_summary ?? null,
         completed_at: feature.completed_at ?? null,
       },
       current_phase,
@@ -202,13 +234,16 @@ export async function handleGetFeatureStatus(
         invocation_coverage,
       },
       phase_execution: {
+        attestation_mode: config.attestation?.mode ?? 'advisory',
         current_phase: current_phase_execution,
         summary: execution_status,
       },
       prompt_realization: {
+        attestation_mode: config.attestation?.mode ?? 'advisory',
         current_phase: current_phase_prompt_realization,
         summary: prompt_realization_status,
       },
+      artifact_completion,
       development_evals,
       latest_feature_eval,
       latest_review_check,

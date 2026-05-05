@@ -10,11 +10,16 @@ import dotenv from 'dotenv';
 import YAML from 'yaml';
 
 import {
+  ATTESTATION_MODES,
   AUTOMATION_MERGE_STRATEGIES,
   AUTOMATION_MODES,
+  PHASE_IDS,
+  type AttestationMode,
+  type AttestationPolicyConfig,
   type AutomationMergeStrategy,
   type AutomationMode,
   type AutomationPolicyConfig,
+  type PhaseId,
 } from './types.js';
 
 export interface RuntimeConfig {
@@ -45,6 +50,7 @@ export interface RuntimeConfig {
     provider?: 'supabase' | 'none';
   };
   automation?: Partial<AutomationPolicyConfig>;
+  attestation?: Partial<AttestationPolicyConfig>;
 }
 
 export const CONFIG_RESTART_NOTE =
@@ -80,6 +86,11 @@ const DEFAULT_CONFIG: RuntimeConfig = {
     kill_switch: false,
     merge_strategy: 'squash',
   },
+  attestation: {
+    mode: 'advisory',
+    require_execution_phases: ['5', '6', '7', '9'],
+    require_prompt_realization_phases: ['5', '6', '7', '9'],
+  },
 };
 
 export interface RuntimeConfigSummary {
@@ -92,10 +103,73 @@ export interface RuntimeConfigSummary {
   automation_mode: AutomationMode;
   automation_paused: boolean;
   automation_kill_switch: boolean;
+  attestation_mode: AttestationMode;
+}
+
+function isAttestationMode(value: unknown): value is AttestationMode {
+  return typeof value === 'string' && ATTESTATION_MODES.includes(value as AttestationMode);
 }
 
 function isAutomationMode(value: unknown): value is AutomationMode {
   return typeof value === 'string' && AUTOMATION_MODES.includes(value as AutomationMode);
+}
+
+function normalizePhaseList(value: unknown, fallback: PhaseId[], field_name: string, source: string): PhaseId[] {
+  if (value == null) {
+    return fallback;
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error(`Invalid ${field_name} in ${source}. Expected an array of phase ids.`);
+  }
+
+  const phases = value.map((phase) => String(phase).trim()).filter((phase) => phase.length > 0);
+  const invalid = phases.find((phase) => !PHASE_IDS.includes(phase as PhaseId));
+  if (invalid != null) {
+    throw new Error(`Invalid ${field_name} phase "${invalid}" in ${source}. Supported: ${PHASE_IDS.join(', ')}.`);
+  }
+
+  return [...new Set(phases)] as PhaseId[];
+}
+
+function normalizeAttestationConfig(
+  project_root: string,
+  config: RuntimeConfig,
+  config_path: string | null,
+): RuntimeConfig {
+  const default_attestation: AttestationPolicyConfig = {
+    mode: 'advisory',
+    require_execution_phases: ['5', '6', '7', '9'],
+    require_prompt_realization_phases: ['5', '6', '7', '9'],
+  };
+  const raw = config.attestation ?? {};
+  const mode = raw.mode ?? default_attestation.mode;
+  const source = config_path ?? `${project_root}/.odin/config.yaml`;
+
+  if (!isAttestationMode(mode)) {
+    throw new Error(
+      `Invalid attestation.mode "${String(mode)}" in ${source}. Supported: ${ATTESTATION_MODES.join(', ')}.`
+    );
+  }
+
+  return {
+    ...config,
+    attestation: {
+      mode,
+      require_execution_phases: normalizePhaseList(
+        raw.require_execution_phases,
+        default_attestation.require_execution_phases,
+        'attestation.require_execution_phases',
+        source,
+      ),
+      require_prompt_realization_phases: normalizePhaseList(
+        raw.require_prompt_realization_phases,
+        default_attestation.require_prompt_realization_phases,
+        'attestation.require_prompt_realization_phases',
+        source,
+      ),
+    },
+  };
 }
 
 function isAutomationMergeStrategy(value: unknown): value is AutomationMergeStrategy {
@@ -256,6 +330,16 @@ function mergeConfig(base: RuntimeConfig, override: Partial<RuntimeConfig>): Run
 
           return override.automation;
         })();
+  const attestation_override =
+    override.attestation == null
+      ? {}
+      : (() => {
+          if (typeof override.attestation !== 'object' || Array.isArray(override.attestation)) {
+            throw new Error('Invalid attestation config. Expected attestation to be a mapping/object.');
+          }
+
+          return override.attestation;
+        })();
 
   return {
     runtime: {
@@ -290,6 +374,10 @@ function mergeConfig(base: RuntimeConfig, override: Partial<RuntimeConfig>): Run
       ...base.automation,
       ...automation_override,
     },
+    attestation: {
+      ...base.attestation,
+      ...attestation_override,
+    },
   };
 }
 
@@ -309,14 +397,18 @@ export function loadRuntimeConfig(project_root: string): RuntimeConfig {
 
   const config_path = join(project_root, '.odin', 'config.yaml');
   if (!existsSync(config_path)) {
-    return normalizeAutomationConfig(project_root, mergeConfig(DEFAULT_CONFIG, env_defaults), null);
+    return normalizeAttestationConfig(project_root, normalizeAutomationConfig(project_root, mergeConfig(DEFAULT_CONFIG, env_defaults), null), null);
   }
 
   const raw = readFileSync(config_path, 'utf8');
   const parsed = YAML.parse(raw) as Partial<RuntimeConfig> | null;
   const interpolated = interpolateEnv(parsed ?? {}) as Partial<RuntimeConfig>;
 
-  return normalizeAutomationConfig(project_root, mergeConfig(mergeConfig(DEFAULT_CONFIG, env_defaults), interpolated), config_path);
+  return normalizeAttestationConfig(
+    project_root,
+    normalizeAutomationConfig(project_root, mergeConfig(mergeConfig(DEFAULT_CONFIG, env_defaults), interpolated), config_path),
+    config_path,
+  );
 }
 
 export function summarizeRuntimeConfig(
@@ -333,5 +425,6 @@ export function summarizeRuntimeConfig(
     automation_mode: config.automation?.mode ?? 'guarded',
     automation_paused: config.automation?.paused ?? false,
     automation_kill_switch: config.automation?.kill_switch ?? false,
+    attestation_mode: config.attestation?.mode ?? 'advisory',
   };
 }

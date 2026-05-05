@@ -9,10 +9,13 @@ import type {
   PhaseExecutionContract,
   PhaseExecutionMode,
   PhaseExecutionPolicy,
+  PhaseExpectedArtifact,
   PhaseId,
   PromptRealizationPolicy,
   PhaseResponseStyle,
 } from '../types.js';
+
+const NO_EXPECTED_ARTIFACTS: PhaseExpectedArtifact[] = [];
 
 const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
   '0': {
@@ -21,22 +24,39 @@ const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
     purpose: 'Establish the feature request and prepare the workflow entry point.',
     definition_of_done: ['Feature request understood', 'Next phase identified'],
     required_artifacts: [],
+    expected_artifacts: NO_EXPECTED_ARTIFACTS,
     allowed_next_phases: ['1'],
   },
   '1': {
     id: '1',
     name: 'Product',
-    purpose: 'Capture the product requirements for the feature.',
+    purpose: 'Capture user value, success criteria, non-goals, and user-visible failure shape before technical discovery.',
     definition_of_done: ['PRD or exemption recorded', 'Success / non-goals / failure shape captured'],
     required_artifacts: ['prd'],
+    expected_artifacts: [
+      {
+        output_type: 'prd',
+        artifact_path_pattern: null,
+        description: 'Product requirements or explicit Product exemption',
+        required_in_strict: true,
+      },
+    ],
     allowed_next_phases: ['2'],
   },
   '2': {
     id: '2',
     name: 'Discovery',
-    purpose: 'Gather requirements, context, and technical constraints.',
-    definition_of_done: ['Requirements recorded', 'Eval-relevant scenarios captured'],
+    purpose: 'Translate Product intent into technical requirements, constraints, existing-system context, unknowns, and eval-relevant scenarios.',
+    definition_of_done: ['Technical requirements recorded', 'Existing-system context and unknowns captured', 'Eval-relevant scenarios captured'],
     required_artifacts: ['requirements'],
+    expected_artifacts: [
+      {
+        output_type: 'requirements',
+        artifact_path_pattern: null,
+        description: 'Technical requirements, constraints, and existing-system context',
+        required_in_strict: true,
+      },
+    ],
     allowed_next_phases: ['3'],
   },
   '3': {
@@ -45,6 +65,20 @@ const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
     purpose: 'Produce the technical spec and task shape.',
     definition_of_done: ['Spec recorded', 'Tasks recorded', 'Eval plan recorded when required'],
     required_artifacts: ['spec', 'tasks'],
+    expected_artifacts: [
+      {
+        output_type: 'spec',
+        artifact_path_pattern: null,
+        description: 'Technical implementation specification',
+        required_in_strict: true,
+      },
+      {
+        output_type: 'tasks',
+        artifact_path_pattern: null,
+        description: 'Implementation task breakdown',
+        required_in_strict: true,
+      },
+    ],
     allowed_next_phases: ['4'],
   },
   '4': {
@@ -53,6 +87,14 @@ const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
     purpose: 'Review the plan for correctness, quality, and risk before build.',
     definition_of_done: ['Review recorded', 'Eval readiness decided when required'],
     required_artifacts: ['review'],
+    expected_artifacts: [
+      {
+        output_type: 'review',
+        artifact_path_pattern: null,
+        description: 'Guardian plan review and readiness decision',
+        required_in_strict: true,
+      },
+    ],
     allowed_next_phases: ['5'],
   },
   '5': {
@@ -61,6 +103,7 @@ const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
     purpose: 'Implement the approved specification.',
     definition_of_done: ['Implementation completed', 'Build/test obligations met'],
     required_artifacts: ['spec', 'tasks'],
+    expected_artifacts: NO_EXPECTED_ARTIFACTS,
     allowed_next_phases: ['6'],
   },
   '6': {
@@ -69,6 +112,14 @@ const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
     purpose: 'Run security and unit-test quality review before integration.',
     definition_of_done: ['Security review completed', 'Test quality evaluation completed', 'Eval run recorded when required'],
     required_artifacts: ['review'],
+    expected_artifacts: [
+      {
+        output_type: 'review',
+        artifact_path_pattern: null,
+        description: 'Reviewer security and test-quality review',
+        required_in_strict: true,
+      },
+    ],
     allowed_next_phases: ['7'],
   },
   '7': {
@@ -77,6 +128,7 @@ const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
     purpose: 'Validate build/runtime behavior and final integration correctness.',
     definition_of_done: ['Integration validation complete', 'Partial eval state resolved when required'],
     required_artifacts: ['spec', 'tasks'],
+    expected_artifacts: NO_EXPECTED_ARTIFACTS,
     allowed_next_phases: ['8'],
   },
   '8': {
@@ -85,6 +137,14 @@ const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
     purpose: 'Update docs and finalize implementation notes.',
     definition_of_done: ['Documentation notes recorded'],
     required_artifacts: ['documentation'],
+    expected_artifacts: [
+      {
+        output_type: 'documentation',
+        artifact_path_pattern: 'documentation-report\\.md$',
+        description: 'Documenter report artifact, conventionally documentation-report.md',
+        required_in_strict: true,
+      },
+    ],
     allowed_next_phases: ['9'],
   },
   '9': {
@@ -93,6 +153,14 @@ const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
     purpose: 'Prepare the feature for PR, archival, and completion.',
     definition_of_done: ['Release notes recorded', 'Feature artifacts archived via odin.archive_feature_release'],
     required_artifacts: ['release_notes'],
+    expected_artifacts: [
+      {
+        output_type: 'release_notes',
+        artifact_path_pattern: null,
+        description: 'Release notes and archive summary',
+        required_in_strict: true,
+      },
+    ],
     allowed_next_phases: ['10'],
   },
   '10': {
@@ -101,6 +169,7 @@ const PHASE_CONTRACTS: Record<PhaseId, PhaseContract> = {
     purpose: 'The feature is fully complete.',
     definition_of_done: ['Feature completed'],
     required_artifacts: [],
+    expected_artifacts: NO_EXPECTED_ARTIFACTS,
     allowed_next_phases: [],
   },
 };
@@ -113,13 +182,13 @@ const PHASE_AGENT_INSTRUCTIONS: Record<PhaseId, PhaseAgentInstructions> = {
   },
   '1': {
     name: 'product-agent',
-    role_summary: 'Create a product-ready PRD or exemption.',
-    constraints: ['Do not leak implementation details into the PRD.'],
+    role_summary: 'Create a product-ready PRD or exemption focused on user value and success boundaries.',
+    constraints: ['Do not leak implementation details into the PRD.', 'Leave technical constraints, system context, and implementation unknowns for Discovery.'],
   },
   '2': {
     name: 'discovery-agent',
-    role_summary: 'Gather concrete requirements and technical context.',
-    constraints: ['Read existing artifacts before adding new assumptions.'],
+    role_summary: 'Convert Product intent into technical requirements, constraints, existing-system context, and unknowns.',
+    constraints: ['Read existing Product artifacts before adding new assumptions.', 'Do not write implementation design or task breakdowns; that is Architect-owned.'],
   },
   '3': {
     name: 'architect-agent',

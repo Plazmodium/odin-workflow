@@ -33,3 +33,6 @@ Latest additive bundled migrations include:
 - `012_phase_execution_attestations.sql`
 - `013_phase_execution_attestations_repairs.sql`
 - `014_phase_prompt_realizations.sql`
+- `015_watcher_review_independence.sql`
+- `016_release_lifecycle.sql`
+- `017_phase_artifact_paths.sql`

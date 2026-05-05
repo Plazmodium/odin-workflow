@@ -27,6 +27,7 @@ export async function handleRecordPhaseArtifact(
     phase: input.phase,
     output_type: input.output_type,
     content: input.content,
+    artifact_path: input.artifact_path ?? null,
     created_by,
     created_at: new Date().toISOString(),
   });

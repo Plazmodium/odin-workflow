@@ -48,6 +48,52 @@ describe('handleSubmitClaim', () => {
     });
   });
 
+  it('merges structured evidence fields into persisted evidence refs', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => ({ id: 'FEAT-CLAIM', current_phase: '7' })),
+      findOpenAgentInvocation: vi.fn(async () => null),
+      submitClaim: vi.fn(async (claim) => ({
+        id: 'claim_1',
+        created_at: '2026-03-20T16:05:00.000Z',
+        ...claim,
+      })),
+    } as unknown as WorkflowStateAdapter;
+
+    const result = await handleSubmitClaim(adapter, {
+      feature_id: 'FEAT-CLAIM',
+      phase: '7',
+      claim_type: 'INTEGRATION_VERIFIED',
+      description: 'Integration verification passed',
+      evidence_refs: { legacy_key: 'legacy-value' },
+      evidence: {
+        command_outputs: ['npm test passed'],
+        file_paths: ['src/app.ts'],
+        artifact_ids: ['artifact_1'],
+        artifact_paths: ['specs/LG-013/integration-report.md'],
+        commit_hashes: ['abc123'],
+        pr_urls: ['https://github.com/org/repo/pull/1'],
+        verification_summaries: ['Integration endpoint returned 200.'],
+      },
+      risk_level: 'MEDIUM',
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(adapter.submitClaim).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evidence_refs: {
+          legacy_key: 'legacy-value',
+          command_outputs: ['npm test passed'],
+          file_paths: ['src/app.ts'],
+          artifact_ids: ['artifact_1'],
+          artifact_paths: ['specs/LG-013/integration-report.md'],
+          commit_hashes: ['abc123'],
+          pr_urls: ['https://github.com/org/repo/pull/1'],
+          verification_summaries: ['Integration endpoint returned 200.'],
+        },
+      })
+    );
+  });
+
   it('rejects claims from non-watched phases', async () => {
     const adapter: WorkflowStateAdapter = {
       getFeature: vi.fn(async () => ({ id: 'FEAT-CLAIM', current_phase: '4' })),

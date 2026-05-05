@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.8.0-beta] - 2026-05-05
+
+### Added
+
+- Runtime attestation strict mode can now elevate configured phase execution and prompt-realization warnings into hard phase-completion gates, with an explicit override reason for deliberate exceptions.
+- `odin.submit_claim` now accepts structured evidence fields for command outputs, file paths, artifact references, commit hashes, PR URLs, and verification summaries.
+- Watcher reviews now persist independence metadata and strict mode blocks same-session watcher PASS results unless an override reason is supplied.
+- Release lifecycle metadata now distinguishes handoff, human merge, and closeout, with `odin.record_release_closeout` as the explicit closeout path.
+- Phase artifacts now accept optional `artifact_path` metadata, expected completion artifacts can warn/block by phase, and `odin.complete_phase_bundle` can record artifacts/evals/claims/checks plus the phase result in one validated operation.
+
+### Changed
+
+- `odin init` now skips broad managed asset sync by default; use `--sync-managed-assets` to copy packaged `.odin/ODIN.md`, agent definitions, and skills into a target project.
+- Product and Discovery contracts now define the boundary between Product intent, technical discovery, and Architect-owned implementation design more explicitly.
+
 ## [0.7.0-beta] - 2026-05-05
 
 ### Fixed

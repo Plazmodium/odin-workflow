@@ -221,7 +221,7 @@ Odin is in active beta. The core workflow and MCP tools are usable today, while 
 What works today:
 
 - 11-phase workflow with sequential phase transitions
-- `odin.start_feature`, `odin.prepare_phase_context`, `odin.record_phase_artifact`, `odin.record_phase_result`, and related workflow tools
+- `odin.start_feature`, `odin.prepare_phase_context`, `odin.record_phase_artifact`, `odin.complete_phase_bundle`, `odin.record_phase_result`, and related workflow tools
 - `odin.apply_migrations` for packaged schema setup
 - Supabase-backed workflow state for persistent runs
 - dashboard support for feature, claim, learning, and eval visibility

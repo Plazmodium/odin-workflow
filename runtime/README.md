@@ -35,13 +35,11 @@ Important:
 ## What `init` Creates
 
 - `.odin/config.yaml` - runtime configuration
-- `.odin/ODIN.md` - workflow instructions for your AI agent
-- `.odin/agents/definitions/` - copied phase-agent prompt definitions
-- `.odin/skills/` - project-local skill overrides
+- `.odin/skills/.gitkeep` - placeholder for project-local skill overrides
 - `.env.example` - environment template
 - your MCP config file when auto-config is supported for that tool
 
-Odin writes all of those files into the target project root.
+Odin does not copy broad managed workflow assets by default. Run `odin init --sync-managed-assets` when you intentionally want packaged `.odin/ODIN.md`, `.odin/agents/definitions/`, and built-in skills copied into the target project for local overrides or inspection.
 
 ## After `init`
 
@@ -243,8 +241,9 @@ These are the runtime calls most users notice first:
 | `odin.start_feature` | Record a feature in the workflow |
 | `odin.get_next_phase` | Ask what should happen next |
 | `odin.prepare_phase_context` | Build the next phase bundle for the agent |
-| `odin.record_phase_artifact` | Save phase outputs |
+| `odin.record_phase_artifact` | Save phase outputs, optionally with `artifact_path` metadata |
 | `odin.record_phase_result` | Advance or block the phase |
+| `odin.complete_phase_bundle` | Record artifacts/evals/claims/checks and phase result in one validated operation |
 | `odin.run_review_checks` | Run review/security checks |
 | `odin.get_feature_status` | Inspect workflow status |
 

@@ -1,6 +1,7 @@
 import { getPhaseAgentInstructions, getPhaseExecutionContract } from './phases.js';
 
 import type {
+  AttestationPolicyConfig,
   PhaseId,
   PhasePromptManifest,
   PhasePromptRealizationAttestation,
@@ -72,6 +73,19 @@ function defaultRow(phase: PhaseId, expected_manifest: PhasePromptManifest | nul
   };
 }
 
+function resolveEffectivePromptRealizationPolicy(
+  phase: PhaseId,
+  base_policy: PromptRealizationPolicy,
+  attestation_config?: Partial<AttestationPolicyConfig>,
+): PromptRealizationPolicy {
+  if (attestation_config?.mode !== 'strict') {
+    return base_policy;
+  }
+
+  const required_phases = attestation_config.require_prompt_realization_phases ?? ['5', '6', '7', '9'];
+  return required_phases.includes(phase) ? 'phase_bundle_required' : base_policy;
+}
+
 function hasPromptBundleProof(row: PhasePromptRealizationStatusRow): boolean {
   return (
     row.actual_mode === 'subagent' &&
@@ -93,14 +107,21 @@ export function buildPromptRealizationStatusRow(
   phase: PhaseId,
   expected_manifest: PhasePromptManifest | null,
   attestation: PhasePromptRealizationAttestation | null,
+  attestation_config?: Partial<AttestationPolicyConfig>,
 ): PhasePromptRealizationStatusRow {
   const row = defaultRow(phase, expected_manifest);
+  const prompt_realization_policy = resolveEffectivePromptRealizationPolicy(
+    phase,
+    row.prompt_realization_policy,
+    attestation_config,
+  );
   if (attestation == null) {
-    return row;
+    return { ...row, prompt_realization_policy };
   }
 
   return {
     ...row,
+    prompt_realization_policy,
     attested_manifest_id: attestation.manifest_id,
     actual_mode: attestation.actual_mode,
     proof_status: attestation.proof_status,
@@ -120,8 +141,9 @@ export function assessPromptRealizationPolicy(
   phase: PhaseId,
   expected_manifest: PhasePromptManifest | null,
   attestation: PhasePromptRealizationAttestation | null,
+  attestation_config?: Partial<AttestationPolicyConfig>,
 ): PromptRealizationAssessment {
-  const row = buildPromptRealizationStatusRow(phase, expected_manifest, attestation);
+  const row = buildPromptRealizationStatusRow(phase, expected_manifest, attestation, attestation_config);
 
   if (row.prompt_realization_policy === 'phase_bundle_optional') {
     return { row, warning: null, error: null };

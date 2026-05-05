@@ -63,6 +63,12 @@ describe('handleRecordReleaseHandoff', () => {
         ended_at: '2026-04-02T00:05:00.000Z',
         duration_ms: 300000,
       })),
+      recordReleaseHandoff: vi.fn(async () => ({
+        feature_id: 'FEAT-RELEASE',
+        handoff_created_at: '2026-04-02T00:05:00.000Z',
+        handoff_created_by: 'ralph-loop',
+        handoff_summary: 'Release handoff prepared by Ralph Loop.',
+      })),
       recordAuditEvent: vi.fn(async () => undefined),
     } as unknown as WorkflowStateAdapter;
 
@@ -106,6 +112,12 @@ describe('handleRecordReleaseHandoff', () => {
         started_at: '2026-04-02T00:00:00.000Z',
         ended_at: '2026-04-02T00:05:00.000Z',
         duration_ms: 300000,
+      })),
+      recordReleaseHandoff: vi.fn(async () => ({
+        feature_id: 'FEAT-RELEASE',
+        handoff_created_at: '2026-04-02T00:05:00.000Z',
+        handoff_created_by: 'ralph-loop',
+        handoff_summary: 'Release handoff prepared by Ralph Loop.',
       })),
       recordAuditEvent: vi.fn(async () => undefined),
     } as unknown as WorkflowStateAdapter;

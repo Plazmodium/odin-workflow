@@ -21,6 +21,7 @@ import type {
   PhasePromptRealizationAttestation,
   PhaseResultRecord,
   QualityGateRecord,
+  ReleaseLifecycleRecord,
   RelatedLearningRecord,
   ReviewCheckRecord,
   ReviewFinding,
@@ -66,6 +67,7 @@ export interface WorkflowStateAdapter {
   listOpenFindings(feature_id: string): Promise<string[]>;
   listPendingClaims(feature_id: string): Promise<string[]>;
   listClaimVerificationStatus(feature_id: string): Promise<ClaimVerificationSummary[]>;
+  getClaim(claim_id: string): Promise<AgentClaimRecord | null>;
   submitClaim(claim: Omit<AgentClaimRecord, 'id' | 'created_at'>): Promise<AgentClaimRecord>;
   runPolicyChecks(feature_id: string): Promise<PolicyCheckResult[]>;
   listClaimsNeedingReview(feature_id?: string): Promise<WatcherQueueClaim[]>;
@@ -89,6 +91,8 @@ export interface WorkflowStateAdapter {
   recordCommit(commit: Omit<FeatureCommitRecord, 'committed_at'>): Promise<FeatureCommitRecord>;
   recordPullRequest(feature_id: string, pr_url: string, pr_number: number): Promise<{ feature_id: string; pr_url: string; pr_number: number }>;
   recordMerge(feature_id: string, merged_by: string): Promise<{ feature_id: string; merged_at: string; merged_by: string; pr_url?: string; pr_number?: number }>;
+  recordReleaseHandoff(feature_id: string, summary: string, created_by: string): Promise<ReleaseLifecycleRecord>;
+  recordReleaseCloseout(feature_id: string, summary: string, created_by: string): Promise<ReleaseLifecycleRecord>;
   recordAuditEvent(feature_id: string | null, operation: string, agent_name: string, details?: Record<string, unknown>): Promise<void>;
   recordQualityGate(
     feature_id: string,

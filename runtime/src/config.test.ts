@@ -38,6 +38,52 @@ describe('loadRuntimeConfig automation defaults', () => {
       kill_switch: false,
       merge_strategy: 'squash',
     });
+    expect(config.attestation).toEqual({
+      mode: 'advisory',
+      require_execution_phases: ['5', '6', '7', '9'],
+      require_prompt_realization_phases: ['5', '6', '7', '9'],
+    });
+  });
+
+  it('loads strict attestation config and rejects invalid phase ids', () => {
+    const dir = createTmpDir();
+    created_dirs.push(dir);
+    const odin_dir = join(dir, '.odin');
+    mkdirSync(odin_dir, { recursive: true });
+
+    writeFileSync(
+      join(odin_dir, 'config.yaml'),
+      [
+        'runtime:',
+        '  mode: in_memory',
+        'attestation:',
+        '  mode: strict',
+        '  require_execution_phases: ["5", "9"]',
+        '  require_prompt_realization_phases: ["5"]',
+      ].join('\n'),
+      'utf8'
+    );
+
+    const config = loadRuntimeConfig(dir);
+    expect(config.attestation).toEqual({
+      mode: 'strict',
+      require_execution_phases: ['5', '9'],
+      require_prompt_realization_phases: ['5'],
+    });
+
+    writeFileSync(
+      join(odin_dir, 'config.yaml'),
+      [
+        'runtime:',
+        '  mode: in_memory',
+        'attestation:',
+        '  mode: strict',
+        '  require_execution_phases: ["11"]',
+      ].join('\n'),
+      'utf8'
+    );
+
+    expect(() => loadRuntimeConfig(dir)).toThrow('attestation.require_execution_phases');
   });
 
   it('rejects unsupported auto_merge mode explicitly', () => {

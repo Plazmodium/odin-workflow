@@ -1,6 +1,7 @@
 import { getPhaseAgentInstructions, getPhaseExecutionContract } from './phases.js';
 
 import type {
+  AttestationPolicyConfig,
   PhaseExecutionAttestation,
   PhaseExecutionMode,
   PhaseExecutionPolicy,
@@ -60,6 +61,19 @@ function defaultRow(phase: PhaseId): PhaseExecutionStatusRow {
   };
 }
 
+function resolveEffectiveExecutionPolicy(
+  phase: PhaseId,
+  base_policy: PhaseExecutionPolicy,
+  attestation_config?: Partial<AttestationPolicyConfig>,
+): PhaseExecutionPolicy {
+  if (attestation_config?.mode !== 'strict') {
+    return base_policy;
+  }
+
+  const required_phases = attestation_config.require_execution_phases ?? ['5', '6', '7', '9'];
+  return required_phases.includes(phase) ? 'distinct_session_required' : base_policy;
+}
+
 function hasDistinctSessionProof(row: PhaseExecutionStatusRow): boolean {
   return (
     row.actual_mode === 'subagent' &&
@@ -73,14 +87,17 @@ function hasDistinctSessionProof(row: PhaseExecutionStatusRow): boolean {
 export function buildPhaseExecutionStatusRow(
   phase: PhaseId,
   attestation: PhaseExecutionAttestation | null,
+  attestation_config?: Partial<AttestationPolicyConfig>,
 ): PhaseExecutionStatusRow {
   const row = defaultRow(phase);
+  const execution_policy = resolveEffectiveExecutionPolicy(phase, row.execution_policy, attestation_config);
   if (attestation == null) {
-    return row;
+    return { ...row, execution_policy };
   }
 
   return {
     ...row,
+    execution_policy,
     actual_mode: attestation.actual_mode,
     proof_status: attestation.proof_status,
     attested_by: attestation.attested_by,
@@ -94,8 +111,9 @@ export function buildPhaseExecutionStatusRow(
 export function assessPhaseExecutionPolicy(
   phase: PhaseId,
   attestation: PhaseExecutionAttestation | null,
+  attestation_config?: Partial<AttestationPolicyConfig>,
 ): PhaseExecutionPolicyAssessment {
-  const row = buildPhaseExecutionStatusRow(phase, attestation);
+  const row = buildPhaseExecutionStatusRow(phase, attestation, attestation_config);
 
   if (row.execution_policy === 'inline_allowed') {
     return { row, warning: null, error: null };
@@ -125,10 +143,11 @@ export function assessPhaseExecutionPolicy(
 
 export function summarizePhaseExecutionStatus(
   attestations: PhaseExecutionAttestation[],
+  attestation_config?: Partial<AttestationPolicyConfig>,
 ): PhaseExecutionStatusSummary {
   const rows = EXECUTION_AUDIT_PHASES.map((phase) => {
     const attestation = attestations.find((entry) => entry.phase === phase) ?? null;
-    return buildPhaseExecutionStatusRow(phase, attestation);
+    return buildPhaseExecutionStatusRow(phase, attestation, attestation_config);
   });
 
   const preferred_without_distinct_session = rows

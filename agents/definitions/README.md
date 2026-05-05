@@ -9,8 +9,8 @@ This is internal workflow reference material. You do not need to read this READM
 | Agent | Phase | File | Description |
 |-------|-------|------|-------------|
 | Planning | 0 | `planning.md` | Epic decomposition into features (L3 only) |
-| **Product** | 1 | `product.md` | PRD generation with complexity-gated templates (NEW in v2) |
-| Discovery | 2 | `discovery.md` | Requirements gathering via stakeholder interviews |
+| **Product** | 1 | `product.md` | User value, success criteria, non-goals, and failure shape |
+| Discovery | 2 | `discovery.md` | Technical requirements, constraints, context, unknowns, and scenarios |
 | Architect | 3 | `architect.md` | Technical specification drafting + opt-in formal design verification |
 | Guardian | 4 | `guardian.md` | Multi-perspective review of PRD + spec + proof results |
 | Builder | 5 | `builder.md` | Code implementation (emits claims, watched) |
@@ -66,7 +66,7 @@ This is internal workflow reference material. You do not need to read this READM
 
 ### Product Agent (Phase 1)
 
-The Product agent generates a Product Requirements Document (PRD) **before** the technical spec. This ensures business requirements are captured before diving into technical details.
+The Product agent generates a Product Requirements Document (PRD) **before** technical discovery and specification. It owns user value, target users, success criteria, non-goals, and user-visible failure shape.
 
 **Key Features:**
 - **Complexity-gated templates:**
@@ -74,7 +74,12 @@ The Product agent generates a Product Requirements Document (PRD) **before** the
   - L2 (Feature): PRD_LITE — 1-page template
   - L3 (Epic): PRD_FULL — Complete PRD with user journeys, NFRs, rollout plan
 - **Max 1 clarification round** — if unresolved, creates blocker
-- **No implementation details** — PRD focuses on "what", not "how"
+- **No implementation details** — PRD focuses on "why", "who", success boundaries, and failure shape
+- **Discovery handoff** — technical constraints, existing-system context, and unknowns are deferred to Phase 2
+
+### Discovery Agent (Phase 2)
+
+The Discovery agent converts Product intent into technical requirements, constraints, existing-system context, unknowns, and eval-relevant should/should-not scenarios. It does not choose the architecture or create the task breakdown; those are Architect responsibilities.
 
 ### Reviewer Agent (Phase 6)
 

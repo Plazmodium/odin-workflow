@@ -194,8 +194,8 @@ Development Evals are a workflow track for defining and checking behavior before
 
 ### Phase Responsibilities
 
-- **Product**: define success, non-goals, and failure shape
-- **Discovery**: collect happy-path, edge, failure, and should-not-trigger scenarios
+- **Product**: define user value, success criteria, non-goals, and user-visible failure shape; do not design the implementation
+- **Discovery**: convert Product intent into technical requirements, constraints, existing-system context, unknowns, and should/should-not scenarios
 - **Architect**: record `eval_plan` when required
 - **Guardian**: decide `eval_readiness`
 - **Builder**: keep regression/acceptance coverage in sync with the work

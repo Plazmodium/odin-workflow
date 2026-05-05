@@ -24,6 +24,7 @@ import type {
   PhasePromptRealizationAttestation,
   PhaseResultRecord,
   QualityGateRecord,
+  ReleaseLifecycleRecord,
   RelatedLearningRecord,
   ReviewCheckRecord,
   ReviewFinding,
@@ -92,12 +93,16 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
 
   async recordPhaseArtifact(artifact: PhaseArtifact): Promise<PhaseArtifact> {
     const existing = this.artifacts.get(artifact.feature_id) ?? [];
+    const record = {
+      ...artifact,
+      artifact_path: artifact.artifact_path ?? null,
+    };
     const filtered = existing.filter(
       (current) => !(current.phase === artifact.phase && current.output_type === artifact.output_type)
     );
-    this.artifacts.set(artifact.feature_id, [...filtered, artifact]);
+    this.artifacts.set(artifact.feature_id, [...filtered, record]);
     this.touchFeature(artifact.feature_id);
-    return artifact;
+    return record;
   }
 
   async listPhaseArtifacts(feature_id: string): Promise<PhaseArtifact[]> {
@@ -247,6 +252,10 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
         final_status,
       };
     });
+  }
+
+  async getClaim(claim_id: string): Promise<AgentClaimRecord | null> {
+    return this.findClaim(claim_id);
   }
 
   async submitClaim(claim: Omit<AgentClaimRecord, 'id' | 'created_at'>): Promise<AgentClaimRecord> {
@@ -523,6 +532,48 @@ export class InMemoryWorkflowStateAdapter implements WorkflowStateAdapter {
       merged_by,
       pr_url: feature?.pr_url,
       pr_number: feature?.pr_number,
+    };
+  }
+
+  async recordReleaseHandoff(feature_id: string, summary: string, created_by: string): Promise<ReleaseLifecycleRecord> {
+    const handoff_created_at = new Date().toISOString();
+    const feature = this.features.get(feature_id);
+    if (feature != null) {
+      this.features.set(feature_id, {
+        ...feature,
+        release_handoff_at: handoff_created_at,
+        release_handoff_by: created_by,
+        release_handoff_summary: summary,
+        updated_at: handoff_created_at,
+      });
+    }
+
+    return {
+      feature_id,
+      handoff_created_at,
+      handoff_created_by: created_by,
+      handoff_summary: summary,
+    };
+  }
+
+  async recordReleaseCloseout(feature_id: string, summary: string, created_by: string): Promise<ReleaseLifecycleRecord> {
+    const closeout_created_at = new Date().toISOString();
+    const feature = this.features.get(feature_id);
+    if (feature != null) {
+      this.features.set(feature_id, {
+        ...feature,
+        release_closeout_at: closeout_created_at,
+        release_closeout_by: created_by,
+        release_closeout_summary: summary,
+        updated_at: closeout_created_at,
+      });
+    }
+
+    return {
+      feature_id,
+      closeout_created_at,
+      closeout_created_by: created_by,
+      closeout_summary: summary,
     };
   }
 

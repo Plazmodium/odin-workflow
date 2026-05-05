@@ -52,6 +52,8 @@ export async function handleRecordReleaseHandoff(
     await adapter.completeAgentInvocation(invocation_id);
   }
 
+  const handoff = await adapter.recordReleaseHandoff(input.feature_id, input.summary, actor);
+
   await adapter.recordAuditEvent(input.feature_id, 'RELEASE_HANDOFF_RECORDED', actor, {
     summary: input.summary,
     pr_url: feature.pr_url,
@@ -65,6 +67,7 @@ export async function handleRecordReleaseHandoff(
     {
       feature: refreshed,
       handoff: {
+        ...handoff,
         summary: input.summary,
         pr_url: feature.pr_url,
         pr_number: feature.pr_number,

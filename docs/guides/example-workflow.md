@@ -80,8 +80,8 @@ The exact content depends on your feature, but the flow normally looks like this
 1. confirm the feature exists and inspect the next phase
 2. use the phase guidance from `.odin/ODIN.md`
 3. produce the phase output
-4. record the artifact with `odin.record_phase_artifact`
-5. close or block the phase with `odin.record_phase_result`
+4. record artifacts/evals/claims individually, or use `odin.complete_phase_bundle` for one validated completion call
+5. close or block the phase with `odin.record_phase_result` when not using the bundle tool
 6. move to the next phase
 
 For a normal feature, that means:
