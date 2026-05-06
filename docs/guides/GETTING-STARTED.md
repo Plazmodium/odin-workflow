@@ -57,7 +57,7 @@ your-project/
 └── opencode.json         # OpenCode only when auto-written
 ```
 
-Odin does not copy broad managed workflow assets by default. Run `odin init --sync-managed-assets` only when you intentionally want packaged `.odin/ODIN.md`, `.odin/agents/definitions/`, and built-in skills copied locally.
+Odin does not copy broad managed workflow assets by default. Run `npx -y @plazmodium/odin init --sync-managed-assets` only when you intentionally want packaged `.odin/ODIN.md`, `.odin/agents/definitions/`, and built-in skills copied locally.
 
 What the main files are for:
 

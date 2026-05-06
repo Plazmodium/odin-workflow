@@ -78,20 +78,63 @@ Expected: one row with `public = false`.
 ### Quick SQL Checks
 
 ```sql
--- 1. Check tables are present
-SELECT COUNT(*) AS table_count
-FROM information_schema.tables
-WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
+-- 1. Check required Odin tables. Expected: no rows.
+WITH expected(name) AS (
+  VALUES
+    ('features'),
+    ('phase_outputs'),
+    ('agent_claims'),
+    ('watcher_reviews'),
+    ('phase_execution_attestations'),
+    ('phase_prompt_realizations'),
+    ('skill_proposal_candidates'),
+    ('skill_proposals')
+), actual(name) AS (
+  SELECT table_name::text
+  FROM information_schema.tables
+  WHERE table_schema = 'public'
+    AND table_type = 'BASE TABLE'
+)
+SELECT expected.name AS missing_table
+FROM expected
+LEFT JOIN actual USING (name)
+WHERE actual.name IS NULL;
 
--- 2. Check views are present
-SELECT COUNT(*) AS view_count
-FROM information_schema.views
-WHERE table_schema = 'public';
+-- 2. Check required Odin views. Expected: no rows.
+WITH expected(name) AS (
+  VALUES
+    ('v_active_features'),
+    ('feature_health_overview'),
+    ('latest_system_health'),
+    ('v_recent_archives')
+), actual(name) AS (
+  SELECT table_name::text
+  FROM information_schema.views
+  WHERE table_schema = 'public'
+)
+SELECT expected.name AS missing_view
+FROM expected
+LEFT JOIN actual USING (name)
+WHERE actual.name IS NULL;
 
--- 3. Check functions are present
-SELECT COUNT(*) AS function_count
-FROM information_schema.routines
-WHERE routine_schema = 'public' AND routine_type = 'FUNCTION';
+-- 3. Check required Odin functions. Expected: no rows.
+WITH expected(name) AS (
+  VALUES
+    ('complete_feature'),
+    ('get_feature_status'),
+    ('record_phase_output'),
+    ('record_watcher_review'),
+    ('replace_skill_proposal_candidates')
+), actual(name) AS (
+  SELECT DISTINCT routine_name::text
+  FROM information_schema.routines
+  WHERE routine_schema = 'public'
+    AND routine_type = 'FUNCTION'
+)
+SELECT expected.name AS missing_function
+FROM expected
+LEFT JOIN actual USING (name)
+WHERE actual.name IS NULL;
 
 -- 4. Check batch_templates seeded (expect 5 rows)
 SELECT COUNT(*) AS template_count FROM batch_templates;
