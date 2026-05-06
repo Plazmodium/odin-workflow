@@ -70,4 +70,3 @@ reviews:
 #   - "!**/*.lock"
 #   - "!**/generated/**"
 #   - "!**/__snapshots__/**"
-

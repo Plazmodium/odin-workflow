@@ -332,7 +332,7 @@ function relativeAssetPath(assetRoot: string, file: string): string {
   return file.slice(assetRoot.length + 1).replace(/\\/g, '/');
 }
 
-function resolveAssetRoot(): string {
+function resolveAssetRoot(requiredPaths: readonly string[]): string {
   const currentFile = fileURLToPath(import.meta.url);
   const packageRoot = resolve(dirname(currentFile), '..');
   const candidates = [
@@ -341,9 +341,13 @@ function resolveAssetRoot(): string {
     join(packageRoot, '..'),
   ];
 
-  const found = candidates.find((candidate) => existsSync(join(candidate, 'ODIN.md')) && existsSync(join(candidate, 'agents')));
+  const found = candidates.find((candidate) =>
+    requiredPaths.every((requiredPath) => existsSync(join(candidate, requiredPath)))
+  );
   if (found == null) {
-    throw new Error(`Could not resolve packaged Odin assets. Checked: ${candidates.join(', ')}.`);
+    throw new Error(
+      `Could not resolve packaged Odin assets with required paths (${requiredPaths.join(', ')}). Checked: ${candidates.join(', ')}.`
+    );
   }
 
   return found;
@@ -408,14 +412,14 @@ function collectManagedDirectoryTargets(sourceRoot: string, targetPrefix: string
 }
 
 function ensureWorkflowGuide(projectRoot: string, force: boolean): ManagedAssetSyncResult {
-  const assetRoot = resolveAssetRoot();
+  const assetRoot = resolveAssetRoot(['ODIN.md']);
   return syncManagedFiles(projectRoot, force, [
     { source: join(assetRoot, 'ODIN.md'), managedPath: '.odin/ODIN.md' },
   ]);
 }
 
 function ensureManagedAssets(projectRoot: string, force: boolean): ManagedAssetSyncResult {
-  const assetRoot = resolveAssetRoot();
+  const assetRoot = resolveAssetRoot(['ODIN.md', 'agents/definitions', 'agents/skills']);
   return syncManagedFiles(projectRoot, force, [
     ...collectManagedDirectoryTargets(join(assetRoot, 'agents', 'definitions'), '.odin/agents/definitions'),
     ...collectManagedDirectoryTargets(join(assetRoot, 'agents', 'skills'), '.odin/skills'),

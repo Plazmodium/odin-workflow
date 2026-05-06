@@ -2,7 +2,7 @@
 
 /**
  * Odin MCP Runtime
- * Version: 0.1.0
+ * Version: 0.8.1-beta
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
