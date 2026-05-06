@@ -9,7 +9,7 @@ export const FEATURE_STATUSES = ['IN_PROGRESS', 'BLOCKED', 'COMPLETED', 'CANCELL
 
 export const PHASE_OUTCOMES = ['completed', 'blocked', 'needs_rework'] as const;
 
-export const REVIEW_TOOLS = ['semgrep'] as const;
+export const REVIEW_TOOLS = ['semgrep', 'docs_process'] as const;
 
 export const REVIEW_CHECK_STATUSES = ['queued', 'passed', 'failed'] as const;
 
@@ -92,6 +92,11 @@ export const PROMPT_REALIZATION_POLICIES = [
 ] as const;
 export const PROMPT_REALIZATION_PROOF_STATUSES = ['none', 'bundle_attested', 'bundle_verified'] as const;
 export const ATTESTATION_MODES = ['advisory', 'strict'] as const;
+export const PHASE_AGENT_READINESS_STATUSES = [
+  'not_required',
+  'blocked_missing_agent_proof',
+  'ready_for_full_odin',
+] as const;
 
 export type PhaseId = (typeof PHASE_IDS)[number];
 export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
@@ -120,6 +125,7 @@ export type PhaseExecutionAttestationSource = (typeof PHASE_EXECUTION_ATTESTATIO
 export type PromptRealizationPolicy = (typeof PROMPT_REALIZATION_POLICIES)[number];
 export type PromptRealizationProofStatus = (typeof PROMPT_REALIZATION_PROOF_STATUSES)[number];
 export type AttestationMode = (typeof ATTESTATION_MODES)[number];
+export type PhaseAgentReadinessStatus = (typeof PHASE_AGENT_READINESS_STATUSES)[number];
 
 export interface AttestationPolicyConfig {
   mode: AttestationMode;
@@ -646,6 +652,32 @@ export interface PhaseExecutionContract {
   prompt_sections: PhasePromptSection[];
 }
 
+export interface PhaseAgentReadiness {
+  attestation_mode: AttestationMode;
+  status: PhaseAgentReadinessStatus;
+  full_odin_required: boolean;
+  can_record_phase_work: boolean;
+  missing: Array<'execution_attestation' | 'prompt_realization'>;
+  next_actions: string[];
+  execution: {
+    actual_mode: PhaseExecutionMode | null;
+    proof_status: PhaseExecutionProofStatus;
+    supervisor_session_id: string | null;
+    worker_session_id: string | null;
+    warning: string | null;
+    error: string | null;
+  } | null;
+  prompt_realization: {
+    actual_mode: PhasePromptRealizationAttestation['actual_mode'] | null;
+    proof_status: PromptRealizationProofStatus;
+    manifest_match: boolean;
+    attested_manifest_id: string | null;
+    expected_manifest_id: string | null;
+    warning: string | null;
+    error: string | null;
+  } | null;
+}
+
 export interface PhaseContextBundle {
   feature: FeatureRecord;
   phase: PhaseContract;
@@ -658,6 +690,7 @@ export interface PhaseContextBundle {
     started_at: string;
     skills_used: string[];
   } | null;
+  phase_agent_readiness: PhaseAgentReadiness;
   workflow: {
     open_blockers: string[];
     open_gates: string[];

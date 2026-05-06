@@ -14,7 +14,7 @@ This file contains common patterns and references shared across all SDD agents. 
 | 3 | Architect | Architect | No | Specification drafting |
 | 4 | Guardian | Guardian | No | PRD + Spec review |
 | 5 | Builder | Builder | **YES** | Implementation |
-| 6 | Reviewer | Reviewer | No | SAST/security scan |
+| 6 | Reviewer | Reviewer | No | Review checks |
 | 7 | Integrator | Integrator | **YES** | Build verification |
 | 8 | Documenter | Documenter | No | Documentation |
 | 9 | Release | Release | **YES** | PR creation + archival |
@@ -41,7 +41,12 @@ If the harness exposes execution guidance, keep these distinctions straight:
 - `recommended_mode` = harness guidance
 - `execution_policy` = runtime enforcement level
 - invocation lifecycle telemetry = timing/ownership bookkeeping, not distinct-session proof
+- `odin.record_phase_agent_launch(...)` = launch intent/provenance, or explicit reduced-fidelity inline execution
 - `odin.register_phase_execution(...)` = attested proof of actual mode plus supervisor/worker session linkage
+- `odin.register_phase_realization(...)` = proof that the worker prompt was built from the canonical Odin phase bundle
+- `odin.record_phase_skills_applied(...)` = skills actually used during work; resolved skills in context are not proof of use
+
+In strict mode, `context.phase_agent_readiness.can_record_phase_work` can be `false`. The orchestrator must launch the canonical phase agent or realized subagent prompt, record the required execution/realization proof, and retry `odin.prepare_phase_context(...)` before recording artifacts, evals, review checks, or watched claims.
 
 ---
 
@@ -53,10 +58,17 @@ Every agent artifact must end with this section when the parent session needs to
 ---
 ## State Changes Required
 
-### 1. Submit Claims (if watched agent: Builder, Integrator, Release)
+### 1. Record Phase Artifact
+- **Feature ID**: [ID]
+- **Phase**: [0-10]
+- **Output Type**: [prd | requirements | spec | review | documentation | release_notes | other]
+- **Artifact Path**: [if written locally]
+- **Created By**: [Agent name]
+
+### 2. Submit Claims (if watched agent: Builder, Integrator, Release)
 [Include structured claims with type, description, risk level, evidence refs]
 
-### 2. Record Phase Result (if phase work is complete, blocked, or needs rework)
+### 3. Record Phase Result (if phase work is complete, blocked, or needs rework)
 - **Feature ID**: [ID]
 - **Phase**: [0-10]
 - **Outcome**: `completed` | `blocked` | `needs_rework`
@@ -65,20 +77,27 @@ Every agent artifact must end with this section when the parent session needs to
 - **Next Phase**: [Optional next phase]
 - **Blockers**: [Optional blocker list]
 
-### 3. Record Development Eval Artifact (if applicable)
+### 4. Record Development Eval (if applicable)
 - **Feature ID**: [ID]
 - **Phase**: [N]
-- **Output Type**: `eval_plan` | `eval_run`
+- **Runtime Call**: `odin.record_eval_plan` | `odin.record_eval_run`
 - **Created By**: [Agent name]
 
-### 4. Record Quality Gate (if applicable)
+### 5. Record Skills Applied
+- **Feature ID**: [ID]
+- **Phase**: [N]
+- **Agent Name**: [Agent name]
+- **Skills Applied**: [skill ids actually used]
+- **Fallback Used / No Applicable Skill**: [if relevant]
+
+### 6. Record Quality Gate (if applicable)
 - **Feature ID**: [ID]
 - **Gate Name**: `eval_readiness` | [other gate]
 - **Status**: `APPROVED` | `REJECTED`
 - **Approver**: [Agent name]
 - **Notes**: [Why]
 
-### 5. Create Blocker (if applicable)
+### 7. Create Blocker (if applicable)
 - **Blocker Type**: [SPEC_AMBIGUITY | MISSING_CONTEXT | TECHNICAL_IMPOSSIBILITY | EXTERNAL_DEPENDENCY | INTEGRATION_CONFLICT | DURATION_EXCEEDED | ITERATION_LIMIT_EXCEEDED | QUALITY_GATE_REJECTED | OTHER]
 - **Phase**: [N]
 - **Severity**: [LOW | MEDIUM | HIGH | CRITICAL]
@@ -116,7 +135,7 @@ Agent work duration is tracked automatically by the runtime-managed invocation l
 ### Escalation Triggers (Any One Triggers LLM Watcher)
 
 - Claim marked `HIGH` risk
-- Evidence refs missing or empty
+- Evidence refs missing or empty in advisory mode; strict mode can reject evidence-free watched claims at submission
 - Policy check inconclusive
 
 ### Claim Format
@@ -180,6 +199,8 @@ Some phases also require workflow skills:
 
 Always follow patterns, conventions, and best practices from your injected skills.
 
+Before completion, document `odin.record_phase_skills_applied(...)` with the skills you actually used. If no domain-specific skill applied, mark `fallback_used` or `no_applicable_skill` instead of pretending a skill was used.
+
 ---
 
 ## Development Evals — Additive Verification
@@ -218,9 +239,9 @@ If Development Evals pass but one of the existing review steps fails, the featur
 
 If your harness does not give the child direct `odin.*` access, document these state changes for the parent session to proxy when relevant:
 
-- `odin.record_phase_artifact({ output_type: "eval_plan", ... })`
+- `odin.record_eval_plan({ ... })`
 - `odin.record_quality_gate({ gate_name: "eval_readiness", ... })`
-- `odin.record_phase_artifact({ output_type: "eval_run", ... })`
+- `odin.record_eval_run({ ... })`
 
 ---
 
@@ -293,7 +314,7 @@ PR merging is ALWAYS a human decision. This applies to ALL agents with git/gh ac
 
 - **Release agent**: Reads `context.automation` first. In `guarded`, it prepares PR handoff for a human. In `auto_pr`, it may create the PR via `gh pr create`, record PR URL via `odin.record_pr()`, then STOP.
 - **Human**: Reviews, approves, and merges the PR
-- **After merge**: Human (or agent on instruction) calls `odin.record_merge()` to update merge tracking, then `odin.record_release_closeout()` completes Release metadata and phase 9 -> 10 closeout
+- **After merge**: Human (or agent on instruction) calls `odin.record_merge()` to move release state to `merged`, then `odin.record_release_closeout()` completes Release metadata and phase 9 -> 10 closeout
 
 ---
 
@@ -371,7 +392,7 @@ Before each phase, the orchestrator MUST:
 
 ## What ALL Agents Must NOT Do
 
-- Try to call MCP tools directly (you don't have access)
+- Try to call MCP tools directly when your harness did not give you access
 - Skip documenting State Changes Required
 - Proceed without skills loaded
 - **Skip phases** — all 11 phases must execute, even for L1 tasks (see above)

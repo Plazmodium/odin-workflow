@@ -79,10 +79,12 @@ The exact content depends on your feature, but the flow normally looks like this
 
 1. confirm the feature exists and inspect the next phase
 2. use `.odin/ODIN.md` plus phase guidance from `odin.prepare_phase_context`
-3. produce the phase output
-4. record artifacts/evals/claims individually, or use `odin.complete_phase_bundle` for one validated completion call
-5. close or block the phase with `odin.record_phase_result` when not using the bundle tool
-6. move to the next phase
+3. inspect `context.phase_agent_readiness`; in strict mode, launch/realize the canonical phase agent before recording phase work
+4. produce the phase output
+5. record artifacts/evals/claims individually, or use `odin.complete_phase_bundle` for one validated completion call
+6. record `odin.record_phase_skills_applied` for skills actually used
+7. close or block the phase with `odin.record_phase_result` when not using the bundle tool
+8. move to the next phase
 
 For a normal feature, that means:
 
@@ -108,6 +110,8 @@ You still:
 - decide when to add persistence, automation, or dashboard tooling
 
 In the default `guarded` automation mode, the human remains the PR review boundary.
+
+Release handoff can create or prepare a PR, but Odin still treats merge as human-controlled. After merge, record `odin.record_merge`, then `odin.record_release_closeout` to move the feature to Complete.
 
 ## 7. Common First-Run Questions
 

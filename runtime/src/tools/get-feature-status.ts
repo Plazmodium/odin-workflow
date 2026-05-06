@@ -66,7 +66,7 @@ function buildInvocationCoverage(
 
 function deriveReleaseStage(feature: { current_phase: PhaseId; pr_url?: string; merged_at?: string; completed_at?: string; release_handoff_at?: string; release_closeout_at?: string }) {
   if (feature.release_closeout_at != null || feature.completed_at != null || feature.current_phase === '10') {
-    return 'closed' as const;
+    return 'complete' as const;
   }
 
   if (feature.current_phase !== '9') {
@@ -74,11 +74,11 @@ function deriveReleaseStage(feature: { current_phase: PhaseId; pr_url?: string; 
   }
 
   if (feature.merged_at != null) {
-    return 'merged_closeout_ready' as const;
+    return 'merged' as const;
   }
 
   if (feature.release_handoff_at != null || feature.pr_url != null) {
-    return 'handoff_created_waiting_merge' as const;
+    return feature.release_handoff_at != null ? 'awaiting_merge' as const : 'handoff_created' as const;
   }
 
   return 'handoff_ready' as const;

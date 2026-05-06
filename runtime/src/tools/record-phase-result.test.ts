@@ -468,7 +468,7 @@ describe('handleRecordPhaseResult', () => {
     expect(adapter.recordPhaseResult).not.toHaveBeenCalled();
   });
 
-  it('blocks strict phases without execution attestation unless an override reason is supplied', async () => {
+  it('blocks strict phases without execution attestation even when an override reason is supplied', async () => {
     const adapter: WorkflowStateAdapter = {
       getFeature: vi.fn(async () => createFeature()),
       listPhaseArtifacts: vi.fn(async () => []),
@@ -484,17 +484,6 @@ describe('handleRecordPhaseResult', () => {
       getPhasePromptRealization: vi.fn(async () => null),
       recordPhaseResult: vi.fn(async () => createFeature({ current_phase: '6' })),
       findOpenAgentInvocation: vi.fn(async () => null),
-      startAgentInvocation: vi.fn(async () => ({
-        id: 'inv_strict',
-        feature_id: 'FEAT-RESULT',
-        phase: '5',
-        agent_name: 'builder-agent',
-        operation: 'Phase 5: Builder (fallback)',
-        skills_used: [],
-        started_at: '2026-03-20T00:00:00.000Z',
-        ended_at: null,
-        duration_ms: null,
-      })),
       completeAgentInvocation: vi.fn(async () => ({
         id: 'inv_strict',
         feature_id: 'FEAT-RESULT',
@@ -508,6 +497,7 @@ describe('handleRecordPhaseResult', () => {
       })),
       recordQualityGate: vi.fn(async () => 1),
       computeFeatureEval: vi.fn(async () => null),
+      recordAuditEvent: vi.fn(async () => undefined),
     } as unknown as WorkflowStateAdapter;
 
     const blocked = await handleRecordPhaseResult(adapter, createSkillAdapter(), createStrictConfig(), null, {
@@ -533,8 +523,17 @@ describe('handleRecordPhaseResult', () => {
       attestation_override_reason: 'Manual emergency workflow; child session was unavailable.',
     });
 
-    expect(overridden.isError).toBeUndefined();
-    expect(overridden.content[0]?.text).toContain('Override accepted');
-    expect(adapter.recordPhaseResult).toHaveBeenCalledTimes(1);
+    expect(overridden.isError).toBe(true);
+    expect(overridden.content[0]?.text).toContain('requires a distinct worker session');
+    expect(overridden.structuredContent).toMatchObject({
+      recovery: expect.stringContaining('dedicated break-glass process'),
+    });
+    expect(adapter.recordAuditEvent).toHaveBeenCalledWith(
+      'FEAT-RESULT',
+      'STRICT_ATTESTATION_OVERRIDE_REJECTED',
+      'builder-agent',
+      expect.objectContaining({ missing_proof: 'execution_attestation' }),
+    );
+    expect(adapter.recordPhaseResult).not.toHaveBeenCalled();
   });
 });

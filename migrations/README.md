@@ -61,6 +61,9 @@ Run these migrations in order on a fresh Supabase project:
 
 -- 17. Phase artifact path metadata
 \i 017_phase_artifact_paths.sql
+
+-- 18. Safe skill proposal candidate replacement
+\i 018_safe_skill_proposal_candidate_replace.sql
 ```
 
 Or via Supabase MCP:
@@ -91,6 +94,7 @@ Or via Supabase MCP:
 | `015_watcher_review_independence.sql` | watcher review independence | Persists watcher session/trust metadata and updates watcher review recording |
 | `016_release_lifecycle.sql` | release lifecycle | Persists handoff/closeout metadata and exposes it through feature status |
 | `017_phase_artifact_paths.sql` | artifact path metadata | Adds optional phase artifact paths and updates `record_phase_output` |
+| `018_safe_skill_proposal_candidate_replace.sql` | skill proposal sync repair | Replaces unsafe broad candidate sync deletes with an explicit table replacement operation |
 
 ## Schema Summary
 
@@ -186,6 +190,10 @@ These migrations extend Odin for v2 features. **Run AFTER the base migrations (0
 | `012_phase_execution_attestations.sql` | Persists actual phase execution mode plus attested supervisor/worker session linkage |
 | `013_phase_execution_attestations_repairs.sql` | Repairs attestation storage objects for existing installs and adds the `updated_at` trigger |
 | `014_phase_prompt_realizations.sql` | Persists phase-bundle realization proof keyed by feature and phase for canonical Odin prompt bundles |
+| `015_watcher_review_independence.sql` | Persists watcher session/trust metadata and updates watcher review recording |
+| `016_release_lifecycle.sql` | Persists release handoff/merge/closeout metadata |
+| `017_phase_artifact_paths.sql` | Adds optional phase artifact path metadata |
+| `018_safe_skill_proposal_candidate_replace.sql` | Replaces unsafe broad skill proposal candidate sync deletes with explicit table replacement |
 
 ### v2 Features
 

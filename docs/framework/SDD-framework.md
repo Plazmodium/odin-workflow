@@ -796,7 +796,7 @@ PLANNING → PRODUCT → DISCOVERY → ARCHITECT → GUARDIAN → BUILDER → RE
 
 **v2 Additions:**
 - **Product Agent** (Phase 1): PRD generation with complexity-gated templates
-- **Reviewer Agent** (Phase 6): SAST/security scanning via Semgrep
+- **Reviewer Agent** (Phase 6): Review checks via Semgrep for code or `docs_process` for docs/process-only changes
 - **Watcher Agent** (Support): LLM escalation for claim verification
 
 **Key Benefits:**
@@ -860,13 +860,13 @@ See **`example-workflow.md`** for a complete example:
 - `architect.md` - Phase 3: Technical specification
 - `guardian.md` - Phase 4: Multi-perspective review
 - `builder.md` - Phase 5: Implementation (watched)
-- `reviewer.md` - Phase 6: SAST/security (NEW in v2)
+- `reviewer.md` - Phase 6: Review checks (NEW in v2)
 - `integrator.md` - Phase 7: Integration (watched)
 - `documenter.md` - Phase 8: Documentation
 - `release.md` - Phase 9: PR creation (watched)
 - `watcher.md` - Support: LLM escalation (NEW in v2)
 
-**Status**: v2 architecture with Hybrid Watcher and Semgrep integration.
+**Status**: v2 architecture with Hybrid Watcher and runtime review-check integration.
 
 ---
 
@@ -909,4 +909,3 @@ See **`example-workflow.md`** for a complete example:
 **Version:** 2.0  
 **Last Updated:** 2026-03-06  
 **License:** Adapt freely for your organization's use
-
