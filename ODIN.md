@@ -613,6 +613,7 @@ The `dev_initials` and `author` parameters in `odin.start_feature` identify the 
 7. In `guarded`, prepare the PR handoff for a human; in `auto_pr`, create the PR via `gh pr create` only when policy allows it, then record it with `odin.record_pr`
 8. Human reviews and merges the PR (NEVER the agent)
 9. After the human merges the PR, record the merge with `odin.record_merge`
+10. Complete Release closeout with `odin.record_release_closeout`
 
 `odin.record_phase_artifact` accepts optional `artifact_path` metadata. Use it for durable files such as `documentation-report.md` so strict projects can enforce expected completion artifacts by filename.
 
@@ -1094,13 +1095,10 @@ odin.record_merge({
   merged_by: "human"
 })
 
-odin.record_phase_result({
+odin.record_release_closeout({
   feature_id: "FEAT-001",
-  phase: "9",
-  outcome: "completed",
-  next_phase: "10",
   summary: "Release closed after human merge",
-  created_by: "release-agent"
+  created_by: "ralph-loop"
 })
 ```
 

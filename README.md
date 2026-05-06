@@ -103,38 +103,38 @@ Odin writes `.odin/` into the directory you run this command from, unless you pa
 What `init` does:
 
 - creates `.odin/config.yaml`
-- copies Odin's agent-facing workflow files into `.odin/`
+- creates `.odin/skills/.gitkeep` for project-local skill overrides
 - writes `.env.example`
 - writes your MCP config when auto-config is supported for that tool
 - defaults Odin to `runtime.mode: in_memory` so you can try it without external services first
 
+Odin does not copy broad managed workflow assets by default. Add `--sync-managed-assets` when you intentionally want packaged `.odin/ODIN.md`, `.odin/agents/definitions/`, and built-in skills copied into the project for local overrides or inspection.
+
 ### What gets created in your project
 
 - `.odin/config.yaml` - Odin runtime config
-- `.odin/ODIN.md` - workflow instructions for your AI agent
-- `.odin/agents/definitions/` - the phase-agent prompt definitions Odin uses
-- `.odin/skills/` - project-local skill overrides
+- `.odin/skills/.gitkeep` - placeholder for project-local skill overrides
 - `.env.example` - environment variable template
 - tool config such as `opencode.json`, `.mcp.json`, or `.codex/config.toml` when auto-config is supported
 
-At minimum, commit `.odin/` and `.env.example`. Keep `.env` local.
+At minimum, commit `.odin/config.yaml`, `.odin/skills/.gitkeep`, and `.env.example`. Keep `.env` local.
 
 ## After `init`
 
 1. Restart your AI tool so it reloads MCP servers.
 2. Confirm the `odin` MCP server is available.
-3. Tell your AI agent to use `.odin/ODIN.md` as its workflow guide.
+3. Tell your AI agent to use the `odin` MCP tools for workflow state and phase context. If you opted into managed assets, `.odin/ODIN.md` is the local workflow guide.
 
 From this point on, you normally work through your AI tool. The AI tool calls Odin's MCP server; you do not rerun `init` for every feature.
 
 Suggested first prompt:
 
 ```text
-Confirm the `odin` MCP tools are available in this project. Then use `.odin/ODIN.md` as your workflow guide for future feature work and tell me what Odin added to this repo.
+Confirm the `odin` MCP tools are available in this project. Tell me what Odin added to this repo and whether managed workflow assets were synced locally.
 ```
 
 Important:
-`.odin/ODIN.md` is for the AI agent. It is not the human onboarding doc.
+If present, `.odin/ODIN.md` is for the AI agent. It is not the human onboarding doc.
 
 ## Database Setup
 
@@ -163,7 +163,7 @@ The normal way to start is back in your AI tool, not with a manual CLI command.
 Suggested prompt:
 
 ```text
-Use Odin in this repository. Confirm the `odin` MCP tools are available, use `.odin/ODIN.md` as your workflow guide, and help me start a new feature for: <plain English feature request>. If you need my author name, initials, or any other missing metadata, ask me before starting.
+Use Odin in this repository. Confirm the `odin` MCP tools are available and help me start a new feature for: <plain English feature request>. If you need my author name, initials, or any other missing metadata, ask me before starting.
 ```
 
 In the normal flow, the orchestrating AI session handles the branch-first + `odin.start_feature` workflow for you.
