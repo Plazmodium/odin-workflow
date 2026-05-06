@@ -288,12 +288,14 @@ CREATE TABLE phase_outputs (
   phase phase NOT NULL,
   output_type TEXT NOT NULL,  -- 'requirements', 'perspectives', 'tasks'
   content JSONB NOT NULL,
+  artifact_path TEXT,
   created_by TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
 COMMENT ON TABLE phase_outputs IS 'Structured outputs from each phase (requirements, perspectives, tasks)';
 COMMENT ON COLUMN phase_outputs.content IS 'JSONB acceptable here: shape varies by output_type';
+COMMENT ON COLUMN phase_outputs.artifact_path IS 'Optional repository-relative path or filename for artifact completion checks';
 
 -- ============================================================================
 -- MEMORIES (Knowledge persistence)

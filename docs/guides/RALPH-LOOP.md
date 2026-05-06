@@ -13,8 +13,8 @@ Current supported execution paths:
    - records the PR with `odin.record_pr`
    - records release handoff with `odin.record_release_handoff`
 2. **Release closeout after human merge**
-   - waits for `odin.record_merge`
-   - completes phase 9 -> 10 via `odin.record_phase_result`
+    - waits for `odin.record_merge`
+    - completes phase 9 -> 10 via `odin.record_release_closeout`
 3. **Optional child-command execution for phases 5-8**
    - enabled with `RALPH_SUBAGENT_COMMAND_JSON` or `--subagent-command-json`
    - Ralph Loop spawns the configured child command

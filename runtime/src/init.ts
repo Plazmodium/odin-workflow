@@ -49,6 +49,12 @@ const CONFIG_TEMPLATE = [
   '# `auto_pr` is opt-in and only works on allowlisted base branches.',
   '# `auto_merge` is reserved for future use and is not supported yet.',
   '',
+  'attestation:',
+  '  # advisory warns; strict blocks configured phases unless an override reason is supplied.',
+  '  mode: advisory',
+  '  require_execution_phases: ["5", "6", "7", "9"]',
+  '  require_prompt_realization_phases: ["5", "6", "7", "9"]',
+  '',
   '# formal_verification:',
   '#   provider: tla-precheck    # requires: Java 17+, npm install -D tla-precheck',
   '#   timeout_seconds: 120',
@@ -78,6 +84,7 @@ interface InitOptions {
   tool: HarnessTool;
   distribution: DistributionMode;
   writeMcp: boolean;
+  syncManagedAssets: boolean;
   help: boolean;
 }
 
@@ -102,6 +109,7 @@ function parseArgs(argv: string[]): InitOptions {
   let tool: HarnessTool = 'generic';
   let distribution: DistributionMode = 'published';
   let writeMcp = false;
+  let syncManagedAssets = false;
   let help = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -128,6 +136,10 @@ function parseArgs(argv: string[]): InitOptions {
       writeMcp = true;
     }
 
+    if (arg === '--sync-managed-assets') {
+      syncManagedAssets = true;
+    }
+
     if (arg === '--tool') {
       const next = argv[index + 1] as HarnessTool | undefined;
       if (next != null && (VALID_TOOLS as readonly string[]).includes(next)) {
@@ -146,7 +158,7 @@ function parseArgs(argv: string[]): InitOptions {
     }
   }
 
-  return { projectRoot, force, tool, distribution, writeMcp, help };
+  return { projectRoot, force, tool, distribution, writeMcp, syncManagedAssets, help };
 }
 
 function printHelp(): void {
@@ -162,9 +174,10 @@ Options:
   --distribution <mode>  MCP server command strategy:
                              published, source (default: published)
   --write-mcp            Write the harness config file directly
-                             (opencode.json for opencode,
-                              .mcp.json for claude-code/amp,
-                              .codex/config.toml for codex)
+                              (opencode.json for opencode,
+                               .mcp.json for claude-code/amp,
+                               .codex/config.toml for codex)
+  --sync-managed-assets  Copy packaged Odin agent definitions and skills into .odin/
   --force                Overwrite existing config files
   -h, --help             Show this help message
 
@@ -650,8 +663,9 @@ function printHarnessSnippet(projectRoot: string, tool: HarnessTool, distributio
     '3. Use `context.execution.recommended_mode` as the default inline/subagent choice.',
     '4. If the child cannot call `odin.*` directly, proxy those calls from the parent session and pass `context.execution.acting_agent_name` through to fields like `agent_name` and `created_by`.',
     '5. Use `odin.get_development_eval_status({ feature_id })` when you need focused eval state instead of parsing broad status payloads.',
-    '6. Record structured eval artifacts with `odin.record_eval_plan`, `odin.record_eval_run`, and `odin.record_quality_gate`.',
-    '7. Never treat Development Evals as a replacement for `odin.verify_design`, `odin.run_review_checks`, tests, runtime verification, or watcher checks.',
+    '6. Record structured eval artifacts with `odin.record_eval_plan`, `odin.record_eval_run`, and `odin.record_quality_gate`, or use `odin.complete_phase_bundle` when recording a phase completion as one validated operation.',
+    '7. Include `artifact_path` for durable phase files such as `documentation-report.md` so expected artifact checks can inspect filenames.',
+    '8. Never treat Development Evals as a replacement for `odin.verify_design`, `odin.run_review_checks`, tests, runtime verification, or watcher checks.',
   ].join('\n'));
 }
 
@@ -664,7 +678,7 @@ function main(): void {
   }
 
   const config = ensureConfig(options.projectRoot, options.force);
-  const managedAssets = ensureManagedAssets(options.projectRoot, options.force);
+  const managedAssets = options.syncManagedAssets ? ensureManagedAssets(options.projectRoot, options.force) : null;
   const envExample = ensureEnvExample(options.projectRoot, options.force);
   const mcpSnippet = createMcpJsonSnippet(options.projectRoot, options.distribution);
   const tomlConfigPath = join(options.projectRoot, '.odin', 'config.toml');
@@ -677,10 +691,14 @@ function main(): void {
   if (existsSync(tomlConfigPath)) {
     console.log(`- kept ${tomlConfigPath} (Odin runtime reads .odin/config.yaml; .odin/config.toml is not active runtime config)`);
   }
-  console.log(
-    `- synced Odin managed assets: ${managedAssets.written} written, ${managedAssets.kept} kept (${managedAssets.manifest_path})`
-  );
-  if (managedAssets.conflicts.length > 0) {
+  if (managedAssets == null) {
+    console.log('- skipped Odin managed asset sync (rerun with --sync-managed-assets to refresh .odin/ODIN.md, agent definitions, and skills)');
+  } else {
+    console.log(
+      `- synced Odin managed assets: ${managedAssets.written} written, ${managedAssets.kept} kept (${managedAssets.manifest_path})`
+    );
+  }
+  if (managedAssets != null && managedAssets.conflicts.length > 0) {
     console.log(
       `- skipped ${managedAssets.conflicts.length} locally modified Odin managed asset(s); rerun with --force to overwrite: ${managedAssets.conflicts.join(', ')}`
     );

@@ -6,6 +6,7 @@ import type {
   PickNextAutonomousPhaseResult,
   RecordPhaseResultInput,
   RecordPullRequestInput,
+  RecordReleaseCloseoutInput,
   RecordReleaseCloseoutFailureInput,
   RecordReleaseHandoffFailureInput,
   RecordReleaseHandoffInput,
@@ -76,6 +77,7 @@ class FakeRuntimeToolClient implements RuntimeToolClient {
   readonly archived_releases: ArchiveFeatureReleaseInput[] = [];
   readonly recorded_prs: RecordPullRequestInput[] = [];
   readonly release_handoffs: RecordReleaseHandoffInput[] = [];
+  readonly release_closeouts: RecordReleaseCloseoutInput[] = [];
   readonly release_handoff_failures: RecordReleaseHandoffFailureInput[] = [];
   readonly release_closeout_failures: RecordReleaseCloseoutFailureInput[] = [];
   readonly phase_results: RecordPhaseResultInput[] = [];
@@ -176,6 +178,11 @@ class FakeRuntimeToolClient implements RuntimeToolClient {
     this.release_handoffs.push(input);
   }
 
+  async recordReleaseCloseout(input: RecordReleaseCloseoutInput): Promise<void> {
+    this.release_closeouts.push(input);
+    this.stage = 'noop';
+  }
+
   async recordReleaseHandoffFailure(input: RecordReleaseHandoffFailureInput): Promise<void> {
     this.release_handoff_failures.push(input);
   }
@@ -245,15 +252,11 @@ describe('Ralph Loop simulated scenarios', () => {
     const closeout = await runTick(client, 'ralph-loop', '/tmp/project', runner);
 
     expect(closeout.outcome).toBe('completed');
-    expect(client.phase_results).toEqual([
+    expect(client.release_closeouts).toEqual([
       {
         feature_id: 'FEAT-RALPH',
-        phase: '9',
-        outcome: 'completed',
-        next_phase: '10',
         summary: 'ralph-loop closed Release after human merge.',
         created_by: 'ralph-loop',
-        blockers: [],
       },
     ]);
   });

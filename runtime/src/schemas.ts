@@ -60,6 +60,12 @@ export const RecordReleaseCloseoutFailureInputSchema = z.object({
   created_by: z.string().min(1),
 });
 
+export const RecordReleaseCloseoutInputSchema = z.object({
+  feature_id: z.string().min(1),
+  summary: z.string().min(1),
+  created_by: z.string().min(1),
+});
+
 export const RecordCommitInputSchema = z.object({
   feature_id: z.string().min(1),
   commit_hash: z.string().min(1),
@@ -195,6 +201,16 @@ export const VerifyClaimsInputSchema = z.object({
   feature_id: z.string().min(1),
 });
 
+const ClaimEvidenceInputSchema = z.object({
+  command_outputs: z.array(z.string().min(1)).default([]),
+  file_paths: z.array(z.string().min(1)).default([]),
+  artifact_ids: z.array(z.string().min(1)).default([]),
+  artifact_paths: z.array(z.string().min(1)).default([]),
+  commit_hashes: z.array(z.string().min(1)).default([]),
+  pr_urls: z.array(z.string().url()).default([]),
+  verification_summaries: z.array(z.string().min(1)).default([]),
+});
+
 export const SubmitClaimInputSchema = z.object({
   feature_id: z.string().min(1),
   phase: phase_id_schema,
@@ -202,6 +218,7 @@ export const SubmitClaimInputSchema = z.object({
   claim_type: z.enum(CLAIM_TYPES),
   description: z.string().min(1),
   evidence_refs: z.record(z.string(), z.unknown()).default({}),
+  evidence: ClaimEvidenceInputSchema.optional(),
   risk_level: z.enum(RISK_LEVELS).default('LOW'),
   invocation_id: z.string().optional(),
 });
@@ -219,6 +236,8 @@ export const RecordWatcherReviewInputSchema = z.object({
   verdict: z.enum(WATCHER_REVIEW_VERDICTS),
   reasoning: z.string().min(1),
   watcher_agent: z.string().optional(),
+  watcher_session_id: z.string().min(1).optional(),
+  independence_override_reason: z.string().min(1).optional(),
   confidence: z.number().min(0).max(1).default(0.8),
 });
 
@@ -301,6 +320,7 @@ export const RecordPhaseArtifactInputSchema = z.object({
   phase: phase_id_schema,
   output_type: z.union([z.enum(ARTIFACT_OUTPUT_TYPES), z.string().min(1)]),
   content: z.unknown(),
+  artifact_path: z.string().min(1).optional(),
   created_by: z.string().min(1),
 });
 
@@ -312,6 +332,62 @@ export const RecordPhaseResultInputSchema = z.object({
   next_phase: phase_id_schema.optional(),
   blockers: z.array(z.string()).default([]),
   created_by: z.string().min(1),
+  attestation_override_reason: z.string().min(1).optional(),
+});
+
+const CompletePhaseBundleArtifactInputSchema = z.object({
+  output_type: z.union([z.enum(ARTIFACT_OUTPUT_TYPES), z.string().min(1)]),
+  content: z.unknown(),
+  artifact_path: z.string().min(1).optional(),
+});
+
+const CompletePhaseBundleEvalPlanInputSchema = z
+  .object({
+    scope: z.string().min(1),
+    success_criteria: z.array(z.string().min(1)).default([]),
+    non_goals: z.array(z.string().min(1)).default([]),
+    capability_evals: z.array(DevelopmentEvalCaseInputSchema).default([]),
+    regression_evals: z.array(DevelopmentEvalCaseInputSchema).default([]),
+    transcript_review_plan: z.array(z.string().min(1)).default([]),
+    solvability_note: z.string().optional(),
+  })
+  .refine(
+    (value) => value.capability_evals.length > 0 || value.regression_evals.length > 0,
+    'At least one capability or regression eval is required.'
+  );
+
+const CompletePhaseBundleEvalRunInputSchema = z.object({
+  status: z.union([z.literal('passed'), z.literal('failed'), z.literal('partial'), z.literal('blocked')]),
+  cases_run: z.array(z.string().min(1)).default([]),
+  important_failures: z.array(z.string().min(1)).default([]),
+  manual_review_notes: z.array(z.string().min(1)).default([]),
+  transcript_review_observations: z.array(z.string().min(1)).default([]),
+  follow_up: z.array(z.string().min(1)).default([]),
+  environment_summary: z.array(z.string().min(1)).default([]),
+});
+
+const CompletePhaseBundleClaimInputSchema = z.object({
+  claim_type: z.enum(CLAIM_TYPES),
+  description: z.string().min(1),
+  evidence_refs: z.record(z.string(), z.unknown()).default({}),
+  evidence: ClaimEvidenceInputSchema.optional(),
+  risk_level: z.enum(RISK_LEVELS).default('LOW'),
+});
+
+export const CompletePhaseBundleInputSchema = z.object({
+  feature_id: z.string().min(1),
+  phase: phase_id_schema,
+  created_by: z.string().min(1),
+  summary: z.string().min(1),
+  outcome: z.enum(PHASE_OUTCOMES).default('completed'),
+  next_phase: phase_id_schema.optional(),
+  blockers: z.array(z.string()).default([]),
+  artifacts: z.array(CompletePhaseBundleArtifactInputSchema).default([]),
+  eval_plan: CompletePhaseBundleEvalPlanInputSchema.optional(),
+  eval_run: CompletePhaseBundleEvalRunInputSchema.optional(),
+  claims: z.array(CompletePhaseBundleClaimInputSchema).default([]),
+  run_policy_checks: z.boolean().default(true),
+  attestation_override_reason: z.string().min(1).optional(),
 });
 
 export const RunReviewChecksInputSchema = z.object({
@@ -351,6 +427,7 @@ export type RecordCommitInput = z.infer<typeof RecordCommitInputSchema>;
 export type RecordReleaseHandoffInput = z.infer<typeof RecordReleaseHandoffInputSchema>;
 export type RecordReleaseHandoffFailureInput = z.infer<typeof RecordReleaseHandoffFailureInputSchema>;
 export type RecordReleaseCloseoutFailureInput = z.infer<typeof RecordReleaseCloseoutFailureInputSchema>;
+export type RecordReleaseCloseoutInput = z.infer<typeof RecordReleaseCloseoutInputSchema>;
 export type RecordMergeInput = z.infer<typeof RecordMergeInputSchema>;
 export type RecordQualityGateInput = z.infer<typeof RecordQualityGateInputSchema>;
 export type RecordEvalPlanInput = z.infer<typeof RecordEvalPlanInputSchema>;
@@ -378,6 +455,7 @@ export type RegisterPhaseExecutionInput = z.infer<typeof RegisterPhaseExecutionI
 export type RegisterPhaseRealizationInput = z.infer<typeof RegisterPhaseRealizationInputSchema>;
 export type RecordPhaseArtifactInput = z.infer<typeof RecordPhaseArtifactInputSchema>;
 export type RecordPhaseResultInput = z.infer<typeof RecordPhaseResultInputSchema>;
+export type CompletePhaseBundleInput = z.infer<typeof CompletePhaseBundleInputSchema>;
 export type RunReviewChecksInput = z.infer<typeof RunReviewChecksInputSchema>;
 export type CaptureLearningInput = z.infer<typeof CaptureLearningInputSchema>;
 export const ApplyMigrationsInputSchema = z.object({

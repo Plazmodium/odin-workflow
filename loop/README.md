@@ -18,7 +18,7 @@ It does **not** replace the runtime. Instead it:
 This tracer-bullet slice supports:
 
 1. **Auto-PR handoff** for phase 9 when `automation.mode: auto_pr` allows PR creation
-2. **Release closeout** after a human merge is recorded
+2. **Release closeout** after a human merge is recorded, persisted with `odin.record_release_closeout`
 3. **Optional child-command execution for phases 5-8** when a subagent command is configured
 
 Release stays inline inside Ralph Loop. Phases 5-8 only become eligible when a child command is configured; Ralph Loop then spawns that command and proxies the returned artifacts and final phase result from the parent session. Ralph Loop also respects `context.execution.response_style`, so terse operational chatter can be requested without changing the normal human-readable templates for final artifacts.

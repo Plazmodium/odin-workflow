@@ -309,7 +309,14 @@ describe('handleGetFeatureStatus', () => {
       release: {
         pr_url: string | null;
         pr_number: number | null;
+        stage: string;
+        handoff_created_at: string | null;
+        handoff_created_by: string | null;
+        handoff_summary: string | null;
         merged_at: string | null;
+        closeout_created_at: string | null;
+        closeout_created_by: string | null;
+        closeout_summary: string | null;
         completed_at: string | null;
       };
       counts: Record<string, number>;
@@ -387,7 +394,14 @@ describe('handleGetFeatureStatus', () => {
     expect(status.release).toEqual({
       pr_url: null,
       pr_number: null,
+      stage: 'not_in_release',
+      handoff_created_at: null,
+      handoff_created_by: null,
+      handoff_summary: null,
       merged_at: null,
+      closeout_created_at: null,
+      closeout_created_by: null,
+      closeout_summary: null,
       completed_at: null,
     });
     expect(status.latest_review_check.summary).toBe('0 findings');

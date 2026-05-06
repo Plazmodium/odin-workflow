@@ -22,6 +22,7 @@ import type {
   RecordPhaseArtifactInput,
   RecordPhaseResultInput,
   RecordPullRequestInput,
+  RecordReleaseCloseoutInput,
   RecordReleaseCloseoutFailureInput,
   RecordReleaseHandoffFailureInput,
   RecordReleaseHandoffInput,
@@ -627,6 +628,21 @@ class McpRuntimeToolClient implements RuntimeToolClient {
   async recordReleaseHandoff(input: RecordReleaseHandoffInput): Promise<void> {
     const result = await this.client.callTool({
       name: 'odin.record_release_handoff',
+      arguments: {
+        feature_id: input.feature_id,
+        summary: input.summary,
+        created_by: input.created_by,
+      },
+    });
+    const error = extractError(result);
+    if (error != null) {
+      throw new Error(error);
+    }
+  }
+
+  async recordReleaseCloseout(input: RecordReleaseCloseoutInput): Promise<void> {
+    const result = await this.client.callTool({
+      name: 'odin.record_release_closeout',
       arguments: {
         feature_id: input.feature_id,
         summary: input.summary,

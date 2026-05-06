@@ -169,6 +169,12 @@ export interface RecordReleaseHandoffInput {
   created_by: string;
 }
 
+export interface RecordReleaseCloseoutInput {
+  feature_id: string;
+  summary: string;
+  created_by: string;
+}
+
 export interface RecordReleaseHandoffFailureInput {
   feature_id: string;
   summary: string;
@@ -192,6 +198,7 @@ export interface RuntimeToolClient {
   archiveFeatureRelease(input: ArchiveFeatureReleaseInput): Promise<void>;
   recordPullRequest(input: RecordPullRequestInput): Promise<void>;
   recordReleaseHandoff(input: RecordReleaseHandoffInput): Promise<void>;
+  recordReleaseCloseout(input: RecordReleaseCloseoutInput): Promise<void>;
   recordReleaseHandoffFailure(input: RecordReleaseHandoffFailureInput): Promise<void>;
   recordReleaseCloseoutFailure(input: RecordReleaseCloseoutFailureInput): Promise<void>;
   close(): Promise<void>;

@@ -52,6 +52,15 @@ Run these migrations in order on a fresh Supabase project:
 
 -- 14. Phase prompt realization attestation storage
 \i 014_phase_prompt_realizations.sql
+
+-- 15. Watcher review independence metadata
+\i 015_watcher_review_independence.sql
+
+-- 16. Release lifecycle metadata
+\i 016_release_lifecycle.sql
+
+-- 17. Phase artifact path metadata
+\i 017_phase_artifact_paths.sql
 ```
 
 Or via Supabase MCP:
@@ -79,6 +88,9 @@ Or via Supabase MCP:
 | `012_phase_execution_attestations.sql` | execution attestation | Persists actual execution mode and attested supervisor/worker linkage per phase |
 | `013_phase_execution_attestations_repairs.sql` | execution attestation repairs | Backfills missing indexes, policy, and the `updated_at` trigger for attestation storage |
 | `014_phase_prompt_realizations.sql` | prompt realization attestation | Persists phase-bundle realization proof for phase workers launched from the canonical Odin prompt bundle |
+| `015_watcher_review_independence.sql` | watcher review independence | Persists watcher session/trust metadata and updates watcher review recording |
+| `016_release_lifecycle.sql` | release lifecycle | Persists handoff/closeout metadata and exposes it through feature status |
+| `017_phase_artifact_paths.sql` | artifact path metadata | Adds optional phase artifact paths and updates `record_phase_output` |
 
 ## Schema Summary
 
@@ -92,7 +104,7 @@ Or via Supabase MCP:
 | `blockers` | Issues preventing progress |
 | `agent_invocations` | Duration tracking per agent call |
 | `feature_commits` | Git commits per feature |
-| `phase_outputs` | Structured phase artifacts (requirements, perspectives, tasks) |
+| `phase_outputs` | Structured phase artifacts with optional path metadata |
 
 ### Learning System
 

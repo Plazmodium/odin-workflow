@@ -9,6 +9,21 @@ import { getPhaseAgentInstructions, isWatchedPhase } from '../domain/phases.js';
 import type { SubmitClaimInput } from '../schemas.js';
 import { createErrorResult, createTextResult } from '../utils.js';
 
+function mergeEvidence(input: SubmitClaimInput): Record<string, unknown> {
+  if (input.evidence == null) {
+    return input.evidence_refs;
+  }
+
+  const structured = Object.fromEntries(
+    Object.entries(input.evidence).filter(([, value]) => Array.isArray(value) && value.length > 0)
+  );
+
+  return {
+    ...input.evidence_refs,
+    ...structured,
+  };
+}
+
 export async function handleSubmitClaim(
   adapter: WorkflowStateAdapter,
   input: SubmitClaimInput
@@ -58,7 +73,7 @@ export async function handleSubmitClaim(
     invocation_id: input.invocation_id ?? invocation?.id ?? null,
     claim_type: input.claim_type,
     claim_description: input.description,
-    evidence_refs: input.evidence_refs,
+    evidence_refs: mergeEvidence(input),
     risk_level: input.risk_level,
   });
 

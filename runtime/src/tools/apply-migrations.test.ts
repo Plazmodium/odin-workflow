@@ -12,6 +12,9 @@ const tools_dir = dirname(fileURLToPath(import.meta.url));
 const bundled_migration_011_path = resolve(tools_dir, '../../migrations/011_complete_feature_phase_coverage.sql');
 const bundled_migration_012_path = resolve(tools_dir, '../../migrations/012_phase_execution_attestations.sql');
 const bundled_migration_014_path = resolve(tools_dir, '../../migrations/014_phase_prompt_realizations.sql');
+const bundled_migration_015_path = resolve(tools_dir, '../../migrations/015_watcher_review_independence.sql');
+const bundled_migration_016_path = resolve(tools_dir, '../../migrations/016_release_lifecycle.sql');
+const bundled_migration_017_path = resolve(tools_dir, '../../migrations/017_phase_artifact_paths.sql');
 
 function resolveCanonicalMigrationPath(filename: string): string {
   const candidates = [
@@ -217,6 +220,36 @@ describe('migration 014', () => {
     const canonical_sql = readFileSync(resolveCanonicalMigrationPath('014_phase_prompt_realizations.sql'), 'utf8');
 
     expect(bundled_sql).toContain('CREATE TABLE phase_prompt_realizations');
+    expect(bundled_sql).toBe(canonical_sql);
+  });
+});
+
+describe('migration 015', () => {
+  it('stays aligned with the canonical SQL', () => {
+    const bundled_sql = readFileSync(bundled_migration_015_path, 'utf8');
+    const canonical_sql = readFileSync(resolveCanonicalMigrationPath('015_watcher_review_independence.sql'), 'utf8');
+
+    expect(bundled_sql).toContain('watcher_session_id');
+    expect(bundled_sql).toBe(canonical_sql);
+  });
+});
+
+describe('migration 016', () => {
+  it('stays aligned with the canonical SQL', () => {
+    const bundled_sql = readFileSync(bundled_migration_016_path, 'utf8');
+    const canonical_sql = readFileSync(resolveCanonicalMigrationPath('016_release_lifecycle.sql'), 'utf8');
+
+    expect(bundled_sql).toContain('release_handoff_at');
+    expect(bundled_sql).toBe(canonical_sql);
+  });
+});
+
+describe('migration 017', () => {
+  it('stays aligned with the canonical SQL', () => {
+    const bundled_sql = readFileSync(bundled_migration_017_path, 'utf8');
+    const canonical_sql = readFileSync(resolveCanonicalMigrationPath('017_phase_artifact_paths.sql'), 'utf8');
+
+    expect(bundled_sql).toContain('artifact_path');
     expect(bundled_sql).toBe(canonical_sql);
   });
 });

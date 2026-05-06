@@ -14,7 +14,7 @@ import { getPhaseAgentInstructions, getPhaseContract, getPhaseExecutionContract,
 import { formatOpenGateSummary } from '../domain/quality-gates.js';
 import { computeResonance, type ResonanceInput } from '../domain/resonance.js';
 import type { PreparePhaseContextInput } from '../schemas.js';
-import type { ArtifactOutputType, FeatureRecord, LearningCategory, PhaseArtifact, PhaseContextBundle } from '../types.js';
+import type { ArtifactOutputType, FeatureRecord, LearningCategory, PhaseArtifact, PhaseContextBundle, PhaseExecutionContract, PhaseId } from '../types.js';
 import { createErrorResult, createTextResult } from '../utils.js';
 
 const ARTIFACT_KEYS: ArtifactOutputType[] = [
@@ -42,6 +42,29 @@ function buildArtifactLineage(artifacts: PhaseArtifact[]): PhaseContextBundle['a
   }
 
   return lineage;
+}
+
+function applyEffectiveAttestationPolicy(
+  phase: PhaseId,
+  execution: PhaseExecutionContract,
+  config: RuntimeConfig,
+): PhaseExecutionContract {
+  if (config.attestation?.mode !== 'strict') {
+    return execution;
+  }
+
+  const required_execution_phases = config.attestation.require_execution_phases ?? ['5', '6', '7', '9'];
+  const required_prompt_realization_phases = config.attestation.require_prompt_realization_phases ?? ['5', '6', '7', '9'];
+
+  return {
+    ...execution,
+    execution_policy: required_execution_phases.includes(phase)
+      ? 'distinct_session_required'
+      : execution.execution_policy,
+    prompt_realization_policy: required_prompt_realization_phases.includes(phase)
+      ? 'phase_bundle_required'
+      : execution.prompt_realization_policy,
+  };
 }
 
 interface BuildPhaseContextOptions {
@@ -77,7 +100,7 @@ export async function buildPhaseContextBundleForFeature(
   const phase = getPhaseContract(input.phase);
   const agent = getPhaseAgentInstructions(input.phase);
   const actor_name = resolveWorkflowActorName(input.phase, input.agent_name ?? agent.name);
-  const execution = getPhaseExecutionContract(input.phase, actor_name);
+  const execution = applyEffectiveAttestationPolicy(input.phase, getPhaseExecutionContract(input.phase, actor_name), config);
   const development_evals = buildDevelopmentEvalContext(feature, input.phase, all_artifacts, open_gate_records);
   const automation = resolveAutomationDecision({
     config,

@@ -25,6 +25,7 @@ import {
   ArchiveFeatureReleaseInputSchema,
   CaptureLearningInputSchema,
   ClearPhaseExecutionInputSchema,
+  CompletePhaseBundleInputSchema,
   ExploreKnowledgeInputSchema,
   GetClaimsNeedingReviewInputSchema,
   GetDevelopmentEvalStatusInputSchema,
@@ -41,6 +42,7 @@ import {
   RecordEvalPlanInputSchema,
   RecordEvalRunInputSchema,
   RecordMergeInputSchema,
+  RecordReleaseCloseoutInputSchema,
   RecordReleaseCloseoutFailureInputSchema,
   RecordReleaseHandoffFailureInputSchema,
   RecordReleaseHandoffInputSchema,
@@ -64,6 +66,7 @@ import { handleApplyMigrations } from './tools/apply-migrations.js';
 import { handleArchiveFeatureRelease } from './tools/archive-feature-release.js';
 import { handleCaptureLearning } from './tools/capture-learning.js';
 import { handleClearPhaseExecution } from './tools/clear-phase-execution.js';
+import { handleCompletePhaseBundle } from './tools/complete-phase-bundle.js';
 import { handleExploreKnowledge } from './tools/explore-knowledge.js';
 import { handleGetClaimsNeedingReview } from './tools/get-claims-needing-review.js';
 import { handleGetDevelopmentEvalStatus } from './tools/get-development-eval-status.js';
@@ -80,6 +83,7 @@ import { handleRecordCommit } from './tools/record-commit.js';
 import { handleRecordEvalPlan } from './tools/record-eval-plan.js';
 import { handleRecordEvalRun } from './tools/record-eval-run.js';
 import { handleRecordMerge } from './tools/record-merge.js';
+import { handleRecordReleaseCloseout } from './tools/record-release-closeout.js';
 import { handleRecordReleaseCloseoutFailure } from './tools/record-release-closeout-failure.js';
 import { handleRecordReleaseHandoffFailure } from './tools/record-release-handoff-failure.js';
 import { handleRecordReleaseHandoff } from './tools/record-release-handoff.js';
@@ -195,7 +199,7 @@ const formal_verification_adapter = createFormalVerificationAdapter(project_root
 const server = new McpServer(
   {
     name: 'odin',
-    version: '0.7.0-beta',
+    version: '0.8.0-beta',
   },
   {
     capabilities: {
@@ -365,6 +369,16 @@ server.registerTool(
 );
 
 server.registerTool(
+  'odin.record_release_closeout',
+  {
+    title: 'Record Release Closeout',
+    description: 'Complete Release after a recorded human merge and persist release closeout metadata.',
+    inputSchema: RecordReleaseCloseoutInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordReleaseCloseout(workflow_state, skill_adapter, runtime_config, archive_adapter, input))
+);
+
+server.registerTool(
   'odin.record_release_handoff_failure',
   {
     title: 'Record Release Handoff Failure',
@@ -432,6 +446,16 @@ server.registerTool(
     inputSchema: RecordPhaseResultInputSchema,
   },
   safeToolHandler(async (input) => handleRecordPhaseResult(workflow_state, skill_adapter, runtime_config, archive_adapter, input))
+);
+
+server.registerTool(
+  'odin.complete_phase_bundle',
+  {
+    title: 'Complete Phase Bundle',
+    description: 'Record phase artifacts, eval data, claims, policy status, watcher status, and the phase result in one validated operation.',
+    inputSchema: CompletePhaseBundleInputSchema,
+  },
+  safeToolHandler(async (input) => handleCompletePhaseBundle(workflow_state, skill_adapter, runtime_config, archive_adapter, input))
 );
 
 server.registerTool(
@@ -561,7 +585,7 @@ server.registerTool(
     description: 'Record the watcher verdict for an escalated claim.',
     inputSchema: RecordWatcherReviewInputSchema,
   },
-  safeToolHandler(async (input) => handleRecordWatcherReview(workflow_state, input))
+  safeToolHandler(async (input) => handleRecordWatcherReview(workflow_state, runtime_config, input))
 );
 
 server.registerTool(

@@ -305,6 +305,9 @@ describe('InMemoryWorkflowStateAdapter watcher lifecycle', () => {
       confidence: 0.88,
       reasoning: 'The high-risk change matches the supplied diff and tests.',
       watcher_agent: 'watcher-agent',
+      watcher_session_id: 'watcher-session',
+      trust_level: 'independent',
+      independence_override_reason: null,
     });
 
     const verification = await adapter.listClaimVerificationStatus('FEAT-WATCHER');

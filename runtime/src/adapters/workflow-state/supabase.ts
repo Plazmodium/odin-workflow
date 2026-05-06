@@ -25,6 +25,7 @@ import type {
   PhasePromptRealizationAttestation,
   PhaseResultRecord,
   QualityGateRecord,
+  ReleaseLifecycleRecord,
   RiskLevel,
   RelatedLearningRecord,
   ReviewCheckRecord,
@@ -102,7 +103,13 @@ function toFeatureRecord(row: JsonRecord): FeatureRecord {
     base_branch: row.base_branch == null ? undefined : String(row.base_branch),
     pr_url: row.pr_url == null ? undefined : String(row.pr_url),
     pr_number: row.pr_number == null ? undefined : Number(row.pr_number),
+    release_handoff_at: row.release_handoff_at == null ? undefined : String(row.release_handoff_at),
+    release_handoff_by: row.release_handoff_by == null ? undefined : String(row.release_handoff_by),
+    release_handoff_summary: row.release_handoff_summary == null ? undefined : String(row.release_handoff_summary),
     merged_at: row.merged_at == null ? undefined : String(row.merged_at),
+    release_closeout_at: row.release_closeout_at == null ? undefined : String(row.release_closeout_at),
+    release_closeout_by: row.release_closeout_by == null ? undefined : String(row.release_closeout_by),
+    release_closeout_summary: row.release_closeout_summary == null ? undefined : String(row.release_closeout_summary),
     completed_at: row.completed_at == null ? undefined : String(row.completed_at),
     author: row.author == null ? undefined : String(row.author),
     created_at: String(row.created_at ?? new Date().toISOString()),
@@ -177,6 +184,24 @@ function toPhasePromptRealizationAttestation(row: JsonRecord): PhasePromptRealiz
     wrapper_hash: row.wrapper_hash == null ? null : String(row.wrapper_hash),
     child_ack_nonce: row.child_ack_nonce == null ? null : String(row.child_ack_nonce),
     recorded_at: String(row.recorded_at),
+  };
+}
+
+function toAgentClaimRecord(row: JsonRecord): AgentClaimRecord {
+  return {
+    id: String(row.id),
+    feature_id: String(row.feature_id),
+    phase: String(row.phase) as PhaseId,
+    agent_name: String(row.agent_name),
+    invocation_id: row.invocation_id == null ? null : String(row.invocation_id),
+    claim_type: String(row.claim_type) as ClaimType,
+    claim_description: String(row.claim_description),
+    evidence_refs:
+      row.evidence_refs != null && typeof row.evidence_refs === 'object' && !Array.isArray(row.evidence_refs)
+        ? row.evidence_refs as Record<string, unknown>
+        : {},
+    risk_level: String(row.risk_level) as RiskLevel,
+    created_at: String(row.created_at),
   };
 }
 
@@ -289,6 +314,7 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       p_output_type: artifact.output_type,
       p_content: artifact.content,
       p_created_by: artifact.created_by,
+      p_artifact_path: artifact.artifact_path ?? null,
     });
 
     if (error != null || data == null) {
@@ -302,6 +328,7 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       phase: String(row.phase) as PhaseArtifact['phase'],
       output_type: String(row.output_type),
       content: row.content,
+      artifact_path: row.artifact_path == null ? null : String(row.artifact_path),
       created_by: String(row.created_by),
       created_at: String(row.created_at),
     };
@@ -329,6 +356,7 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       phase: String(row.phase) as PhaseArtifact['phase'],
       output_type: String(row.output_type),
       content: row.content,
+      artifact_path: row.artifact_path == null ? null : String(row.artifact_path),
       created_by: String(row.created_by),
       created_at: String(row.created_at),
     }));
@@ -597,6 +625,24 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
     };
   }
 
+  async getClaim(claim_id: string): Promise<AgentClaimRecord | null> {
+    const { data, error } = await this.client
+      .from('agent_claims')
+      .select('*')
+      .eq('id', claim_id)
+      .maybeSingle();
+
+    if (error != null) {
+      throw new Error(`Failed to fetch claim from Supabase: ${error.message}`);
+    }
+
+    if (data == null) {
+      return null;
+    }
+
+    return toAgentClaimRecord(data as JsonRecord);
+  }
+
   async runPolicyChecks(feature_id: string): Promise<PolicyCheckResult[]> {
     const { data, error } = await this.client.rpc('run_policy_checks', {
       p_feature_id: feature_id,
@@ -656,6 +702,9 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       p_reasoning: review.reasoning,
       p_watcher_agent: review.watcher_agent,
       p_confidence: review.confidence,
+      p_watcher_session_id: review.watcher_session_id,
+      p_trust_level: review.trust_level,
+      p_independence_override_reason: review.independence_override_reason,
     });
 
     if (error != null || data == null) {
@@ -670,6 +719,9 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       confidence: Number(row.confidence),
       reasoning: review.reasoning,
       watcher_agent: review.watcher_agent,
+      watcher_session_id: review.watcher_session_id,
+      trust_level: review.trust_level,
+      independence_override_reason: review.independence_override_reason,
       reviewed_at: new Date().toISOString(),
     };
   }
@@ -1158,6 +1210,54 @@ export class SupabaseWorkflowStateAdapter implements WorkflowStateAdapter {
       merged_by,
       pr_url: row.pr_url == null ? undefined : String(row.pr_url),
       pr_number: row.pr_number == null ? undefined : Number(row.pr_number),
+    };
+  }
+
+  async recordReleaseHandoff(feature_id: string, summary: string, created_by: string): Promise<ReleaseLifecycleRecord> {
+    const handoff_created_at = new Date().toISOString();
+    const { error } = await this.client
+      .from('features')
+      .update({
+        release_handoff_at: handoff_created_at,
+        release_handoff_by: created_by,
+        release_handoff_summary: summary,
+        updated_at: handoff_created_at,
+      })
+      .eq('id', feature_id);
+
+    if (error != null) {
+      throw new Error(`Failed to record release handoff lifecycle: ${error.message}`);
+    }
+
+    return {
+      feature_id,
+      handoff_created_at,
+      handoff_created_by: created_by,
+      handoff_summary: summary,
+    };
+  }
+
+  async recordReleaseCloseout(feature_id: string, summary: string, created_by: string): Promise<ReleaseLifecycleRecord> {
+    const closeout_created_at = new Date().toISOString();
+    const { error } = await this.client
+      .from('features')
+      .update({
+        release_closeout_at: closeout_created_at,
+        release_closeout_by: created_by,
+        release_closeout_summary: summary,
+        updated_at: closeout_created_at,
+      })
+      .eq('id', feature_id);
+
+    if (error != null) {
+      throw new Error(`Failed to record release closeout lifecycle: ${error.message}`);
+    }
+
+    return {
+      feature_id,
+      closeout_created_at,
+      closeout_created_by: created_by,
+      closeout_summary: summary,
     };
   }
 

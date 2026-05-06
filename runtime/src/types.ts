@@ -32,6 +32,7 @@ export const CLAIM_TYPES = [
 export const VERIFICATION_STATUSES = ['PENDING', 'PASS', 'FAIL', 'NEEDS_REVIEW'] as const;
 
 export const WATCHER_REVIEW_VERDICTS = ['PASS', 'FAIL'] as const;
+export const WATCHER_REVIEW_TRUST_LEVELS = ['independent', 'self_review', 'override'] as const;
 
 export const RISK_LEVELS = ['LOW', 'MEDIUM', 'HIGH'] as const;
 export const QUALITY_GATE_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'] as const;
@@ -90,6 +91,7 @@ export const PROMPT_REALIZATION_POLICIES = [
   'phase_bundle_required',
 ] as const;
 export const PROMPT_REALIZATION_PROOF_STATUSES = ['none', 'bundle_attested', 'bundle_verified'] as const;
+export const ATTESTATION_MODES = ['advisory', 'strict'] as const;
 
 export type PhaseId = (typeof PHASE_IDS)[number];
 export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
@@ -99,6 +101,7 @@ export type ReviewCheckStatus = (typeof REVIEW_CHECK_STATUSES)[number];
 export type ClaimType = (typeof CLAIM_TYPES)[number];
 export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
 export type WatcherReviewVerdict = (typeof WATCHER_REVIEW_VERDICTS)[number];
+export type WatcherReviewTrustLevel = (typeof WATCHER_REVIEW_TRUST_LEVELS)[number];
 export type RiskLevel = (typeof RISK_LEVELS)[number];
 export type QualityGateStatus = (typeof QUALITY_GATE_STATUSES)[number];
 export type LearningCategory = (typeof LEARNING_CATEGORIES)[number];
@@ -116,6 +119,13 @@ export type PhaseExecutionProofStatus = (typeof PHASE_EXECUTION_PROOF_STATUSES)[
 export type PhaseExecutionAttestationSource = (typeof PHASE_EXECUTION_ATTESTATION_SOURCES)[number];
 export type PromptRealizationPolicy = (typeof PROMPT_REALIZATION_POLICIES)[number];
 export type PromptRealizationProofStatus = (typeof PROMPT_REALIZATION_PROOF_STATUSES)[number];
+export type AttestationMode = (typeof ATTESTATION_MODES)[number];
+
+export interface AttestationPolicyConfig {
+  mode: AttestationMode;
+  require_execution_phases: PhaseId[];
+  require_prompt_realization_phases: PhaseId[];
+}
 
 export type PersistedTargetType = 'skill' | 'agent_definition' | 'agents_md';
 
@@ -176,8 +186,25 @@ export interface AutonomyFeatureState {
 export interface ReleaseStatusSummary {
   pr_url: string | null;
   pr_number: number | null;
+  stage: 'not_in_release' | 'handoff_ready' | 'handoff_created_waiting_merge' | 'merged_closeout_ready' | 'closed';
+  handoff_created_at: string | null;
+  handoff_created_by: string | null;
+  handoff_summary: string | null;
   merged_at: string | null;
+  closeout_created_at: string | null;
+  closeout_created_by: string | null;
+  closeout_summary: string | null;
   completed_at: string | null;
+}
+
+export interface ReleaseLifecycleRecord {
+  feature_id: string;
+  handoff_created_at?: string;
+  handoff_created_by?: string;
+  handoff_summary?: string;
+  closeout_created_at?: string;
+  closeout_created_by?: string;
+  closeout_summary?: string;
 }
 
 export interface KnowledgeDomain {
@@ -292,6 +319,9 @@ export interface WatcherReviewRecord {
   confidence: number;
   reasoning: string;
   watcher_agent: string;
+  watcher_session_id: string | null;
+  trust_level: WatcherReviewTrustLevel;
+  independence_override_reason: string | null;
   reviewed_at: string;
 }
 
@@ -322,7 +352,15 @@ export interface PhaseContract {
   purpose: string;
   definition_of_done: string[];
   required_artifacts: ArtifactOutputType[];
+  expected_artifacts: PhaseExpectedArtifact[];
   allowed_next_phases: PhaseId[];
+}
+
+export interface PhaseExpectedArtifact {
+  output_type: ArtifactOutputType;
+  artifact_path_pattern: string | null;
+  description: string;
+  required_in_strict: boolean;
 }
 
 export interface FeatureRecord {
@@ -338,7 +376,13 @@ export interface FeatureRecord {
   base_branch?: string;
   pr_url?: string;
   pr_number?: number;
+  release_handoff_at?: string;
+  release_handoff_by?: string;
+  release_handoff_summary?: string;
   merged_at?: string;
+  release_closeout_at?: string;
+  release_closeout_by?: string;
+  release_closeout_summary?: string;
   completed_at?: string;
   author?: string;
   created_at: string;
@@ -351,6 +395,7 @@ export interface PhaseArtifact {
   phase: PhaseId;
   output_type: ArtifactOutputType | string;
   content: unknown;
+  artifact_path?: string | null;
   created_by: string;
   created_at: string;
 }

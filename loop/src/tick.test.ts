@@ -100,6 +100,7 @@ function createClient(overrides: Partial<RuntimeToolClient> = {}): RuntimeToolCl
     archiveFeatureRelease: vi.fn(async () => undefined),
     recordPullRequest: vi.fn(async () => undefined),
     recordReleaseHandoff: vi.fn(async () => undefined),
+    recordReleaseCloseout: vi.fn(async () => undefined),
     recordReleaseHandoffFailure: vi.fn(async () => undefined),
     recordReleaseCloseoutFailure: vi.fn(async () => undefined),
     close: vi.fn(async () => undefined),
@@ -171,14 +172,10 @@ describe('runTick', () => {
         feature_id: 'FEAT-2',
       },
     });
-    expect(client.recordPhaseResult).toHaveBeenCalledWith({
+    expect(client.recordReleaseCloseout).toHaveBeenCalledWith({
       feature_id: 'FEAT-2',
-      phase: '9',
-      outcome: 'completed',
-      next_phase: '10',
       summary: 'ralph-loop closed Release after human merge.',
       created_by: 'ralph-loop',
-      blockers: [],
     });
     expect(client.registerPhaseExecution).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -208,7 +205,7 @@ describe('runTick', () => {
         },
         skipped_summary: [],
       })),
-      recordPhaseResult: vi.fn(async () => {
+      recordReleaseCloseout: vi.fn(async () => {
         throw new Error('runtime completion blocked');
       }),
     });

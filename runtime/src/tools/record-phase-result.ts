@@ -9,6 +9,7 @@ import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
 import type { RuntimeConfig } from '../config.js';
 import { resolveWorkflowActorName } from '../domain/actors.js';
 import { assessPhaseExecutionPolicy } from '../domain/execution-policy.js';
+import { assessPhaseExpectedArtifacts } from '../domain/phase-artifacts.js';
 import { getNextPhaseId, getPhaseContract } from '../domain/phases.js';
 import { assessPromptRealizationPolicy } from '../domain/prompt-realization.js';
 import { completeTaskArtifactContent } from '../domain/tasks.js';
@@ -17,6 +18,21 @@ import type { FeatureEvalSummary } from '../types.js';
 import { createErrorResult, createId, createTextResult } from '../utils.js';
 import { autoArchiveFeature } from './archive-feature-release.js';
 import { buildPhaseContextBundleForFeature } from './prepare-phase-context.js';
+
+function applyAttestationOverride<T extends { warning: string | null; error: string | null }>(
+  assessment: T,
+  override_reason: string | undefined,
+): T {
+  if (assessment.error == null || override_reason == null) {
+    return assessment;
+  }
+
+  return {
+    ...assessment,
+    warning: `${assessment.error} Override accepted: ${override_reason}`,
+    error: null,
+  };
+}
 
 async function completeBuilderTasks(
   adapter: WorkflowStateAdapter,
@@ -87,11 +103,18 @@ export async function handleRecordPhaseResult(
   }, {
     open_invocation: false,
   });
-  const execution_assessment = assessPhaseExecutionPolicy(input.phase, execution_attestation);
-  const prompt_realization_assessment = assessPromptRealizationPolicy(
-    input.phase,
-    expected_bundle.execution.phase_prompt_manifest,
-    prompt_realization,
+  const execution_assessment = applyAttestationOverride(
+    assessPhaseExecutionPolicy(input.phase, execution_attestation, config.attestation),
+    input.attestation_override_reason,
+  );
+  const prompt_realization_assessment = applyAttestationOverride(
+    assessPromptRealizationPolicy(
+      input.phase,
+      expected_bundle.execution.phase_prompt_manifest,
+      prompt_realization,
+      config.attestation,
+    ),
+    input.attestation_override_reason,
   );
 
   if (execution_assessment.error != null) {
@@ -119,6 +142,23 @@ export async function handleRecordPhaseResult(
         next_phase,
       }
     );
+  }
+
+  const artifact_completion =
+    input.outcome === 'completed'
+      ? assessPhaseExpectedArtifacts(
+          input.phase,
+          await adapter.listPhaseArtifacts(input.feature_id),
+          config.attestation,
+        )
+      : null;
+
+  if (artifact_completion?.error != null) {
+    return createErrorResult(artifact_completion.error, {
+      feature_id: input.feature_id,
+      phase: input.phase,
+      artifact_completion,
+    });
   }
 
   if (input.phase === '5' && input.outcome === 'completed') {
@@ -253,9 +293,9 @@ export async function handleRecordPhaseResult(
   }
 
   return createTextResult(
-    execution_assessment.warning == null && prompt_realization_assessment.warning == null
+    execution_assessment.warning == null && prompt_realization_assessment.warning == null && artifact_completion?.warning == null
       ? `Recorded ${input.outcome} result for phase ${input.phase} on feature ${input.feature_id}.`
-      : `Recorded ${input.outcome} result for phase ${input.phase} on feature ${input.feature_id}. Warning: ${[execution_assessment.warning, prompt_realization_assessment.warning].filter((value): value is string => value != null).join(' ')}`,
+      : `Recorded ${input.outcome} result for phase ${input.phase} on feature ${input.feature_id}. Warning: ${[execution_assessment.warning, prompt_realization_assessment.warning, artifact_completion?.warning].filter((value): value is string => value != null).join(' ')}`,
     {
       feature: updated_feature,
       next_phase,
@@ -265,6 +305,7 @@ export async function handleRecordPhaseResult(
       prompt_realization: {
         ...prompt_realization_assessment,
       },
+      artifact_completion,
       ...(feature_eval != null ? { feature_eval } : {}),
       ...(auto_archive != null ? { auto_archive } : {}),
     }
