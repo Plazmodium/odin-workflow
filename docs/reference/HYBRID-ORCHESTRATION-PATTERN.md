@@ -549,6 +549,7 @@ The orchestrator manages git branches per feature. Database records intent, orch
 4. Release phase: gh pr create, call record_pr()
 5. Human reviews and merges PR (NEVER the agent)
 6. Human calls record_merge()
+7. Orchestrator calls record_release_closeout()
 ```
 
 ### Branch Naming

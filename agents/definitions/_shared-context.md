@@ -293,7 +293,7 @@ PR merging is ALWAYS a human decision. This applies to ALL agents with git/gh ac
 
 - **Release agent**: Reads `context.automation` first. In `guarded`, it prepares PR handoff for a human. In `auto_pr`, it may create the PR via `gh pr create`, record PR URL via `odin.record_pr()`, then STOP.
 - **Human**: Reviews, approves, and merges the PR
-- **After merge**: Human (or agent on instruction) calls `odin.record_merge()` to update tracking
+- **After merge**: Human (or agent on instruction) calls `odin.record_merge()` to update merge tracking, then `odin.record_release_closeout()` completes Release metadata and phase 9 -> 10 closeout
 
 ---
 

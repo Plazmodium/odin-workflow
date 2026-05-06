@@ -49,30 +49,31 @@ Odin creates files in your project root.
 your-project/
 ├── .env.example
 ├── .odin/
-│   ├── ODIN.md
 │   ├── config.yaml
-│   ├── agents/
-│   │   └── definitions/
 │   └── skills/
+│       └── .gitkeep
 ├── .codex/config.toml    # Codex only when auto-written
 ├── .mcp.json             # Claude Code / Amp only when auto-written
 └── opencode.json         # OpenCode only when auto-written
 ```
 
+Odin does not copy broad managed workflow assets by default. Run `odin init --sync-managed-assets` only when you intentionally want packaged `.odin/ODIN.md`, `.odin/agents/definitions/`, and built-in skills copied locally.
+
 What the main files are for:
 
 - `.odin/config.yaml` - Odin runtime config for this project
-- `.odin/ODIN.md` - workflow instructions for the AI agent
-- `.odin/agents/definitions/` - the phase-agent prompt definitions the workflow uses
-- `.odin/skills/` - project-local skill overrides and additions
+- `.odin/skills/.gitkeep` - placeholder for project-local skill overrides and additions
 - `.env.example` - copy this to `.env` when you want database-backed features
 
 ## Step 3: Decide What To Commit
 
 Commit these:
 
-- `.odin/`
+- `.odin/config.yaml`
+- `.odin/skills/.gitkeep`
 - `.env.example`
+
+If you ran `odin init --sync-managed-assets`, also commit the synced managed assets when your team wants local Odin workflow overrides checked in.
 
 Keep this local:
 
@@ -89,11 +90,11 @@ Then ask the AI agent to confirm the `odin` tools are available.
 Suggested prompt:
 
 ```text
-Confirm the `odin` MCP tools are available in this project. Then use `.odin/ODIN.md` as your workflow guide for future feature work and summarize what Odin added to this repo.
+Confirm the `odin` MCP tools are available in this project. Summarize what Odin added to this repo and whether managed workflow assets were synced locally.
 ```
 
 Important:
-`.odin/ODIN.md` is for the AI agent. It is not the human onboarding document.
+If present, `.odin/ODIN.md` is for the AI agent. It is not the human onboarding document.
 
 ## Step 5: Choose Whether To Stay In `in_memory`
 
@@ -147,7 +148,7 @@ The orchestrator is responsible for creating the feature branch first and then r
 Suggested prompt:
 
 ```text
-Use Odin in this repository. Confirm the `odin` MCP tools are available, use `.odin/ODIN.md` as your workflow guide, and help me start a new feature for: <plain English feature request>. If you need my author name, initials, or any other missing metadata, ask me before starting.
+Use Odin in this repository. Confirm the `odin` MCP tools are available and help me start a new feature for: <plain English feature request>. If you need my author name, initials, or any other missing metadata, ask me before starting.
 ```
 
 If your setup does not automate feature start yet, the manual fallback helper is documented in [../../runtime/README.md](../../runtime/README.md).
@@ -199,7 +200,7 @@ No. `init` is one-time project setup.
 
 ### Is `.odin/ODIN.md` for me?
 
-No. It is for the AI agent to follow.
+No. If it exists because you opted into managed assets, it is for the AI agent to follow.
 
 ### What if I am in a monorepo?
 
