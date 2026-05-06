@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.8.1-beta] - 2026-05-06
+
+### Changed
+
+- Documentation now reflects the Odin 0.8 workflow hardening, including opt-in managed asset sync, attestation config defaults, explicit release closeout, artifact path metadata, and named Supabase setup checks.
+
 ## [0.8.0-beta] - 2026-05-05
 
 ### Added
