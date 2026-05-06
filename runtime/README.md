@@ -35,23 +35,25 @@ Important:
 ## What `init` Creates
 
 - `.odin/config.yaml` - runtime configuration
+- `.odin/ODIN.md` - local workflow guide for the AI agent
+- `.odin/managed-assets.json` - update metadata for managed Odin files
 - `.odin/skills/.gitkeep` - placeholder for project-local skill overrides
 - `.env.example` - environment template
 - your MCP config file when auto-config is supported for that tool
 
-Odin does not copy broad managed workflow assets by default. Run `odin init --sync-managed-assets` when you intentionally want packaged `.odin/ODIN.md`, `.odin/agents/definitions/`, and built-in skills copied into the target project for local overrides or inspection.
+Odin does not copy broad managed workflow assets by default. Run `odin init --sync-managed-assets` when you intentionally want packaged `.odin/agents/definitions/` and built-in skills copied into the target project for local overrides or inspection.
 
 ## After `init`
 
 1. Restart your AI tool so it reloads MCP servers.
 2. Confirm the `odin` server is available.
-3. Tell the AI agent to use the `odin` MCP tools for workflow state and phase context. If you opted into managed assets, `.odin/ODIN.md` is the local workflow guide.
+3. Tell the AI agent to use the `odin` MCP tools for workflow state and phase context. `odin init` also writes `.odin/ODIN.md` as the local workflow guide the agent can consult.
 4. If database credentials are configured, ask the AI agent to run `odin.apply_migrations`.
 
 Suggested first prompt:
 
 ```text
-Confirm the `odin` MCP tools are available. Summarize what Odin added to this repo, whether managed workflow assets were synced locally, and whether this project is still in `in_memory` mode or ready for migrations.
+Confirm the `odin` MCP tools are available. Use `.odin/ODIN.md` as your workflow guide, then summarize what Odin added to this repo, whether broad managed workflow assets were synced locally, and whether this project is still in `in_memory` mode or ready for migrations.
 ```
 
 Suggested migrations prompt:
@@ -61,7 +63,7 @@ If Odin database credentials are configured, run `odin.apply_migrations`. If the
 ```
 
 Important:
-If present, `.odin/ODIN.md` is for the AI agent. Humans should not treat it as the onboarding guide.
+`.odin/ODIN.md` is for the AI agent. Humans should not treat it as the onboarding guide.
 
 ## One-Time Setup vs Ongoing Use
 

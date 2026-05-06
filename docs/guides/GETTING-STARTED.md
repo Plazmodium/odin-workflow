@@ -50,6 +50,8 @@ your-project/
 ├── .env.example
 ├── .odin/
 │   ├── config.yaml
+│   ├── ODIN.md
+│   ├── managed-assets.json
 │   └── skills/
 │       └── .gitkeep
 ├── .codex/config.toml    # Codex only when auto-written
@@ -57,11 +59,13 @@ your-project/
 └── opencode.json         # OpenCode only when auto-written
 ```
 
-Odin does not copy broad managed workflow assets by default. Run `npx -y @plazmodium/odin init --sync-managed-assets` only when you intentionally want packaged `.odin/ODIN.md`, `.odin/agents/definitions/`, and built-in skills copied locally.
+Odin does not copy broad managed workflow assets by default. Run `npx -y @plazmodium/odin init --sync-managed-assets` only when you intentionally want packaged `.odin/agents/definitions/` and built-in skills copied locally.
 
 What the main files are for:
 
 - `.odin/config.yaml` - Odin runtime config for this project
+- `.odin/ODIN.md` - local workflow guide for your AI agent
+- `.odin/managed-assets.json` - update metadata so Odin can refresh managed files safely
 - `.odin/skills/.gitkeep` - placeholder for project-local skill overrides and additions
 - `.env.example` - copy this to `.env` when you want database-backed features
 
@@ -70,6 +74,8 @@ What the main files are for:
 Commit these:
 
 - `.odin/config.yaml`
+- `.odin/ODIN.md`
+- `.odin/managed-assets.json`
 - `.odin/skills/.gitkeep`
 - `.env.example`
 
@@ -90,11 +96,11 @@ Then ask the AI agent to confirm the `odin` tools are available.
 Suggested prompt:
 
 ```text
-Confirm the `odin` MCP tools are available in this project. Summarize what Odin added to this repo and whether managed workflow assets were synced locally.
+Confirm the `odin` MCP tools are available in this project. Use `.odin/ODIN.md` as your workflow guide, then summarize what Odin added to this repo and whether broad managed workflow assets were synced locally.
 ```
 
 Important:
-If present, `.odin/ODIN.md` is for the AI agent. It is not the human onboarding document.
+`.odin/ODIN.md` is for the AI agent. It is not the human onboarding document.
 
 ## Step 5: Choose Whether To Stay In `in_memory`
 
@@ -200,7 +206,7 @@ No. `init` is one-time project setup.
 
 ### Is `.odin/ODIN.md` for me?
 
-No. If it exists because you opted into managed assets, it is for the AI agent to follow.
+No. `odin init` creates it for the AI agent to follow.
 
 ### What if I am in a monorepo?
 

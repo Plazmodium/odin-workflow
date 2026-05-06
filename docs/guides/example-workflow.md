@@ -40,7 +40,7 @@ Restart the tool so it reloads MCP servers.
 Then send a prompt like this:
 
 ```text
-Confirm the `odin` MCP tools are available in this project. Summarize what Odin added to this repo and whether managed workflow assets were synced locally.
+Confirm the `odin` MCP tools are available in this project. Use `.odin/ODIN.md` as your workflow guide, then summarize what Odin added to this repo and whether broad managed workflow assets were synced locally.
 ```
 
 At this point, Odin is running in `in_memory` mode unless you have already configured database credentials.
@@ -78,7 +78,7 @@ In the normal flow, the orchestrator handles branch creation first and then reco
 The exact content depends on your feature, but the flow normally looks like this:
 
 1. confirm the feature exists and inspect the next phase
-2. use phase guidance from `odin.prepare_phase_context` and, when synced, `.odin/ODIN.md`
+2. use `.odin/ODIN.md` plus phase guidance from `odin.prepare_phase_context`
 3. produce the phase output
 4. record artifacts/evals/claims individually, or use `odin.complete_phase_bundle` for one validated completion call
 5. close or block the phase with `odin.record_phase_result` when not using the bundle tool
@@ -121,7 +121,7 @@ Usually no. In the normal flow, your AI tool's orchestrating session handles fea
 
 ### Do I need to read `.odin/ODIN.md` myself?
 
-No. If managed assets were synced, the AI agent can use it as the local workflow guide.
+No. `odin init` creates it as the local workflow guide for the AI agent.
 
 ### Do I need Supabase before I can try Odin?
 

@@ -100,6 +100,11 @@ interface ManagedAssetSyncResult {
   manifest_path: string;
 }
 
+interface ManagedFileTarget {
+  source: string;
+  managedPath: string;
+}
+
 const VALID_TOOLS: readonly HarnessTool[] = ['opencode', 'claude-code', 'amp', 'codex', 'generic'];
 const VALID_DISTRIBUTIONS: readonly DistributionMode[] = ['published', 'source'];
 
@@ -177,7 +182,7 @@ Options:
                               (opencode.json for opencode,
                                .mcp.json for claude-code/amp,
                                .codex/config.toml for codex)
-  --sync-managed-assets  Copy packaged Odin agent definitions and skills into .odin/
+  --sync-managed-assets  Copy packaged Odin agent definitions and built-in skills into .odin/
   --force                Overwrite existing config files
   -h, --help             Show this help message
 
@@ -344,71 +349,77 @@ function resolveAssetRoot(): string {
   return found;
 }
 
-function ensureManagedAssets(projectRoot: string, force: boolean): ManagedAssetSyncResult {
-  const assetRoot = resolveAssetRoot();
+function syncManagedFiles(projectRoot: string, force: boolean, targets: ManagedFileTarget[]): ManagedAssetSyncResult {
   const odinDir = join(projectRoot, '.odin');
   const manifestPath = join(odinDir, 'managed-assets.json');
   const manifest = readManagedAssetManifest(manifestPath);
   const nextManifest: ManagedAssetManifest = { version: 1, files: { ...manifest.files } };
-  const sourceTargets = [
-    { source: join(assetRoot, 'ODIN.md'), targetPrefix: '.odin' },
-    { source: join(assetRoot, 'agents', 'definitions'), targetPrefix: '.odin/agents/definitions' },
-    { source: join(assetRoot, 'agents', 'skills'), targetPrefix: '.odin/skills' },
-  ];
   let written = 0;
   let kept = 0;
   const conflicts: string[] = [];
 
   ensureDir(odinDir);
 
-  for (const target of sourceTargets) {
-    const sourceFiles = existsSync(target.source)
-      ? target.source.endsWith('ODIN.md')
-        ? [target.source]
-        : collectFiles(target.source)
-      : [];
+  for (const target of targets) {
+    const destination = join(projectRoot, target.managedPath);
+    const sourceContent = readFileSync(target.source, 'utf8');
+    const sourceHash = hashContent(sourceContent);
+    const previousHash = manifest.files[target.managedPath];
 
-    for (const sourceFile of sourceFiles) {
-      const relativePath = sourceFile === target.source
-        ? 'ODIN.md'
-        : relativeAssetPath(target.source, sourceFile);
-      const managedPath = target.source.endsWith('ODIN.md')
-        ? '.odin/ODIN.md'
-        : `${target.targetPrefix}/${relativePath}`;
-      const destination = join(projectRoot, managedPath);
-      const sourceContent = readFileSync(sourceFile, 'utf8');
-      const sourceHash = hashContent(sourceContent);
-      const previousHash = manifest.files[managedPath];
-
-      if (!existsSync(destination) || force) {
-        ensureDir(dirname(destination));
-        writeFileSync(destination, sourceContent, 'utf8');
-        nextManifest.files[managedPath] = sourceHash;
-        written += 1;
-        continue;
-      }
-
-      const currentContent = readFileSync(destination, 'utf8');
-      const currentHash = hashContent(currentContent);
-      if (currentHash === sourceHash) {
-        nextManifest.files[managedPath] = sourceHash;
-        kept += 1;
-        continue;
-      }
-
-      if (previousHash != null && currentHash === previousHash) {
-        writeFileSync(destination, sourceContent, 'utf8');
-        nextManifest.files[managedPath] = sourceHash;
-        written += 1;
-        continue;
-      }
-
-      conflicts.push(managedPath);
+    if (!existsSync(destination) || force) {
+      ensureDir(dirname(destination));
+      writeFileSync(destination, sourceContent, 'utf8');
+      nextManifest.files[target.managedPath] = sourceHash;
+      written += 1;
+      continue;
     }
+
+    const currentContent = readFileSync(destination, 'utf8');
+    const currentHash = hashContent(currentContent);
+    if (currentHash === sourceHash) {
+      nextManifest.files[target.managedPath] = sourceHash;
+      kept += 1;
+      continue;
+    }
+
+    if (previousHash != null && currentHash === previousHash) {
+      writeFileSync(destination, sourceContent, 'utf8');
+      nextManifest.files[target.managedPath] = sourceHash;
+      written += 1;
+      continue;
+    }
+
+    conflicts.push(target.managedPath);
   }
 
   writeFileSync(manifestPath, `${JSON.stringify(nextManifest, null, 2)}\n`, 'utf8');
   return { written, kept, conflicts, manifest_path: manifestPath };
+}
+
+function collectManagedDirectoryTargets(sourceRoot: string, targetPrefix: string): ManagedFileTarget[] {
+  if (!existsSync(sourceRoot)) {
+    return [];
+  }
+
+  return collectFiles(sourceRoot).map((source) => ({
+    source,
+    managedPath: `${targetPrefix}/${relativeAssetPath(sourceRoot, source)}`,
+  }));
+}
+
+function ensureWorkflowGuide(projectRoot: string, force: boolean): ManagedAssetSyncResult {
+  const assetRoot = resolveAssetRoot();
+  return syncManagedFiles(projectRoot, force, [
+    { source: join(assetRoot, 'ODIN.md'), managedPath: '.odin/ODIN.md' },
+  ]);
+}
+
+function ensureManagedAssets(projectRoot: string, force: boolean): ManagedAssetSyncResult {
+  const assetRoot = resolveAssetRoot();
+  return syncManagedFiles(projectRoot, force, [
+    ...collectManagedDirectoryTargets(join(assetRoot, 'agents', 'definitions'), '.odin/agents/definitions'),
+    ...collectManagedDirectoryTargets(join(assetRoot, 'agents', 'skills'), '.odin/skills'),
+  ]);
 }
 
 function ensureEnvExample(projectRoot: string, force: boolean): { path: string; changed: boolean } {
@@ -678,6 +689,7 @@ function main(): void {
   }
 
   const config = ensureConfig(options.projectRoot, options.force);
+  const workflowGuide = ensureWorkflowGuide(options.projectRoot, options.force);
   const managedAssets = options.syncManagedAssets ? ensureManagedAssets(options.projectRoot, options.force) : null;
   const envExample = ensureEnvExample(options.projectRoot, options.force);
   const mcpSnippet = createMcpJsonSnippet(options.projectRoot, options.distribution);
@@ -691,8 +703,15 @@ function main(): void {
   if (existsSync(tomlConfigPath)) {
     console.log(`- kept ${tomlConfigPath} (Odin runtime reads .odin/config.yaml; .odin/config.toml is not active runtime config)`);
   }
+  if (workflowGuide.conflicts.length > 0) {
+    console.log(
+      `- skipped locally modified Odin workflow guide; rerun with --force to overwrite: ${workflowGuide.conflicts.join(', ')}`
+    );
+  } else {
+    console.log(`- ${workflowGuide.written > 0 ? 'wrote' : 'kept'} ${join(options.projectRoot, '.odin', 'ODIN.md')}`);
+  }
   if (managedAssets == null) {
-    console.log('- skipped Odin managed asset sync (rerun with --sync-managed-assets to refresh .odin/ODIN.md, agent definitions, and skills)');
+    console.log('- skipped broad Odin managed asset sync (rerun with --sync-managed-assets to copy agent definitions and built-in skills)');
   } else {
     console.log(
       `- synced Odin managed assets: ${managedAssets.written} written, ${managedAssets.kept} kept (${managedAssets.manifest_path})`
