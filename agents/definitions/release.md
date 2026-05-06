@@ -211,7 +211,7 @@ End your `release-report.md` with:
 1. Execute state changes via MCP
 2. If no PR was created automatically, human creates the PR using the provided handoff payload
 3. Human reviews and merges the PR
-4. After merge, the orchestrator records `odin.record_merge()` and closes the workflow
+4. After merge, the orchestrator records `odin.record_merge()` and then `odin.record_release_closeout()` to complete Release closeout
 ```
 
 ---

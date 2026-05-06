@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.8.1-beta] - 2026-05-06
+
+### Changed
+
+- `odin init` now creates `.odin/ODIN.md` by default as the local AI workflow guide, while `--sync-managed-assets` remains limited to broad local copies of agent definitions and built-in skills.
+- Documentation now reflects the Odin 0.8 workflow hardening, including attestation config defaults, explicit release closeout, artifact path metadata, and named Supabase setup checks.
+
 ## [0.8.0-beta] - 2026-05-05
 
 ### Added

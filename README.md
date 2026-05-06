@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.6.3--beta-orange" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.8.1--beta-orange" alt="Version">
   <img src="https://img.shields.io/badge/workflow-11_phase-blue" alt="11-phase workflow">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
 </p>
@@ -103,34 +103,38 @@ Odin writes `.odin/` into the directory you run this command from, unless you pa
 What `init` does:
 
 - creates `.odin/config.yaml`
-- copies Odin's agent-facing workflow files into `.odin/`
+- creates `.odin/ODIN.md` as the local workflow guide for your AI agent
+- creates `.odin/managed-assets.json` so Odin can refresh managed files without clobbering local edits
+- creates `.odin/skills/.gitkeep` for project-local skill overrides
 - writes `.env.example`
 - writes your MCP config when auto-config is supported for that tool
 - defaults Odin to `runtime.mode: in_memory` so you can try it without external services first
 
+Odin does not copy broad managed workflow assets by default. Add `--sync-managed-assets` when you intentionally want packaged `.odin/agents/definitions/` and built-in skills copied into the project for local overrides or inspection.
+
 ### What gets created in your project
 
 - `.odin/config.yaml` - Odin runtime config
-- `.odin/ODIN.md` - workflow instructions for your AI agent
-- `.odin/agents/definitions/` - the phase-agent prompt definitions Odin uses
-- `.odin/skills/` - project-local skill overrides
+- `.odin/ODIN.md` - local workflow guide for your AI agent
+- `.odin/managed-assets.json` - update metadata for managed Odin files
+- `.odin/skills/.gitkeep` - placeholder for project-local skill overrides
 - `.env.example` - environment variable template
 - tool config such as `opencode.json`, `.mcp.json`, or `.codex/config.toml` when auto-config is supported
 
-At minimum, commit `.odin/` and `.env.example`. Keep `.env` local.
+At minimum, commit `.odin/config.yaml`, `.odin/ODIN.md`, `.odin/managed-assets.json`, `.odin/skills/.gitkeep`, and `.env.example`. Keep `.env` local.
 
 ## After `init`
 
 1. Restart your AI tool so it reloads MCP servers.
 2. Confirm the `odin` MCP server is available.
-3. Tell your AI agent to use `.odin/ODIN.md` as its workflow guide.
+3. Tell your AI agent to use the `odin` MCP tools for workflow state and phase context. `odin init` also writes `.odin/ODIN.md` as the local workflow guide the agent can consult.
 
 From this point on, you normally work through your AI tool. The AI tool calls Odin's MCP server; you do not rerun `init` for every feature.
 
 Suggested first prompt:
 
 ```text
-Confirm the `odin` MCP tools are available in this project. Then use `.odin/ODIN.md` as your workflow guide for future feature work and tell me what Odin added to this repo.
+Confirm the `odin` MCP tools are available in this project. Use `.odin/ODIN.md` as your workflow guide, then tell me what Odin added to this repo and whether broad managed workflow assets were synced locally.
 ```
 
 Important:
@@ -163,7 +167,7 @@ The normal way to start is back in your AI tool, not with a manual CLI command.
 Suggested prompt:
 
 ```text
-Use Odin in this repository. Confirm the `odin` MCP tools are available, use `.odin/ODIN.md` as your workflow guide, and help me start a new feature for: <plain English feature request>. If you need my author name, initials, or any other missing metadata, ask me before starting.
+Use Odin in this repository. Confirm the `odin` MCP tools are available and help me start a new feature for: <plain English feature request>. If you need my author name, initials, or any other missing metadata, ask me before starting.
 ```
 
 In the normal flow, the orchestrating AI session handles the branch-first + `odin.start_feature` workflow for you.

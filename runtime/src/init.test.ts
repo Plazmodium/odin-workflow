@@ -35,19 +35,19 @@ describe('odin-runtime-init', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('creates config and .env.example without syncing managed assets by default', () => {
+  it('creates config, ODIN.md, and .env.example without syncing broad managed assets by default', () => {
     const output = runInit(`--project-root ${tmpDir}`);
 
     expect(existsSync(join(tmpDir, '.odin', 'config.yaml'))).toBe(true);
     expect(existsSync(join(tmpDir, '.odin', 'skills', '.gitkeep'))).toBe(true);
-    expect(existsSync(join(tmpDir, '.odin', 'ODIN.md'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.odin', 'ODIN.md'))).toBe(true);
     expect(existsSync(join(tmpDir, '.odin', 'agents', 'definitions', '_shared-context.md'))).toBe(false);
     expect(existsSync(join(tmpDir, '.odin', 'agents', 'definitions', 'builder.md'))).toBe(false);
     expect(existsSync(join(tmpDir, '.odin', 'skills', 'testing', 'vitest', 'SKILL.md'))).toBe(false);
-    expect(existsSync(join(tmpDir, '.odin', 'managed-assets.json'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.odin', 'managed-assets.json'))).toBe(true);
     expect(existsSync(join(tmpDir, '.env.example'))).toBe(true);
     expect(output).toContain('Odin runtime project bootstrap complete');
-    expect(output).toContain('skipped Odin managed asset sync');
+    expect(output).toContain('skipped broad Odin managed asset sync');
     expect(output).toContain('runtime quick-start mode: in_memory');
     expect(output).toContain('odin.get_development_eval_status');
     expect(output).toContain('Canonical eval-aware orchestration snippet');
@@ -65,7 +65,7 @@ describe('odin-runtime-init', () => {
     expect(config).toContain('mode: advisory');
   });
 
-  it('syncs managed Odin assets when requested', () => {
+  it('syncs broad managed Odin assets when requested', () => {
     const output = runInit(`--project-root ${tmpDir} --sync-managed-assets`);
 
     expect(existsSync(join(tmpDir, '.odin', 'ODIN.md'))).toBe(true);
@@ -74,6 +74,19 @@ describe('odin-runtime-init', () => {
     expect(existsSync(join(tmpDir, '.odin', 'skills', 'testing', 'vitest', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(tmpDir, '.odin', 'managed-assets.json'))).toBe(true);
     expect(output).toContain('synced Odin managed assets');
+  });
+
+  it('preserves a locally edited ODIN.md on rerun', () => {
+    runInit(`--project-root ${tmpDir}`);
+
+    const guidePath = join(tmpDir, '.odin', 'ODIN.md');
+    const localEdit = `${readFileSync(guidePath, 'utf8')}\nlocal project note\n`;
+    writeFileSync(guidePath, localEdit, 'utf8');
+
+    const output = runInit(`--project-root ${tmpDir}`);
+
+    expect(readFileSync(guidePath, 'utf8')).toBe(localEdit);
+    expect(output).toContain('skipped locally modified Odin workflow guide');
   });
 
   it('patches existing config with missing defaults without overwriting custom values', () => {

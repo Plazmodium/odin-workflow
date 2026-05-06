@@ -49,7 +49,7 @@ npm run init:project -- --project-root /path/to/your/project --tool codex --dist
 npm run init:project -- --project-root /path/to/your/project --tool generic --distribution source
 ```
 
-That writes `.odin/` into the target project and points the MCP server config at this repo checkout's built runtime.
+That writes the default `.odin/config.yaml`, `.odin/ODIN.md`, `.odin/skills/.gitkeep`, `.env.example`, and MCP wiring into the target project while pointing the MCP server config at this repo checkout's built runtime. Add `--sync-managed-assets` if you also need packaged agent definitions and built-in skills copied for local inspection or override testing.
 
 ## Run The Runtime Locally
 

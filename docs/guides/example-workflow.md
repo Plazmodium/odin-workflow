@@ -40,7 +40,7 @@ Restart the tool so it reloads MCP servers.
 Then send a prompt like this:
 
 ```text
-Confirm the `odin` MCP tools are available in this project. Then use `.odin/ODIN.md` as your workflow guide and summarize what Odin added to this repo.
+Confirm the `odin` MCP tools are available in this project. Use `.odin/ODIN.md` as your workflow guide, then summarize what Odin added to this repo and whether broad managed workflow assets were synced locally.
 ```
 
 At this point, Odin is running in `in_memory` mode unless you have already configured database credentials.
@@ -68,7 +68,7 @@ Now stay inside your AI tool and let the agent work through Odin.
 Suggested prompt:
 
 ```text
-Use Odin in this repository. Confirm the `odin` MCP tools are available, use `.odin/ODIN.md` as your workflow guide, and help me start a new feature for a login flow. If you need my author name, initials, or any other missing metadata, ask me before starting.
+Use Odin in this repository. Confirm the `odin` MCP tools are available and help me start a new feature for a login flow. If you need my author name, initials, or any other missing metadata, ask me before starting.
 ```
 
 In the normal flow, the orchestrator handles branch creation first and then records the feature through `odin.start_feature`.
@@ -78,7 +78,7 @@ In the normal flow, the orchestrator handles branch creation first and then reco
 The exact content depends on your feature, but the flow normally looks like this:
 
 1. confirm the feature exists and inspect the next phase
-2. use the phase guidance from `.odin/ODIN.md`
+2. use `.odin/ODIN.md` plus phase guidance from `odin.prepare_phase_context`
 3. produce the phase output
 4. record artifacts/evals/claims individually, or use `odin.complete_phase_bundle` for one validated completion call
 5. close or block the phase with `odin.record_phase_result` when not using the bundle tool
@@ -121,7 +121,7 @@ Usually no. In the normal flow, your AI tool's orchestrating session handles fea
 
 ### Do I need to read `.odin/ODIN.md` myself?
 
-No. The AI agent should use it as the workflow guide.
+No. `odin init` creates it as the local workflow guide for the AI agent.
 
 ### Do I need Supabase before I can try Odin?
 

@@ -35,23 +35,25 @@ Important:
 ## What `init` Creates
 
 - `.odin/config.yaml` - runtime configuration
+- `.odin/ODIN.md` - local workflow guide for the AI agent
+- `.odin/managed-assets.json` - update metadata for managed Odin files
 - `.odin/skills/.gitkeep` - placeholder for project-local skill overrides
 - `.env.example` - environment template
 - your MCP config file when auto-config is supported for that tool
 
-Odin does not copy broad managed workflow assets by default. Run `odin init --sync-managed-assets` when you intentionally want packaged `.odin/ODIN.md`, `.odin/agents/definitions/`, and built-in skills copied into the target project for local overrides or inspection.
+Odin does not copy broad managed workflow assets by default. Run `odin init --sync-managed-assets` when you intentionally want packaged `.odin/agents/definitions/` and built-in skills copied into the target project for local overrides or inspection.
 
 ## After `init`
 
 1. Restart your AI tool so it reloads MCP servers.
 2. Confirm the `odin` server is available.
-3. Tell the AI agent to use `.odin/ODIN.md` as its workflow guide.
+3. Tell the AI agent to use the `odin` MCP tools for workflow state and phase context. `odin init` also writes `.odin/ODIN.md` as the local workflow guide the agent can consult.
 4. If database credentials are configured, ask the AI agent to run `odin.apply_migrations`.
 
 Suggested first prompt:
 
 ```text
-Confirm the `odin` MCP tools are available. Then use `.odin/ODIN.md` as your workflow guide, summarize what Odin added to this repo, and tell me whether this project is still in `in_memory` mode or ready for migrations.
+Confirm the `odin` MCP tools are available. Use `.odin/ODIN.md` as your workflow guide, then summarize what Odin added to this repo, whether broad managed workflow assets were synced locally, and whether this project is still in `in_memory` mode or ready for migrations.
 ```
 
 Suggested migrations prompt:
@@ -72,7 +74,7 @@ Important:
 Suggested start prompt:
 
 ```text
-Use Odin in this repository. Confirm the `odin` MCP tools are available, use `.odin/ODIN.md` as your workflow guide, and help me start a new feature for: <plain English feature request>. If you need my author name, initials, or any other missing metadata, ask me before starting.
+Use Odin in this repository. Confirm the `odin` MCP tools are available and help me start a new feature for: <plain English feature request>. If you need my author name, initials, or any other missing metadata, ask me before starting.
 ```
 
 ### Manual fallback: `odin start-feature`
@@ -195,8 +197,9 @@ For Junie and other emerging tools, use the same generic server block when your 
 runtime:
   mode: in_memory
 
-database:
-  url: ${DATABASE_URL}
+# Switch to `supabase` when you want persistent workflow state.
+# runtime:
+#   mode: supabase
 
 supabase:
   url: ${SUPABASE_URL}
@@ -205,6 +208,7 @@ supabase:
 skills:
   paths:
     - .odin/skills
+  defaults: []
   auto_detect: true
 
 review:
@@ -221,12 +225,25 @@ automation:
   kill_switch: false
   merge_strategy: squash
 
-formal_verification:
-  provider: none
-  timeout_seconds: 120
+# `auto_pr` is opt-in and only works on allowlisted base branches.
+# `auto_merge` is reserved for future use and is not supported yet.
+
+attestation:
+  # advisory warns; strict blocks configured phases unless an override reason is supplied.
+  mode: advisory
+  require_execution_phases: ["5", "6", "7", "9"]
+  require_prompt_realization_phases: ["5", "6", "7", "9"]
+
+# formal_verification:
+#   provider: tla-precheck    # requires: Java 17+, npm install -D tla-precheck
+#   timeout_seconds: 120
 
 archive:
   provider: none
+
+# Enable Supabase archival after switching workflow state to remote Supabase.
+# archive:
+#   provider: supabase
 ```
 
 Odin runtime reads `.odin/config.yaml`. A `.odin/config.toml` file is not active runtime config; `.codex/config.toml` is only Codex MCP host wiring.
@@ -244,6 +261,7 @@ These are the runtime calls most users notice first:
 | `odin.record_phase_artifact` | Save phase outputs, optionally with `artifact_path` metadata |
 | `odin.record_phase_result` | Advance or block the phase |
 | `odin.complete_phase_bundle` | Record artifacts/evals/claims/checks and phase result in one validated operation |
+| `odin.record_release_closeout` | Complete Release after recorded PR merge |
 | `odin.run_review_checks` | Run review/security checks |
 | `odin.get_feature_status` | Inspect workflow status |
 

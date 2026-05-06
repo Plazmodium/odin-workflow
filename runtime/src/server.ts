@@ -2,7 +2,7 @@
 
 /**
  * Odin MCP Runtime
- * Version: 0.1.0
+ * Version: 0.8.1-beta
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -199,7 +199,7 @@ const formal_verification_adapter = createFormalVerificationAdapter(project_root
 const server = new McpServer(
   {
     name: 'odin',
-    version: '0.8.0-beta',
+    version: '0.8.1-beta',
   },
   {
     capabilities: {
