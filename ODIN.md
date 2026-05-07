@@ -529,7 +529,8 @@ The Reviewer agent (Phase 6) runs review checks. Code changes use Semgrep; docum
 ### How It Works
 
 The orchestrator calls:
-```
+
+```typescript
 odin.run_review_checks({
   feature_id: "FEAT-001",
   tool: "semgrep",
@@ -614,7 +615,7 @@ The `dev_initials` and `author` parameters in `odin.start_feature` identify the 
 1. **Orchestrator creates the git branch FIRST**: `git checkout -b {dev_initials}/feature/{FEATURE-ID}` — this must succeed before anything is recorded in the database
 2. **Only after the branch exists**, call `odin.start_feature` to record the feature
 3. Transition to Phase 1 (Product) — all work happens on the feature branch
-4. Each phase: `odin.prepare_phase_context` → inspect `phase_agent_readiness` → launch/realize the phase agent or record reduced fidelity → agent work → either individual records (`odin.record_phase_artifact`, claims/evals, `odin.record_phase_result`) or one `odin.complete_phase_bundle` call
+4. Each phase: `odin.prepare_phase_context` → inspect `phase_agent_readiness` → launch/realize the phase agent or record reduced fidelity → agent work → either individual records (`odin.record_phase_artifact`, claims/evals, `odin.record_phase_result`) or one `odin.complete_phase_bundle` call. In strict mode, watched completed phases must submit and verify claims before completion; do not include claims inside a completed `odin.complete_phase_bundle` call.
 5. `odin.prepare_phase_context` may open invocation telemetry; this is timing/lineage only, not proof that a canonical phase agent ran. Full-Odin proof requires `odin.record_phase_agent_launch`, `odin.register_phase_execution`, and `odin.register_phase_realization` when strict policy requires them.
 6. Release phase inspects `context.automation` from `odin.prepare_phase_context`
 7. In `guarded`, prepare the PR handoff for a human; in `auto_pr`, create the PR via `gh pr create` only when policy allows it, then record it with `odin.record_pr`
@@ -1003,25 +1004,20 @@ odin.record_phase_result({
 })
 ```
 
-> `odin.prepare_phase_context` returns an `invocation` object. That invocation stays open while the agent works and is completed automatically when `odin.record_phase_result` is called for the same phase.
+Runtime notes:
 
-> In strict attestation mode, `odin.prepare_phase_context` also returns `phase_agent_readiness`. If `can_record_phase_work` is false, do not record phase artifacts, evals, review checks, or watched claims yet. Launch the canonical phase agent directly, or spawn a subagent from the returned phase prompt manifest, then record `odin.register_phase_execution` and `odin.register_phase_realization` before phase work is written.
-
-> Harnesses should also call `odin.record_phase_agent_launch` when a phase agent is actually launched, or with `launch_mode: "inline_reduced_fidelity"` when the orchestrator performs the phase inline. Inline reduced-fidelity records do not satisfy strict full-Odin gates.
-
-> Each phase should record `odin.record_phase_skills_applied` with the skills actually used, or explicitly mark fallback/no-applicable-skill. This is separate from the skills resolved in context.
-
-> Strict watched claims must be evidence-backed when submitted. Include non-empty `evidence_refs` or structured `evidence` such as command outputs, file paths, artifact ids/paths, commit hashes, PR URLs, or verification summaries.
-
-> When Development Evals are relevant, `odin.prepare_phase_context` also returns `development_evals.expected_artifacts`, `development_evals.expected_gate`, `development_evals.status_summary`, and `development_evals.harness_prompt_block`. Harnesses should append the `harness_prompt_block` lines to the active agent prompt instead of relying on implicit eval behavior.
-
-> If the harness wants a focused eval-only read path, use `odin.get_development_eval_status({ feature_id })` instead of parsing the broader `odin.get_feature_status` payload.
-
-> Canonical eval-aware harness flow: `odin.prepare_phase_context` -> build prompt from `role_summary`, `constraints`, and `harness_prompt_block` -> `odin.get_development_eval_status` when focused eval state is needed -> `odin.record_eval_plan` / `odin.record_eval_run` / `odin.record_quality_gate` as work completes.
+- `odin.prepare_phase_context` returns an `invocation` object. That invocation stays open while the agent works and is completed automatically when `odin.record_phase_result` is called for the same phase.
+- In strict attestation mode, `odin.prepare_phase_context` also returns `phase_agent_readiness`. If `can_record_phase_work` is false, do not record phase artifacts, evals, review checks, or watched claims yet. Launch the canonical phase agent directly, or spawn a subagent from the returned phase prompt manifest, then record `odin.register_phase_execution` and `odin.register_phase_realization` before phase work is written.
+- Harnesses should also call `odin.record_phase_agent_launch` when a phase agent is actually launched, or with `launch_mode: "inline_reduced_fidelity"` when the orchestrator performs the phase inline. Inline reduced-fidelity records do not satisfy strict full-Odin gates.
+- Each phase should record `odin.record_phase_skills_applied` with the skills actually used, or explicitly mark fallback/no-applicable-skill. This is separate from the skills resolved in context.
+- Strict watched claims must be evidence-backed when submitted. Include non-empty `evidence_refs` or structured `evidence` such as command outputs, file paths, artifact ids/paths, commit hashes, PR URLs, or verification summaries.
+- When Development Evals are relevant, `odin.prepare_phase_context` also returns `development_evals.expected_artifacts`, `development_evals.expected_gate`, `development_evals.status_summary`, and `development_evals.harness_prompt_block`. Harnesses should append the `harness_prompt_block` lines to the active agent prompt instead of relying on implicit eval behavior.
+- If the harness wants a focused eval-only read path, use `odin.get_development_eval_status({ feature_id })` instead of parsing the broader `odin.get_feature_status` payload.
+- Canonical eval-aware harness flow: `odin.prepare_phase_context` -> build prompt from `role_summary`, `constraints`, and `harness_prompt_block` -> `odin.get_development_eval_status` when focused eval state is needed -> `odin.record_eval_plan` / `odin.record_eval_run` / `odin.record_quality_gate` as work completes.
 
 ### Review & Verification
 
-```
+```typescript
 odin.run_review_checks({
   feature_id: "FEAT-001",
   initiated_by: "reviewer-agent",

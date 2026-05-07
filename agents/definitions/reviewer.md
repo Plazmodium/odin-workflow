@@ -138,9 +138,11 @@ The orchestrator runs the runtime tool and provides the result.
 
 ---
 
-### Step 3: Parse and Record Findings
+### Step 3: Parse Review Findings
 
-For each finding in Semgrep output, extract. The `docs_process` profile may return no security findings; in that case, record the review check result and continue.
+Use the `odin.run_review_checks` output to summarize findings in `security-review.md`. The runtime owns review-check and finding persistence; do not document separate manual security-finding state changes.
+
+For each finding in Semgrep output, summarize:
 - `rule_id`: Semgrep rule identifier
 - `severity`: CRITICAL/HIGH/MEDIUM/LOW/INFO
 - `file_path`: File containing the issue
@@ -148,19 +150,7 @@ For each finding in Semgrep output, extract. The `docs_process` profile may retu
 - `message`: Description of the vulnerability
 - `snippet`: Code snippet (if available)
 
-Record each finding via State Changes:
-
-```markdown
-### Record Security Finding
-- **Feature ID**: FEAT-001
-- **Tool**: semgrep
-- **Severity**: HIGH
-- **Rule ID**: javascript.lang.security.audit.sqli.node-postgres-sqli
-- **File Path**: src/api/users.ts
-- **Line Number**: 42
-- **Message**: Detected SQL injection vulnerability in query construction
-- **Snippet**: `const query = "SELECT * FROM users WHERE id = " + userId`
-```
+The `docs_process` profile may return no security findings; in that case, summarize the review check result and continue.
 
 ---
 
@@ -350,36 +340,34 @@ OR
 ---
 ## State Changes Required
 
-### 1. Record Security Findings
-[For each finding, document the record_security_finding call]
-
-### 2. Record Review Check
+### 1. Record Review Check
 - **Runtime Call**: `odin.run_review_checks`
 - **Tool**: `semgrep` / `docs_process`
 - **Changed Files**: [files]
+- **Notes**: [Summary of findings returned by the runtime]
 
-### 3. Record Development Eval Artifact
+### 2. Record Development Eval Artifact
 - **Runtime Call**: `odin.record_eval_run`
 - **Output Type**: `eval_run`
 - **Status**: passed / failed / partial / blocked
 - **Notes**: [Summary of cases run and manual review]
 
-### 4. Record Skills Applied
+### 3. Record Skills Applied
 - **Runtime Call**: `odin.record_phase_skills_applied`
 - **Skills Applied**: [`testing/unit-tests-eval-sdd`, ...]
 
-### 5. Gate Decision
+### 4. Gate Decision
 - **Feature ID**: FEAT-001
 - **Gate**: reviewer_approval
 - **Status**: APPROVED / REJECTED
 - **Reason**: [Summary]
 
-### 6. Transition Phase (if PROCEED)
+### 5. Transition Phase (if PROCEED)
 - **From Phase**: 6 (Reviewer)
 - **To Phase**: 7 (Integrator)
 - **Notes**: Security review passed, X deferred findings tracked
 
-### 7. Create Blocker (if NEEDS_REWORK)
+### 6. Create Blocker (if NEEDS_REWORK)
 - **Blocker Type**: QUALITY_GATE_REJECTED
 - **Phase**: 6
 - **Severity**: HIGH
@@ -403,6 +391,7 @@ OR
 ## Handling Common Scenarios
 
 ### No Source Files Changed
+
 ```markdown
 ## Security Review: [Feature ID]
 
@@ -412,6 +401,7 @@ OR
 ```
 
 ### Semgrep Unavailable For Code Review
+
 ```markdown
 ### BLOCKER: Security Tool Unavailable
 

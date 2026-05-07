@@ -21,6 +21,21 @@ afterEach(async () => {
 });
 
 describe('SemgrepReviewAdapter docs_process profile', () => {
+  it('passes with no findings when no changed files are provided', async () => {
+    const root = await createTempDir();
+    const adapter = new SemgrepReviewAdapter(root);
+
+    const result = await adapter.runChecks({
+      feature_id: 'FEAT-DOCS',
+      tool: 'docs_process',
+      changed_files: [],
+    });
+
+    expect(result.tool).toBe('docs_process');
+    expect(result.status).toBe('passed');
+    expect(result.findings).toEqual([]);
+  });
+
   it('checks markdown links and command placeholders without invoking semgrep', async () => {
     const root = await createTempDir();
     await mkdir(join(root, 'docs'), { recursive: true });
@@ -41,5 +56,21 @@ describe('SemgrepReviewAdapter docs_process profile', () => {
         expect.objectContaining({ rule_id: 'docs-process/placeholder-command' }),
       ]),
     );
+  });
+
+  it('ignores markdown links that use explicit URI schemes', async () => {
+    const root = await createTempDir();
+    await mkdir(join(root, 'docs'), { recursive: true });
+    await writeFile(join(root, 'docs/guide.md'), '[Email](mailto:user@example.com)\n[Phone](tel:+15555550123)\n', 'utf8');
+    const adapter = new SemgrepReviewAdapter(root);
+
+    const result = await adapter.runChecks({
+      feature_id: 'FEAT-DOCS',
+      tool: 'docs_process',
+      changed_files: ['docs/guide.md'],
+    });
+
+    expect(result.status).toBe('passed');
+    expect(result.findings).toEqual([]);
   });
 });

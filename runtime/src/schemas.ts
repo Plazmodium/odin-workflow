@@ -359,6 +359,12 @@ export const RecordPhaseSkillsAppliedInputSchema = z.object({
 }).refine(
   (value) => value.skills_applied.length > 0 || value.fallback_used || value.no_applicable_skill,
   'Record at least one applied skill, fallback_used, or no_applicable_skill.'
+).refine(
+  (value) => !(value.no_applicable_skill && (value.skills_applied.length > 0 || value.fallback_used)),
+  'no_applicable_skill cannot be combined with skills_applied or fallback_used.'
+).refine(
+  (value) => !(value.fallback_used && value.skills_applied.length > 0),
+  'fallback_used cannot be combined with skills_applied.'
 );
 
 export const RecordPhaseArtifactInputSchema = z.object({

@@ -10,22 +10,22 @@ Current supported execution paths:
    - archives the release bundle
    - pushes the feature branch
    - creates a pull request with `gh pr create`
-    - records the PR with `odin.record_pr`
-    - records release handoff with `odin.record_release_handoff`
-    - moves release state through `handoff_created` and then `awaiting_merge`
+   - records the PR with `odin.record_pr`
+   - records release handoff with `odin.record_release_handoff`
+   - moves release state through `handoff_created` and then `awaiting_merge`
 2. **Release closeout after human merge**
-     - waits for `odin.record_merge`
-     - completes phase 9 -> 10 via `odin.record_release_closeout`
-     - moves release state through `merged` to `complete`
+   - waits for `odin.record_merge`
+   - completes phase 9 -> 10 via `odin.record_release_closeout`
+   - moves release state through `merged` to `complete`
 3. **Optional child-command execution for phases 5-8**
    - enabled with `RALPH_SUBAGENT_COMMAND_JSON` or `--subagent-command-json`
    - Ralph Loop spawns the configured child command
-    - Ralph Loop records `odin.register_phase_execution(...)` so Odin can audit actual mode and attested session linkage
-    - Ralph Loop can also record `odin.register_phase_realization(...)` after a successful child run when a canonical phase prompt manifest was used
-    - strict runtime pre-work gates can reject artifact/eval/review/claim writes until execution and realization proof is recorded
-    - the child returns artifacts and a final phase outcome on stdout
-    - Ralph Loop proxies `odin.record_phase_artifact` / `odin.record_phase_result` from the parent session using `context.execution.acting_agent_name`
-    - Ralph Loop also respects `context.execution.response_style` so internal execution chatter can be terse without changing final artifact templates
+   - Ralph Loop records `odin.register_phase_execution(...)` so Odin can audit actual mode and attested session linkage
+   - Ralph Loop can also record `odin.register_phase_realization(...)` after a successful child run when a canonical phase prompt manifest was used
+   - strict runtime pre-work gates can reject artifact/eval/review/claim writes until execution and realization proof is recorded
+   - the child returns artifacts and a final phase outcome on stdout
+   - Ralph Loop proxies `odin.record_phase_artifact` / `odin.record_phase_result` from the parent session using `context.execution.acting_agent_name`
+   - Ralph Loop also respects `context.execution.response_style` so internal execution chatter can be terse without changing final artifact templates
 
 Without a child command configured, Ralph Loop keeps its earlier Release-only behavior. That inline Release path is auditable as supervisor automation, but it is not a canonical spawned phase-agent session. If a project requires strict full-Odin launch proof for Release, use a harness path that records `odin.record_phase_agent_launch`, `odin.register_phase_execution`, and `odin.register_phase_realization` before phase work is written.
 

@@ -34,7 +34,7 @@ export async function handleRunReviewChecks(
       feature,
       input.phase,
       resolveWorkflowActorName(input.phase, input.initiated_by),
-      'record phase artifact',
+      'run review checks',
     );
     if (prework_error != null) {
       return prework_error;

@@ -66,12 +66,21 @@ export async function handleRecordPhaseAgentLaunch(
     });
   }
 
-  if (input.manifest?.manifest_id !== expected_manifest.manifest_id) {
+  if (input.manifest == null) {
+    return createErrorResult('A launch manifest is required for direct_agent and subagent launches.', {
+      feature_id: input.feature_id,
+      phase: input.phase,
+      expected_manifest_id: expected_manifest.manifest_id,
+      provided_manifest_id: null,
+    });
+  }
+
+  if (input.manifest.manifest_id !== expected_manifest.manifest_id) {
     return createErrorResult('Launch manifest does not match the current canonical phase prompt manifest.', {
       feature_id: input.feature_id,
       phase: input.phase,
       expected_manifest_id: expected_manifest.manifest_id,
-      provided_manifest_id: input.manifest?.manifest_id ?? null,
+      provided_manifest_id: input.manifest.manifest_id,
     });
   }
 

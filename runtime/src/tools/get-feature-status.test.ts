@@ -551,20 +551,19 @@ describe('handleGetFeatureStatus', () => {
     });
   });
 
-  it('reports explicit release lifecycle substates', async () => {
-    const cases: Array<{ feature: FeatureRecord; stage: string }> = [
-      { feature: createFeature({ current_phase: '9', pr_url: 'https://github.com/org/repo/pull/1', pr_number: 1 }), stage: 'handoff_created' },
-      { feature: createFeature({ current_phase: '9', pr_url: 'https://github.com/org/repo/pull/1', pr_number: 1, release_handoff_at: '2026-03-13T04:00:00.000Z' }), stage: 'awaiting_merge' },
-      { feature: createFeature({ current_phase: '9', pr_url: 'https://github.com/org/repo/pull/1', pr_number: 1, release_handoff_at: '2026-03-13T04:00:00.000Z', merged_at: '2026-03-13T05:00:00.000Z' }), stage: 'merged' },
-      { feature: createFeature({ current_phase: '10', completed_at: '2026-03-13T06:00:00.000Z' }), stage: 'complete' },
-    ];
-
-    for (const entry of cases) {
-      const result = await handleGetFeatureStatus(createWorkflowAdapter(entry.feature), createSkillAdapter(), createConfig('guarded'), {
+  it.each([
+    ['handoff_created', createFeature({ current_phase: '9', pr_url: 'https://github.com/org/repo/pull/1', pr_number: 1 })],
+    ['awaiting_merge', createFeature({ current_phase: '9', pr_url: 'https://github.com/org/repo/pull/1', pr_number: 1, release_handoff_at: '2026-03-13T04:00:00.000Z' })],
+    ['merged', createFeature({ current_phase: '9', pr_url: 'https://github.com/org/repo/pull/1', pr_number: 1, release_handoff_at: '2026-03-13T04:00:00.000Z', merged_at: '2026-03-13T05:00:00.000Z' })],
+    ['complete', createFeature({ current_phase: '10', completed_at: '2026-03-13T06:00:00.000Z' })],
+  ] as Array<[string, FeatureRecord]>)(
+    'reports release lifecycle stage: %s',
+    async (stage, feature) => {
+      const result = await handleGetFeatureStatus(createWorkflowAdapter(feature), createSkillAdapter(), createConfig('guarded'), {
         feature_id: 'FEAT-002',
       });
       const status = result.structuredContent as { release: { stage: string } };
-      expect(status.release.stage).toBe(entry.stage);
-    }
-  });
+      expect(status.release.stage).toBe(stage);
+    },
+  );
 });

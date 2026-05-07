@@ -77,13 +77,19 @@ describe('handleRecordPhaseAgentLaunch', () => {
       include_skills: true,
       include_learnings: true,
     }, { open_invocation: false });
+    const manifest = context.execution.phase_prompt_manifest;
+
+    expect(manifest).not.toBeNull();
+    if (manifest == null) {
+      throw new Error('Expected phase prompt manifest for launch test.');
+    }
 
     const result = await handleRecordPhaseAgentLaunch(adapter, skillAdapter, config, {
       feature_id: 'FEAT-LAUNCH',
       phase: '5',
       launch_mode: 'subagent',
       launched_by: 'opencode',
-      manifest: context.execution.phase_prompt_manifest!,
+      manifest,
       supervisor_session_id: 'supervisor-1',
       worker_session_id: 'worker-1',
     });
@@ -93,7 +99,7 @@ describe('handleRecordPhaseAgentLaunch', () => {
       'FEAT-LAUNCH',
       'PHASE_AGENT_LAUNCH_RECORDED',
       'builder-agent',
-      expect.objectContaining({ launch_mode: 'subagent', manifest_id: context.execution.phase_prompt_manifest!.manifest_id }),
+      expect.objectContaining({ launch_mode: 'subagent', manifest_id: manifest.manifest_id }),
     );
   });
 
@@ -115,5 +121,20 @@ describe('handleRecordPhaseAgentLaunch', () => {
       'builder-agent',
       expect.objectContaining({ reason: 'Harness cannot spawn subagents.' }),
     );
+  });
+
+  it('returns a clear error when a non-inline launch omits manifest', async () => {
+    const feature = createFeature();
+    const adapter = createAdapter(feature);
+    const result = await handleRecordPhaseAgentLaunch(adapter, createSkillAdapter(), createConfig(), {
+      feature_id: 'FEAT-LAUNCH',
+      phase: '5',
+      launch_mode: 'subagent',
+      launched_by: 'opencode',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('launch manifest is required');
+    expect(adapter.recordAuditEvent).not.toHaveBeenCalled();
   });
 });

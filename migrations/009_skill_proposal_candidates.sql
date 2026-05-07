@@ -54,7 +54,8 @@ BEGIN
     RAISE EXCEPTION 'replace_skill_proposal_candidates expects a JSON array payload';
   END IF;
 
-  TRUNCATE TABLE skill_proposal_evidence, skill_proposal_candidates;
+  DELETE FROM skill_proposal_evidence;
+  DELETE FROM skill_proposal_candidates;
 
   IF p_candidates IS NULL OR jsonb_typeof(p_candidates) <> 'array' OR jsonb_array_length(p_candidates) = 0 THEN
     RETURN;

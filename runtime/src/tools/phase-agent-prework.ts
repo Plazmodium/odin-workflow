@@ -15,22 +15,24 @@ export async function assessStrictPhaseAgentPrework(
   feature: FeatureRecord,
   phase: PhaseId,
   actor_name: string,
-  operation: 'record phase artifact' | 'submit claim',
+  operation: 'record phase artifact' | 'submit claim' | 'run review checks',
 ): Promise<ToolResult | null> {
   if (config.attestation?.mode !== 'strict') {
     return null;
   }
 
-  const expected_bundle = await buildPhaseContextBundleForFeature(feature, adapter, skill_adapter, config, {
-    feature_id: feature.id,
-    phase,
-    agent_name: actor_name,
-    include_artifacts: true,
-    include_skills: true,
-    include_learnings: true,
-  }, { open_invocation: false });
-  const execution_attestation = await adapter.getPhaseExecutionAttestation(feature.id, phase);
-  const prompt_realization = await adapter.getPhasePromptRealization(feature.id, phase);
+  const [expected_bundle, execution_attestation, prompt_realization] = await Promise.all([
+    buildPhaseContextBundleForFeature(feature, adapter, skill_adapter, config, {
+      feature_id: feature.id,
+      phase,
+      agent_name: actor_name,
+      include_artifacts: true,
+      include_skills: true,
+      include_learnings: true,
+    }, { open_invocation: false }),
+    adapter.getPhaseExecutionAttestation(feature.id, phase),
+    adapter.getPhasePromptRealization(feature.id, phase),
+  ]);
   const execution_assessment = assessPhaseExecutionPolicy(phase, execution_attestation, config.attestation);
   const prompt_realization_assessment = assessPromptRealizationPolicy(
     phase,

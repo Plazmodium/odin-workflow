@@ -113,7 +113,17 @@ function parseSemgrepJson(stdout: string, changed_files: string[]): ReviewExecut
 }
 
 async function runDocsProcessChecks(projectRoot: string, changed_files: string[]): Promise<ReviewExecutionResult> {
-  const target_paths = changed_files.length > 0 ? changed_files : ['.'];
+  if (changed_files.length === 0) {
+    return {
+      tool: 'docs_process',
+      status: 'passed',
+      summary: 'Docs/process review completed with 0 note(s).',
+      changed_files,
+      findings: [],
+    };
+  }
+
+  const target_paths = changed_files;
   const findings: ReviewFinding[] = [];
 
   for (const relative_path of target_paths) {
@@ -167,7 +177,7 @@ async function runDocsProcessChecks(projectRoot: string, changed_files: string[]
         });
       }
 
-      const local_links = [...line.matchAll(/\[[^\]]+\]\((?!https?:|#)([^)]+)\)/g)];
+      const local_links = [...line.matchAll(/\[[^\]]+\]\((?![a-zA-Z][a-zA-Z0-9+\-.]*:|#)([^)]+)\)/g)];
       for (const link of local_links) {
         const raw_target = link[1]?.split('#')[0]?.trim() ?? '';
         if (raw_target.length === 0) {
@@ -232,7 +242,7 @@ async function dockerExists(): Promise<boolean> {
 
 function isWithinProjectRoot(projectRoot: string, candidatePath: string): boolean {
   const relativePath = relative(projectRoot, candidatePath);
-  return relativePath !== '..' && !relativePath.startsWith(`..${sep}`) && relativePath !== '';
+  return relativePath === '' || (relativePath !== '..' && !relativePath.startsWith(`..${sep}`));
 }
 
 export class SemgrepReviewAdapter implements ReviewAdapter {
