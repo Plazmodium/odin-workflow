@@ -9,12 +9,14 @@ import type { RuntimeConfig } from '../config.js';
 import { resolveWorkflowActorName } from '../domain/actors.js';
 import { resolveAutomationDecision } from '../domain/automation-policy.js';
 import { appendDevelopmentEvalChecks, buildDevelopmentEvalContext } from '../domain/development-evals.js';
+import { assessPhaseExecutionPolicy } from '../domain/execution-policy.js';
 import { buildPhasePromptManifest } from '../domain/phase-prompt-manifest.js';
 import { getPhaseAgentInstructions, getPhaseContract, getPhaseExecutionContract, isWatchedPhase } from '../domain/phases.js';
+import { assessPromptRealizationPolicy } from '../domain/prompt-realization.js';
 import { formatOpenGateSummary } from '../domain/quality-gates.js';
 import { computeResonance, type ResonanceInput } from '../domain/resonance.js';
 import type { PreparePhaseContextInput } from '../schemas.js';
-import type { ArtifactOutputType, FeatureRecord, LearningCategory, PhaseArtifact, PhaseContextBundle, PhaseExecutionContract, PhaseId } from '../types.js';
+import type { ArtifactOutputType, FeatureRecord, LearningCategory, PhaseAgentReadiness, PhaseArtifact, PhaseContextBundle, PhaseExecutionContract, PhaseId, PhasePromptManifest } from '../types.js';
 import { createErrorResult, createTextResult } from '../utils.js';
 
 const ARTIFACT_KEYS: ArtifactOutputType[] = [
@@ -69,6 +71,100 @@ function applyEffectiveAttestationPolicy(
 
 interface BuildPhaseContextOptions {
   open_invocation?: boolean;
+}
+
+function isFullOdinRequired(config: RuntimeConfig, phase: PhaseId): boolean {
+  if (config.attestation?.mode !== 'strict') {
+    return false;
+  }
+
+  const execution_phases = config.attestation.require_execution_phases ?? ['5', '6', '7', '9'];
+  const prompt_phases = config.attestation.require_prompt_realization_phases ?? ['5', '6', '7', '9'];
+  return execution_phases.includes(phase) || prompt_phases.includes(phase);
+}
+
+function defaultPhaseAgentReadiness(config: RuntimeConfig, phase: PhaseId): PhaseAgentReadiness {
+  const full_odin_required = isFullOdinRequired(config, phase);
+
+  return {
+    attestation_mode: config.attestation?.mode ?? 'advisory',
+    status: full_odin_required ? 'blocked_missing_agent_proof' : 'not_required',
+    full_odin_required,
+    can_record_phase_work: !full_odin_required,
+    missing: full_odin_required ? ['execution_attestation', 'prompt_realization'] : [],
+    next_actions: full_odin_required
+      ? [
+          'Invoke the canonical Odin phase agent directly, or spawn a subagent whose prompt includes the canonical phase definition, prepared phase context, and resolved skills.',
+          'Record odin.register_phase_execution with distinct supervisor and worker sessions.',
+          'Record odin.register_phase_realization with the phase_prompt_manifest returned in this context before recording phase artifacts or claims.',
+        ]
+      : [],
+    execution: null,
+    prompt_realization: null,
+  };
+}
+
+async function buildPhaseAgentReadiness(
+  adapter: WorkflowStateAdapter,
+  config: RuntimeConfig,
+  feature: FeatureRecord,
+  phase: PhaseId,
+  expected_manifest: PhasePromptManifest | null,
+): Promise<PhaseAgentReadiness> {
+  const full_odin_required = isFullOdinRequired(config, phase);
+  if (!full_odin_required) {
+    return defaultPhaseAgentReadiness(config, phase);
+  }
+
+  const [execution_attestation, prompt_realization] = await Promise.all([
+    adapter.getPhaseExecutionAttestation(feature.id, phase),
+    adapter.getPhasePromptRealization(feature.id, phase),
+  ]);
+  const execution_assessment = assessPhaseExecutionPolicy(phase, execution_attestation, config.attestation);
+  const prompt_realization_assessment = assessPromptRealizationPolicy(
+    phase,
+    expected_manifest,
+    prompt_realization,
+    config.attestation,
+  );
+  const missing: PhaseAgentReadiness['missing'] = [
+    ...(execution_assessment.error == null ? [] : ['execution_attestation' as const]),
+    ...(prompt_realization_assessment.error == null ? [] : ['prompt_realization' as const]),
+  ];
+  const next_actions = [
+    ...(missing.includes('execution_attestation')
+      ? ['Record odin.register_phase_execution with actual_mode subagent and distinct supervisor_session_id / worker_session_id before phase work starts.']
+      : []),
+    ...(missing.includes('prompt_realization')
+      ? ['Record odin.register_phase_realization using this context phase_prompt_manifest after launching the canonical phase agent prompt.']
+      : []),
+  ];
+
+  return {
+    attestation_mode: 'strict',
+    status: missing.length === 0 ? 'ready_for_full_odin' : 'blocked_missing_agent_proof',
+    full_odin_required,
+    can_record_phase_work: missing.length === 0,
+    missing,
+    next_actions,
+    execution: {
+      actual_mode: execution_assessment.row.actual_mode,
+      proof_status: execution_assessment.row.proof_status,
+      supervisor_session_id: execution_assessment.row.supervisor_session_id,
+      worker_session_id: execution_assessment.row.worker_session_id,
+      warning: execution_assessment.warning,
+      error: execution_assessment.error,
+    },
+    prompt_realization: {
+      actual_mode: prompt_realization_assessment.row.actual_mode,
+      proof_status: prompt_realization_assessment.row.proof_status,
+      manifest_match: prompt_realization_assessment.row.manifest_match,
+      attested_manifest_id: prompt_realization_assessment.row.attested_manifest_id,
+      expected_manifest_id: prompt_realization_assessment.row.expected_manifest_id,
+      warning: prompt_realization_assessment.warning,
+      error: prompt_realization_assessment.error,
+    },
+  };
 }
 
 export async function buildPhaseContextBundleForFeature(
@@ -155,6 +251,7 @@ export async function buildPhaseContextBundleForFeature(
             started_at: invocation.started_at,
             skills_used: invocation.skills_used,
           },
+    phase_agent_readiness: defaultPhaseAgentReadiness(config, input.phase),
     workflow: {
       open_blockers,
       open_gates,
@@ -219,6 +316,13 @@ export async function buildPhaseContextBundleForFeature(
   };
 
   bundle.execution.phase_prompt_manifest = await buildPhasePromptManifest(bundle);
+  bundle.phase_agent_readiness = await buildPhaseAgentReadiness(
+    adapter,
+    config,
+    feature,
+    input.phase,
+    bundle.execution.phase_prompt_manifest,
+  );
   return bundle;
 }
 

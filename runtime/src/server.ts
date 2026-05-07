@@ -27,6 +27,7 @@ import {
   ClearPhaseExecutionInputSchema,
   CompletePhaseBundleInputSchema,
   ExploreKnowledgeInputSchema,
+  ExportLocalArtifactsInputSchema,
   GetClaimsNeedingReviewInputSchema,
   GetDevelopmentEvalStatusInputSchema,
   GetFeatureStatusInputSchema,
@@ -38,6 +39,7 @@ import {
   RegisterPhaseExecutionInputSchema,
   RegisterPhaseRealizationInputSchema,
   PublishSkillProposalInputSchema,
+  RecordBreakGlassOverrideInputSchema,
   RecordCommitInputSchema,
   RecordEvalPlanInputSchema,
   RecordEvalRunInputSchema,
@@ -47,6 +49,8 @@ import {
   RecordReleaseHandoffFailureInputSchema,
   RecordReleaseHandoffInputSchema,
   RecordPhaseArtifactInputSchema,
+  RecordPhaseAgentLaunchInputSchema,
+  RecordPhaseSkillsAppliedInputSchema,
   RecordQualityGateInputSchema,
   RecordPullRequestInputSchema,
   RecordPhaseResultInputSchema,
@@ -68,6 +72,7 @@ import { handleCaptureLearning } from './tools/capture-learning.js';
 import { handleClearPhaseExecution } from './tools/clear-phase-execution.js';
 import { handleCompletePhaseBundle } from './tools/complete-phase-bundle.js';
 import { handleExploreKnowledge } from './tools/explore-knowledge.js';
+import { handleExportLocalArtifacts } from './tools/export-local-artifacts.js';
 import { handleGetClaimsNeedingReview } from './tools/get-claims-needing-review.js';
 import { handleGetDevelopmentEvalStatus } from './tools/get-development-eval-status.js';
 import { handleGetFeatureStatus } from './tools/get-feature-status.js';
@@ -79,6 +84,7 @@ import { handlePreparePhaseContext } from './tools/prepare-phase-context.js';
 import { handleRegisterPhaseExecution } from './tools/register-phase-execution.js';
 import { handleRegisterPhaseRealization } from './tools/register-phase-realization.js';
 import { handlePublishSkillProposal } from './tools/publish-skill-proposal.js';
+import { handleRecordBreakGlassOverride } from './tools/record-break-glass-override.js';
 import { handleRecordCommit } from './tools/record-commit.js';
 import { handleRecordEvalPlan } from './tools/record-eval-plan.js';
 import { handleRecordEvalRun } from './tools/record-eval-run.js';
@@ -88,6 +94,8 @@ import { handleRecordReleaseCloseoutFailure } from './tools/record-release-close
 import { handleRecordReleaseHandoffFailure } from './tools/record-release-handoff-failure.js';
 import { handleRecordReleaseHandoff } from './tools/record-release-handoff.js';
 import { handleRecordPhaseArtifact } from './tools/record-phase-artifact.js';
+import { handleRecordPhaseAgentLaunch } from './tools/record-phase-agent-launch.js';
+import { handleRecordPhaseSkillsApplied } from './tools/record-phase-skills-applied.js';
 import { handleRecordPullRequest } from './tools/record-pull-request.js';
 import { handleRecordQualityGate } from './tools/record-quality-gate.js';
 import { handleRecordPhaseResult } from './tools/record-phase-result.js';
@@ -219,6 +227,16 @@ server.registerTool(
 );
 
 server.registerTool(
+  'odin.export_local_artifacts',
+  {
+    title: 'Export Local Artifacts',
+    description: 'Mirror PRD, eval, and release lifecycle records into stable local markdown files.',
+    inputSchema: ExportLocalArtifactsInputSchema,
+  },
+  safeToolHandler(async (input) => handleExportLocalArtifacts(workflow_state, project_root, input))
+);
+
+server.registerTool(
   'odin.start_feature',
   {
     title: 'Start Feature',
@@ -309,13 +327,33 @@ server.registerTool(
 );
 
 server.registerTool(
+  'odin.record_phase_agent_launch',
+  {
+    title: 'Record Phase Agent Launch',
+    description: 'Record canonical phase-agent launch or explicitly mark reduced-fidelity inline execution.',
+    inputSchema: RecordPhaseAgentLaunchInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordPhaseAgentLaunch(workflow_state, skill_adapter, runtime_config, input))
+);
+
+server.registerTool(
+  'odin.record_phase_skills_applied',
+  {
+    title: 'Record Phase Skills Applied',
+    description: 'Audit which skills were actually applied in a phase, including fallback or no-skill cases.',
+    inputSchema: RecordPhaseSkillsAppliedInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordPhaseSkillsApplied(workflow_state, input))
+);
+
+server.registerTool(
   'odin.record_phase_artifact',
   {
     title: 'Record Phase Artifact',
     description: 'Record an artifact produced during a workflow phase.',
     inputSchema: RecordPhaseArtifactInputSchema,
   },
-  safeToolHandler(async (input) => handleRecordPhaseArtifact(workflow_state, input))
+  safeToolHandler(async (input) => handleRecordPhaseArtifact(workflow_state, input, skill_adapter, runtime_config))
 );
 
 server.registerTool(
@@ -325,7 +363,7 @@ server.registerTool(
     description: 'Submit a watched agent claim for policy and watcher verification.',
     inputSchema: SubmitClaimInputSchema,
   },
-  safeToolHandler(async (input) => handleSubmitClaim(workflow_state, input))
+  safeToolHandler(async (input) => handleSubmitClaim(workflow_state, input, skill_adapter, runtime_config))
 );
 
 server.registerTool(
@@ -379,6 +417,16 @@ server.registerTool(
 );
 
 server.registerTool(
+  'odin.record_break_glass_override',
+  {
+    title: 'Record Break-Glass Override',
+    description: 'Record a strict-mode exception and create a visible follow-up gate. This does not bypass normal phase-completion gates.',
+    inputSchema: RecordBreakGlassOverrideInputSchema,
+  },
+  safeToolHandler(async (input) => handleRecordBreakGlassOverride(workflow_state, input))
+);
+
+server.registerTool(
   'odin.record_release_handoff_failure',
   {
     title: 'Record Release Handoff Failure',
@@ -425,7 +473,7 @@ server.registerTool(
     description: 'Record a structured development eval plan for the Architect phase.',
     inputSchema: RecordEvalPlanInputSchema,
   },
-  safeToolHandler(async (input) => handleRecordEvalPlan(workflow_state, input))
+  safeToolHandler(async (input) => handleRecordEvalPlan(workflow_state, input, skill_adapter, runtime_config))
 );
 
 server.registerTool(
@@ -435,7 +483,7 @@ server.registerTool(
     description: 'Record a structured development eval run for Reviewer or Integrator.',
     inputSchema: RecordEvalRunInputSchema,
   },
-  safeToolHandler(async (input) => handleRecordEvalRun(workflow_state, input))
+  safeToolHandler(async (input) => handleRecordEvalRun(workflow_state, input, skill_adapter, runtime_config))
 );
 
 server.registerTool(
@@ -465,7 +513,7 @@ server.registerTool(
     description: 'Queue or execute review checks for a feature phase.',
     inputSchema: RunReviewChecksInputSchema,
   },
-  safeToolHandler(async (input) => handleRunReviewChecks(workflow_state, review_adapter, input))
+  safeToolHandler(async (input) => handleRunReviewChecks(workflow_state, review_adapter, input, skill_adapter, runtime_config))
 );
 
 server.registerTool(

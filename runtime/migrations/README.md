@@ -36,3 +36,4 @@ Latest additive bundled migrations include:
 - `015_watcher_review_independence.sql`
 - `016_release_lifecycle.sql`
 - `017_phase_artifact_paths.sql`
+- `018_safe_skill_proposal_candidate_replace.sql`

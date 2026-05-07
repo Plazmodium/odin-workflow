@@ -17,8 +17,8 @@ It does **not** replace the runtime. Instead it:
 
 This tracer-bullet slice supports:
 
-1. **Auto-PR handoff** for phase 9 when `automation.mode: auto_pr` allows PR creation
-2. **Release closeout** after a human merge is recorded, persisted with `odin.record_release_closeout`
+1. **Auto-PR handoff** for phase 9 when `automation.mode: auto_pr` allows PR creation; release state moves through `handoff_created` / `awaiting_merge`
+2. **Release closeout** after a human merge is recorded, persisted with `odin.record_release_closeout`; release state moves through `merged` / `complete`
 3. **Optional child-command execution for phases 5-8** when a subagent command is configured
 
 Release stays inline inside Ralph Loop. Phases 5-8 only become eligible when a child command is configured; Ralph Loop then spawns that command and proxies the returned artifacts and final phase result from the parent session. Ralph Loop also respects `context.execution.response_style`, so terse operational chatter can be requested without changing the normal human-readable templates for final artifacts.
@@ -30,6 +30,10 @@ Ralph Loop now also records `odin.register_phase_execution(...)` before it execu
 - whether a distinct worker session was attested
 
 For subagent phases, Ralph Loop can now also record `odin.register_phase_realization(...)` after a successful child run so Odin can tell whether the child was launched from the canonical phase prompt bundle returned by `odin.prepare_phase_context(...)`.
+
+In strict mode, `context.phase_agent_readiness` can block phase artifacts, evals, review checks, and watched claims until required execution and prompt-realization proof exists. Ralph Loop records those proofs for child-command runs before proxying artifacts/results. `odin.record_phase_agent_launch(...)` is separate launch provenance; use a harness path that records it when your policy requires explicit launch or `inline_reduced_fidelity` audit.
+
+The child-command protocol currently proxies artifacts and final results. If your policy requires `odin.record_phase_skills_applied(...)`, record it from the supervising harness after the child reports actual skill use.
 
 ## Commands
 
@@ -111,6 +115,8 @@ Ralph Loop writes JSON to stdin shaped like:
 }
 ```
 
+The full raw prepared context is included inside `prepared_context`; in strict mode it includes `phase_agent_readiness`, which tells the harness whether phase work can be recorded yet.
+
 The child command must write JSON to stdout shaped like:
 
 ```json
@@ -138,7 +144,9 @@ Ralph Loop then proxies:
 - `odin.record_phase_result(...)` for the returned outcome
 - on failed/aborted attempts after registration: `odin.clear_phase_execution(...)` before retry
 
-using `selection.prepared_context.execution.acting_agent_name` as the proxied `created_by` value.
+Artifacts and results use `selection.prepared_context.execution.acting_agent_name` as the proxied `created_by` value.
+
+If the supervising harness needs explicit launch provenance or reduced-fidelity inline audit, record `odin.record_phase_agent_launch(...)` outside the child result proxy path.
 
 When `selection.prepared_context.execution.response_style = terse_execution`, Ralph Loop adds terse operational-style instructions to the child prompt. This applies to execution chatter and summaries only. Final artifacts are still expected to follow the normal phase templates.
 

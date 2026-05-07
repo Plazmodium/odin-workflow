@@ -21,9 +21,10 @@ import { buildPhaseContextBundleForFeature } from './prepare-phase-context.js';
 
 function applyAttestationOverride<T extends { warning: string | null; error: string | null }>(
   assessment: T,
+  config: RuntimeConfig,
   override_reason: string | undefined,
 ): T {
-  if (assessment.error == null || override_reason == null) {
+  if (assessment.error == null || override_reason == null || config.attestation?.mode === 'strict') {
     return assessment;
   }
 
@@ -105,6 +106,7 @@ export async function handleRecordPhaseResult(
   });
   const execution_assessment = applyAttestationOverride(
     assessPhaseExecutionPolicy(input.phase, execution_attestation, config.attestation),
+    config,
     input.attestation_override_reason,
   );
   const prompt_realization_assessment = applyAttestationOverride(
@@ -114,22 +116,41 @@ export async function handleRecordPhaseResult(
       prompt_realization,
       config.attestation,
     ),
+    config,
     input.attestation_override_reason,
   );
 
   if (execution_assessment.error != null) {
+    if (config.attestation?.mode === 'strict' && input.attestation_override_reason != null) {
+      await adapter.recordAuditEvent(input.feature_id, 'STRICT_ATTESTATION_OVERRIDE_REJECTED', workflow_actor, {
+        phase: input.phase,
+        missing_proof: 'execution_attestation',
+        reason: input.attestation_override_reason,
+        error: execution_assessment.error,
+      });
+    }
     return createErrorResult(execution_assessment.error, {
       feature_id: input.feature_id,
       phase: input.phase,
       execution: execution_assessment.row,
+      recovery: 'Run the canonical Odin phase agent in a distinct worker session, record odin.register_phase_execution and odin.register_phase_realization before completion, or use a dedicated break-glass process outside normal phase completion.',
     });
   }
 
   if (prompt_realization_assessment.error != null) {
+    if (config.attestation?.mode === 'strict' && input.attestation_override_reason != null) {
+      await adapter.recordAuditEvent(input.feature_id, 'STRICT_ATTESTATION_OVERRIDE_REJECTED', workflow_actor, {
+        phase: input.phase,
+        missing_proof: 'prompt_realization',
+        reason: input.attestation_override_reason,
+        error: prompt_realization_assessment.error,
+      });
+    }
     return createErrorResult(prompt_realization_assessment.error, {
       feature_id: input.feature_id,
       phase: input.phase,
       prompt_realization: prompt_realization_assessment.row,
+      recovery: 'Build the worker prompt from odin.prepare_phase_context, invoke the canonical phase agent or spawned subagent, record odin.register_phase_realization, then retry completion.',
     });
   }
 
@@ -169,21 +190,6 @@ export async function handleRecordPhaseResult(
     await adapter.findOpenAgentInvocation(input.feature_id, input.phase, workflow_actor)
   )?.id ?? null;
   let invocation_completed = false;
-
-  if (invocation_id == null && input.phase !== '10') {
-    try {
-      const phase_contract = getPhaseContract(input.phase);
-      const invocation = await adapter.startAgentInvocation(
-        input.feature_id,
-        input.phase,
-        workflow_actor,
-        `Phase ${input.phase}: ${phase_contract.name} (fallback)`
-      );
-      invocation_id = invocation.id;
-    } catch {
-      console.error(`[Odin Runtime] Failed to start agent invocation for ${input.feature_id} phase ${input.phase}`);
-      }
-  }
 
   if (completing_feature && invocation_id != null) {
     try {

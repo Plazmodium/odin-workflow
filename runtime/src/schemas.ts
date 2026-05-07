@@ -66,6 +66,15 @@ export const RecordReleaseCloseoutInputSchema = z.object({
   created_by: z.string().min(1),
 });
 
+export const RecordBreakGlassOverrideInputSchema = z.object({
+  feature_id: z.string().min(1),
+  phase: phase_id_schema,
+  reason: z.string().min(1),
+  missing_proof: z.array(z.enum(['execution_attestation', 'prompt_realization', 'watcher_independence', 'claim_evidence'])).min(1),
+  created_by: z.string().min(1),
+  follow_up: z.string().min(1).optional(),
+});
+
 export const RecordCommitInputSchema = z.object({
   feature_id: z.string().min(1),
   commit_hash: z.string().min(1),
@@ -283,6 +292,19 @@ export const RegisterPhaseExecutionInputSchema = z.object({
   attested_by: z.string().min(1),
 });
 
+const PhasePromptManifestInputSchema = z.object({
+  manifest_id: z.string().min(1),
+  phase: realizable_phase_id_schema,
+  phase_role_name: z.string().min(1),
+  shared_context_hash: z.string().regex(/^[a-f0-9]{64}$/),
+  phase_definition_hash: z.string().regex(/^[a-f0-9]{64}$/),
+  resolved_skill_hashes: z.array(z.string().regex(/^[a-f0-9]{64}$/)),
+  required_prompt_sections: z.array(z.enum(PHASE_PROMPT_SECTIONS)).min(1),
+  context_bundle_hash: z.string().regex(/^[a-f0-9]{64}$/),
+  manifest_version: z.string().min(1),
+  nonce: z.string().min(1),
+});
+
 export const RegisterPhaseRealizationInputSchema = z.object({
   feature_id: z.string().min(1),
   phase: realizable_phase_id_schema,
@@ -291,18 +313,7 @@ export const RegisterPhaseRealizationInputSchema = z.object({
   worker_session_id: z.string().min(1).optional(),
   harness_run_id: z.string().min(1).optional(),
   attested_by: z.string().min(1),
-  manifest: z.object({
-    manifest_id: z.string().min(1),
-    phase: realizable_phase_id_schema,
-    phase_role_name: z.string().min(1),
-    shared_context_hash: z.string().regex(/^[a-f0-9]{64}$/),
-    phase_definition_hash: z.string().regex(/^[a-f0-9]{64}$/),
-    resolved_skill_hashes: z.array(z.string().regex(/^[a-f0-9]{64}$/)),
-    required_prompt_sections: z.array(z.enum(PHASE_PROMPT_SECTIONS)).min(1),
-    context_bundle_hash: z.string().regex(/^[a-f0-9]{64}$/),
-    manifest_version: z.string().min(1),
-    nonce: z.string().min(1),
-  }),
+  manifest: PhasePromptManifestInputSchema,
   child_prompt_hash: z.string().regex(/^[a-f0-9]{64}$/),
   wrapper_hash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   child_ack_nonce: z.string().min(1).optional(),
@@ -313,6 +324,41 @@ export const RegisterPhaseRealizationInputSchema = z.object({
 ).refine(
   (value) => value.proof_status !== 'bundle_verified' || value.child_ack_nonce === value.manifest.nonce,
   'bundle_verified requires child_ack_nonce to match the manifest nonce.'
+);
+
+export const RecordPhaseAgentLaunchInputSchema = z.object({
+  feature_id: z.string().min(1),
+  phase: realizable_phase_id_schema,
+  launch_mode: z.enum(['direct_agent', 'subagent', 'inline_reduced_fidelity']),
+  launched_by: z.string().min(1),
+  agent_name: z.string().optional(),
+  supervisor_session_id: z.string().min(1).optional(),
+  worker_session_id: z.string().min(1).optional(),
+  harness_run_id: z.string().min(1).optional(),
+  manifest: PhasePromptManifestInputSchema.optional(),
+  reduced_fidelity_reason: z.string().min(1).optional(),
+}).refine(
+  (value) => value.launch_mode === 'inline_reduced_fidelity' || value.manifest != null,
+  'manifest is required for direct_agent and subagent launches.'
+).refine(
+  (value) => value.launch_mode !== 'inline_reduced_fidelity' || value.reduced_fidelity_reason != null,
+  'reduced_fidelity_reason is required for inline_reduced_fidelity launches.'
+).refine(
+  (value) => value.manifest == null || value.manifest.phase === value.phase,
+  'manifest.phase must match phase.'
+);
+
+export const RecordPhaseSkillsAppliedInputSchema = z.object({
+  feature_id: z.string().min(1),
+  phase: phase_id_schema,
+  agent_name: z.string().optional(),
+  skills_applied: z.array(z.string().min(1)).default([]),
+  fallback_used: z.boolean().default(false),
+  no_applicable_skill: z.boolean().default(false),
+  notes: z.string().optional(),
+}).refine(
+  (value) => value.skills_applied.length > 0 || value.fallback_used || value.no_applicable_skill,
+  'Record at least one applied skill, fallback_used, or no_applicable_skill.'
 );
 
 export const RecordPhaseArtifactInputSchema = z.object({
@@ -398,6 +444,18 @@ export const RunReviewChecksInputSchema = z.object({
   initiated_by: z.string().min(1),
 });
 
+export const ExportLocalArtifactsInputSchema = z.object({
+  feature_id: z.string().min(1),
+  output_dir: z.string().min(1).optional(),
+  include: z.array(z.enum(['prd', 'eval_plan', 'eval_run', 'release_handoff', 'release_closeout'])).default([
+    'prd',
+    'eval_plan',
+    'eval_run',
+    'release_handoff',
+    'release_closeout',
+  ]),
+});
+
 export const CaptureLearningInputSchema = z.object({
   feature_id: z.string().min(1),
   phase: phase_id_schema,
@@ -428,6 +486,7 @@ export type RecordReleaseHandoffInput = z.infer<typeof RecordReleaseHandoffInput
 export type RecordReleaseHandoffFailureInput = z.infer<typeof RecordReleaseHandoffFailureInputSchema>;
 export type RecordReleaseCloseoutFailureInput = z.infer<typeof RecordReleaseCloseoutFailureInputSchema>;
 export type RecordReleaseCloseoutInput = z.infer<typeof RecordReleaseCloseoutInputSchema>;
+export type RecordBreakGlassOverrideInput = z.infer<typeof RecordBreakGlassOverrideInputSchema>;
 export type RecordMergeInput = z.infer<typeof RecordMergeInputSchema>;
 export type RecordQualityGateInput = z.infer<typeof RecordQualityGateInputSchema>;
 export type RecordEvalPlanInput = z.infer<typeof RecordEvalPlanInputSchema>;
@@ -453,10 +512,13 @@ export type PreparePhaseContextInput = z.infer<typeof PreparePhaseContextInputSc
 export type ClearPhaseExecutionInput = z.infer<typeof ClearPhaseExecutionInputSchema>;
 export type RegisterPhaseExecutionInput = z.infer<typeof RegisterPhaseExecutionInputSchema>;
 export type RegisterPhaseRealizationInput = z.infer<typeof RegisterPhaseRealizationInputSchema>;
+export type RecordPhaseAgentLaunchInput = z.infer<typeof RecordPhaseAgentLaunchInputSchema>;
+export type RecordPhaseSkillsAppliedInput = z.infer<typeof RecordPhaseSkillsAppliedInputSchema>;
 export type RecordPhaseArtifactInput = z.infer<typeof RecordPhaseArtifactInputSchema>;
 export type RecordPhaseResultInput = z.infer<typeof RecordPhaseResultInputSchema>;
 export type CompletePhaseBundleInput = z.infer<typeof CompletePhaseBundleInputSchema>;
 export type RunReviewChecksInput = z.infer<typeof RunReviewChecksInputSchema>;
+export type ExportLocalArtifactsInput = z.infer<typeof ExportLocalArtifactsInputSchema>;
 export type CaptureLearningInput = z.infer<typeof CaptureLearningInputSchema>;
 export const ApplyMigrationsInputSchema = z.object({
   dry_run: z.boolean().default(false),

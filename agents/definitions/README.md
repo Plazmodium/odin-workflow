@@ -14,7 +14,7 @@ This is internal workflow reference material. You do not need to read this READM
 | Architect | 3 | `architect.md` | Technical specification drafting + opt-in formal design verification |
 | Guardian | 4 | `guardian.md` | Multi-perspective review of PRD + spec + proof results |
 | Builder | 5 | `builder.md` | Code implementation (emits claims, watched) |
-| **Reviewer** | 6 | `reviewer.md` | SAST/security scanning via Semgrep (NEW in v2) |
+| **Reviewer** | 6 | `reviewer.md` | Review checks: Semgrep for code, `docs_process` for docs/process-only changes |
 | Integrator | 7 | `integrator.md` | Build verification and integration (emits claims, watched) |
 | Documenter | 8 | `documenter.md` | Documentation updates |
 | Release | 9 | `release.md` | PR creation and archival (emits claims, watched) |
@@ -52,7 +52,7 @@ This is internal workflow reference material. You do not need to read this READM
    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
    │ BUILDER  │───▶│ REVIEWER │───▶│INTEGRATOR│───▶│DOCUMENTER│───▶│ RELEASE  │
    │  (5)     │    │  (6) NEW │    │   (7)    │    │   (8)    │    │   (9)    │
-   │ WATCHED  │    │   SAST   │    │ WATCHED  │    │   Docs   │    │ WATCHED  │
+    │ WATCHED  │    │  Review  │    │ WATCHED  │    │   Docs   │    │ WATCHED  │
    └──────────┘    └──────────┘    └──────────┘    └──────────┘    └────┬─────┘
                                                                         │
                                                                         ▼
@@ -83,10 +83,11 @@ The Discovery agent converts Product intent into technical requirements, constra
 
 ### Reviewer Agent (Phase 6)
 
-The Reviewer agent runs SAST (Static Application Security Testing) using Semgrep after the Builder completes implementation.
+The Reviewer agent runs review checks after Builder completes implementation. Code changes use Semgrep; documentation/process-only changes use the lightweight `docs_process` review profile through `odin.run_review_checks`.
 
 **Key Features:**
-- **Default scan:** `semgrep scan --config=auto`
+- **Default code scan:** `semgrep scan --config=auto`
+- **Docs/process profile:** `odin.run_review_checks({ tool: "docs_process", ... })`
 - **Severity-based gating:** HIGH/CRITICAL must be resolved or deferred with justification
 - **Findings recorded** to `security_findings` table
 - **Output format:** Summary table with blocking/deferred sections
@@ -98,7 +99,7 @@ The Watcher agent is called via LLM escalation when the Policy Engine cannot mak
 **Key Features:**
 - **Only invoked for:**
   - HIGH risk claims
-  - Claims with missing evidence
+  - Claims with missing evidence in advisory mode; strict mode can reject evidence-free watched claims before Watcher escalation
   - Policy Engine inconclusive results
 - **Returns:** PASS/FAIL with reasoning and confidence; the Policy Engine may emit NEEDS_REVIEW before Watcher escalation
 - **Not a phase agent** — runs as a sub-agent when needed
@@ -146,6 +147,7 @@ All agents receive the `_shared-context.md` file which includes:
 - Critical workflow rules (spec-first, never skip phases, agents never merge)
 - Watcher verification protocol
 - Skills injection block
+- Strict phase-agent proof and skills-applied recording guidance
 - Recovery mechanisms
 
 ## Usage
@@ -164,9 +166,10 @@ Task({
 The orchestrator is responsible for:
 1. Reading agent definitions before each phase
 2. Injecting relevant skills
-3. Executing MCP calls (agents can't access MCP directly)
-4. Submitting claims and running policy checks
-5. Recording phase transitions
+3. Executing MCP calls directly, or proxying calls for child agents without MCP access
+4. Recording phase-agent launch/execution/realization proof when strict mode requires it
+5. Submitting claims, running policy checks, and recording skills actually applied
+6. Recording phase transitions
 
 ## Version History
 

@@ -191,4 +191,51 @@ describe('handleCompletePhaseBundle', () => {
     expect(adapter.recordPhaseArtifact).not.toHaveBeenCalled();
     expect(adapter.recordPhaseResult).not.toHaveBeenCalled();
   });
+
+  it('rejects strict attestation overrides before writing bundle records', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => createFeature({ current_phase: '5' })),
+      recordPhaseArtifact: vi.fn(async (artifact: PhaseArtifact) => artifact),
+      listPhaseArtifacts: vi.fn(async () => []),
+      listLearnings: vi.fn(async () => []),
+      listRelatedLearnings: vi.fn(async () => []),
+      listOpenBlockers: vi.fn(async () => []),
+      listOpenGateRecords: vi.fn(async () => []),
+      listOpenFindings: vi.fn(async () => []),
+      listPendingClaims: vi.fn(async () => []),
+      listClaimVerificationStatus: vi.fn(async () => []),
+      listClaimsNeedingReview: vi.fn(async () => []),
+      getPhaseExecutionAttestation: vi.fn(async () => null),
+      getPhasePromptRealization: vi.fn(async () => null),
+      recordPhaseResult: vi.fn(),
+      recordAuditEvent: vi.fn(async () => undefined),
+    } as unknown as WorkflowStateAdapter;
+
+    const result = await handleCompletePhaseBundle(adapter, createSkillAdapter(), createStrictConfig(), null, {
+      feature_id: 'FEAT-BUNDLE',
+      phase: '5',
+      created_by: 'opencode',
+      summary: 'Builder complete',
+      outcome: 'completed',
+      blockers: [],
+      artifacts: [],
+      claims: [],
+      run_policy_checks: true,
+      attestation_override_reason: 'Manual emergency workflow; child session was unavailable.',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('requires a distinct worker session');
+    expect(result.structuredContent).toMatchObject({
+      recovery: expect.stringContaining('dedicated break-glass process'),
+    });
+    expect(adapter.recordAuditEvent).toHaveBeenCalledWith(
+      'FEAT-BUNDLE',
+      'STRICT_ATTESTATION_OVERRIDE_REJECTED',
+      'builder-agent',
+      expect.objectContaining({ missing_proof: 'execution_attestation' }),
+    );
+    expect(adapter.recordPhaseArtifact).not.toHaveBeenCalled();
+    expect(adapter.recordPhaseResult).not.toHaveBeenCalled();
+  });
 });

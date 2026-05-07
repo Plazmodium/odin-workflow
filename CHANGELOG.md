@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Strict phase-agent readiness now exposes pre-work blocking state through `phase_agent_readiness`, with launch provenance, skills-applied audit, break-glass override, and local artifact export tools.
+- Review checks now include a `docs_process` profile for documentation/process-only changes.
+
+### Changed
+
+- Strict phase work recording now requires execution and prompt-realization proof before artifacts, evals, review checks, or watched claims are written.
+- Release lifecycle documentation now distinguishes handoff, awaiting merge, merged, and closeout-complete states.
+
+### Fixed
+
+- Skill proposal candidate sync now uses safe table replacement via `018_safe_skill_proposal_candidate_replace.sql`.
+
 ## [0.8.1-beta] - 2026-05-06
 
 ### Changed

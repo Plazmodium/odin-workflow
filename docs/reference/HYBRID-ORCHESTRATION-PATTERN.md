@@ -16,9 +16,11 @@ Odin uses a **hybrid orchestration** model where:
 
 This document now describes the **fallback pattern** for harnesses where spawned child agents cannot call `odin.*` directly. If your harness gives the child direct Odin runtime access, use [`../../runtime/README.md#harness-execution-modes`](../../runtime/README.md#harness-execution-modes) as the canonical contract and treat this doc as the parent-session proxy pattern only.
 
-Important: invocation lifecycle telemetry (`prepare_phase_context -> record_phase_result`) is not the same as proof of a distinct child session. When projects care about provable phase ownership, the harness must also record `odin.register_phase_execution(...)`.
+Important: invocation lifecycle telemetry (`prepare_phase_context -> record_phase_result`) is not the same as proof of a distinct child session or canonical phase-agent launch. When projects care about provable phase ownership, the harness must also record `odin.record_phase_agent_launch(...)` and `odin.register_phase_execution(...)`.
 
 For the stricter question "did the child actually run from the properly defined Odin phase bundle?", the harness must additionally record `odin.register_phase_realization(...)` against the manifest returned by `odin.prepare_phase_context(...)`.
+
+Strict mode uses `context.phase_agent_readiness` as a pre-work gate. Parent-proxied `odin.record_phase_artifact`, `odin.submit_claim`, `odin.record_eval_plan`, `odin.record_eval_run`, and `odin.run_review_checks` can reject writes until required execution and realization proof exists. Launch provenance is recorded separately with `odin.record_phase_agent_launch(...)`.
 
 Read the examples below using the current 11-phase order (Planning → Product → Discovery → Architect → Guardian → Builder → Reviewer → Integrator → Documenter → Release → Complete).
 
@@ -99,8 +101,10 @@ In the packaged Odin runtime, the same proxy rule applies when a child agent lac
 ### ✅ Enforce Workflow Rules
 
 - Let the runtime own invocation lifecycle via `odin.prepare_phase_context(...)` and `odin.record_phase_result(...)`
+- Record canonical launch intent with `odin.record_phase_agent_launch(...)`, or explicitly mark `inline_reduced_fidelity`
 - Record actual execution mode with `odin.register_phase_execution(...)` when a project needs auditable phase ownership
 - Record prompt-bundle realization with `odin.register_phase_realization(...)` when a project needs proof that the child ran from the canonical Odin phase bundle manifest
+- Record actual skill use with `odin.record_phase_skills_applied(...)`; resolved skills in context are not proof of application
 - Validate quality gates before phase transitions
 - Manage feature locks for parallel work
 - Handle escalations and blockers
@@ -230,6 +234,17 @@ Discovery agent creates `requirements/AUTH-001-jwt-login/requirements.md`:
 ```typescript
 // Feature already exists in Odin via `odin.start_feature` or `odin start-feature`
 
+// Before child work in strict/full-Odin mode, inspect context.phase_agent_readiness
+// and record phase-agent launch/execution/realization proof as required.
+
+await odin.record_phase_agent_launch({
+  feature_id: 'AUTH-001-jwt-login',
+  phase: '2',
+  launch_mode: 'subagent',
+  launched_by: 'orchestrator',
+  manifest: context.execution.phase_prompt_manifest,
+});
+
 // Read agent output
 const reqDoc = await Read({
   filePath: "requirements/AUTH-001-jwt-login/requirements.md"
@@ -244,6 +259,13 @@ await odin.record_phase_artifact({
   output_type: 'requirements',
   content: reqDoc,
   created_by: context.execution.acting_agent_name,
+});
+
+await odin.record_phase_skills_applied({
+  feature_id: 'AUTH-001-jwt-login',
+  phase: '2',
+  agent_name: context.execution.acting_agent_name,
+  skills_applied: ['generic-dev'],
 });
 
 await odin.record_phase_result({
@@ -417,6 +439,10 @@ async function completePhaseFromChild(featureId, phase, summary, actingAgentName
 }
 
 async function proxyStateChangesFromChild(context, artifactContent) {
+  if (context.phase_agent_readiness?.can_record_phase_work === false) {
+    throw new Error('Strict phase-agent proof is missing; record launch, execution, and realization before proxying state changes.');
+  }
+
   await recordArtifactFromChild(
     context.feature.id,
     context.phase.id,
@@ -547,9 +573,10 @@ The orchestrator manages git branches per feature. Database records intent, orch
 2. Orchestrator: git checkout -b {branch_name} {base_branch}
 3. Each phase: commit work, call record_commit()
 4. Release phase: gh pr create, call record_pr()
-5. Human reviews and merges PR (NEVER the agent)
-6. Human calls record_merge()
-7. Orchestrator calls record_release_closeout()
+5. Orchestrator records release handoff; release stage becomes handoff_created/awaiting_merge
+6. Human reviews and merges PR (NEVER the agent)
+7. Human calls record_merge(); release stage becomes merged
+8. Orchestrator calls record_release_closeout(); release stage becomes complete
 ```
 
 ### Branch Naming

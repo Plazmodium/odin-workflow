@@ -39,11 +39,12 @@ Canonical order:
 \i 015_watcher_review_independence.sql
 \i 016_release_lifecycle.sql
 \i 017_phase_artifact_paths.sql
+\i 018_safe_skill_proposal_candidate_replace.sql
 ```
 
 See `migrations/README.md` for the current authoritative migration inventory.
 
-If using Supabase MCP, use the filename without `.sql` as the migration name (for example `001_schema`, `010_skill_proposals`).
+If using Supabase MCP, use the filename without `.sql` as the migration name (for example `001_schema`, `010_skill_proposals`, or `018_safe_skill_proposal_candidate_replace`).
 
 ---
 
@@ -160,6 +161,7 @@ Open `http://localhost:3000` and verify the dashboard loads.
 
 - Persistent workflow state in Supabase
 - Learnings, propagation targets, related learnings, and governed skill proposal workflow
+- Safe skill proposal candidate refresh through `replace_skill_proposal_candidates`
 - Dashboard read models and 11-phase visibility
 - Private archive storage in `feature-archives`
 - No Edge Function dependency for release archives

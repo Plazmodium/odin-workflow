@@ -229,7 +229,8 @@ automation:
 # `auto_merge` is reserved for future use and is not supported yet.
 
 attestation:
-  # advisory warns; strict blocks configured phases unless an override reason is supplied.
+  # advisory warns; strict blocks configured phases unless required execution and prompt-realization proof exists.
+  # Strict-mode overrides must be handled through an explicit break-glass process, not normal phase completion.
   mode: advisory
   require_execution_phases: ["5", "6", "7", "9"]
   require_prompt_realization_phases: ["5", "6", "7", "9"]
@@ -248,6 +249,16 @@ archive:
 
 Odin runtime reads `.odin/config.yaml`. A `.odin/config.toml` file is not active runtime config; `.codex/config.toml` is only Codex MCP host wiring.
 
+## Harness Execution Modes
+
+Odin distinguishes workflow telemetry from full phase-agent proof.
+
+- **Full Odin direct launch**: the harness invokes the canonical phase agent definition and records `odin.record_phase_agent_launch`, `odin.register_phase_execution`, and `odin.register_phase_realization` when strict policy requires them.
+- **Full Odin subagent launch**: the harness spawns a child/subagent from the `phase_prompt_manifest` returned by `odin.prepare_phase_context`, then records the same launch, execution, and realization proof.
+- **Reduced-fidelity inline work**: the orchestrator performs the phase inline and records `odin.record_phase_agent_launch({ launch_mode: "inline_reduced_fidelity", ... })`. This is auditable but does not satisfy strict full-Odin gates.
+
+`odin.prepare_phase_context` can open invocation telemetry for duration/lineage. Invocation telemetry alone is not proof that a canonical phase agent ran.
+
 ## Common `odin.*` Tools
 
 These are the runtime calls most users notice first:
@@ -258,11 +269,17 @@ These are the runtime calls most users notice first:
 | `odin.start_feature` | Record a feature in the workflow |
 | `odin.get_next_phase` | Ask what should happen next |
 | `odin.prepare_phase_context` | Build the next phase bundle for the agent |
+| `odin.record_phase_agent_launch` | Record canonical phase-agent launch or reduced-fidelity inline execution |
+| `odin.register_phase_execution` | Record actual inline/subagent execution and session linkage |
+| `odin.register_phase_realization` | Record proof that a worker used the canonical phase prompt manifest |
+| `odin.record_phase_skills_applied` | Audit skills actually applied in a phase |
 | `odin.record_phase_artifact` | Save phase outputs, optionally with `artifact_path` metadata |
 | `odin.record_phase_result` | Advance or block the phase |
 | `odin.complete_phase_bundle` | Record artifacts/evals/claims/checks and phase result in one validated operation |
 | `odin.record_release_closeout` | Complete Release after recorded PR merge |
-| `odin.run_review_checks` | Run review/security checks |
+| `odin.record_break_glass_override` | Record a strict-mode exception and create a follow-up gate |
+| `odin.run_review_checks` | Run review/security checks; use `tool: "docs_process"` for docs/process-only changes |
+| `odin.export_local_artifacts` | Mirror PRD, eval, and release lifecycle records to local markdown |
 | `odin.get_feature_status` | Inspect workflow status |
 
 ## Optional Features
