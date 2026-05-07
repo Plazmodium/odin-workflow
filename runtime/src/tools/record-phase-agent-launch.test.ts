@@ -126,7 +126,8 @@ describe('handleRecordPhaseAgentLaunch', () => {
   it('returns a clear error when a non-inline launch omits manifest', async () => {
     const feature = createFeature();
     const adapter = createAdapter(feature);
-    const result = await handleRecordPhaseAgentLaunch(adapter, createSkillAdapter(), createConfig(), {
+    const skillAdapter = createSkillAdapter();
+    const result = await handleRecordPhaseAgentLaunch(adapter, skillAdapter, createConfig(), {
       feature_id: 'FEAT-LAUNCH',
       phase: '5',
       launch_mode: 'subagent',
@@ -135,6 +136,8 @@ describe('handleRecordPhaseAgentLaunch', () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain('launch manifest is required');
+    expect(adapter.listPhaseArtifacts).not.toHaveBeenCalled();
+    expect(skillAdapter.resolveSkills).not.toHaveBeenCalled();
     expect(adapter.recordAuditEvent).not.toHaveBeenCalled();
   });
 });

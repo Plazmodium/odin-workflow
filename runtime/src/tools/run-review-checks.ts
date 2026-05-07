@@ -19,6 +19,14 @@ export async function handleRunReviewChecks(
   skill_adapter?: SkillAdapter,
   config?: RuntimeConfig,
 ) {
+  if (config?.attestation?.mode === 'strict' && skill_adapter == null) {
+    return createErrorResult('Strict attestation mode requires skill_adapter for run review checks so phase-agent prework cannot be bypassed.', {
+      feature_id: input.feature_id,
+      phase: input.phase,
+      recovery: 'Provide the runtime skill adapter when calling odin.run_review_checks in strict attestation mode.',
+    });
+  }
+
   const feature = await adapter.getFeature(input.feature_id);
   if (feature == null) {
     return createErrorResult(`Feature ${input.feature_id} was not found.`, {

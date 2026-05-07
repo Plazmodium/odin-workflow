@@ -46,5 +46,13 @@ describe('handleRecordPhaseSkillsApplied', () => {
       fallback_used: true,
       no_applicable_skill: false,
     }).success).toBe(false);
+
+    expect(RecordPhaseSkillsAppliedInputSchema.safeParse({
+      feature_id: 'FEAT-SKILL',
+      phase: '5',
+      skills_applied: [],
+      fallback_used: true,
+      no_applicable_skill: true,
+    }).success).toBe(false);
   });
 });

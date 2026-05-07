@@ -49,6 +49,14 @@ export async function handleRecordPhaseAgentLaunch(
     );
   }
 
+  if (input.manifest == null) {
+    return createErrorResult('A launch manifest is required for direct_agent and subagent launches.', {
+      feature_id: input.feature_id,
+      phase: input.phase,
+      provided_manifest_id: null,
+    });
+  }
+
   const expected_bundle = await buildPhaseContextBundleForFeature(feature, adapter, skill_adapter, config, {
     feature_id: input.feature_id,
     phase: input.phase,
@@ -63,15 +71,6 @@ export async function handleRecordPhaseAgentLaunch(
     return createErrorResult(`Phase ${input.phase} does not expose a canonical phase prompt manifest.`, {
       feature_id: input.feature_id,
       phase: input.phase,
-    });
-  }
-
-  if (input.manifest == null) {
-    return createErrorResult('A launch manifest is required for direct_agent and subagent launches.', {
-      feature_id: input.feature_id,
-      phase: input.phase,
-      expected_manifest_id: expected_manifest.manifest_id,
-      provided_manifest_id: null,
     });
   }
 

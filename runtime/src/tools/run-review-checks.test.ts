@@ -37,6 +37,29 @@ function createSkillAdapter(): SkillAdapter {
 }
 
 describe('handleRunReviewChecks', () => {
+  it('fails closed in strict mode when skill adapter is unavailable', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(),
+      recordReviewCheck: vi.fn(),
+    } as unknown as WorkflowStateAdapter;
+    const reviewAdapter: ReviewAdapter = {
+      runChecks: vi.fn(async () => ({ tool: 'semgrep', status: 'passed', summary: 'ok', changed_files: [], findings: [] })),
+    };
+
+    const result = await handleRunReviewChecks(adapter, reviewAdapter, {
+      feature_id: 'FEAT-REVIEW',
+      phase: '6',
+      tool: 'semgrep',
+      changed_files: [],
+      initiated_by: 'opencode',
+    }, undefined, createStrictConfig());
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('Strict attestation mode requires skill_adapter');
+    expect(adapter.getFeature).not.toHaveBeenCalled();
+    expect(reviewAdapter.runChecks).not.toHaveBeenCalled();
+  });
+
   it('blocks strict review checks before phase-agent prework is proven', async () => {
     const adapter: WorkflowStateAdapter = {
       getFeature: vi.fn(async () => ({
