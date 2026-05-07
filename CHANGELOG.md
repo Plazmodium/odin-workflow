@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.8.2-beta] - 2026-05-07
+
 ### Added
 
 - Strict phase-agent readiness now exposes pre-work blocking state through `phase_agent_readiness`, with launch provenance, skills-applied audit, break-glass override, and local artifact export tools.
