@@ -23,6 +23,7 @@ import { getFeatureClaimsWithVerification, getClaimsSummary } from '@/lib/data/c
 import { getSecurityFindings, getSecuritySummary } from '@/lib/data/security';
 import { refreshFeatureEval } from '@/lib/actions/refresh-evals';
 import { FeatureHeader } from '@/components/features/feature-header';
+import { FeatureWorkflowHealthCard } from '@/components/features/feature-workflow-health-card';
 import { PhaseTimelineEnhanced } from '@/components/features/phase-timeline-enhanced';
 import { AgentProfiler } from '@/components/features/agent-profiler';
 import { QualityGatesTable } from '@/components/features/quality-gates-table';
@@ -39,6 +40,7 @@ import { RefreshEvalsButton } from '@/components/shared/refresh-evals-button';
 import { PollingSubscription } from '@/components/realtime/realtime-page';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { getFeatureWorkflowHealth } from '@/lib/feature-workflow-health';
 import { formatConfidence } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -52,8 +54,9 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
   const feature = await getFeatureStatus(id);
   if (!feature) notFound();
 
-  const [phases, agentDurationsResult, invocations, executionAttestationsResult, promptRealizationsResult, gates, blockers, eval_, learnings, transitions, iterations, commits, auditLog, phaseOutputs, archive, claims, claimsSummary, securityFindings, securitySummary] =
+  const [featureWorkflowHealthResult, phases, agentDurationsResult, invocations, executionAttestationsResult, promptRealizationsResult, gates, blockers, eval_, learnings, transitions, iterations, commits, auditLog, phaseOutputs, archive, claims, claimsSummary, securityFindings, securitySummary] =
     await Promise.all([
+      getFeatureWorkflowHealth(id),
       getPhaseDurations(id),
       getAgentDurations(id),
       getAgentInvocations(id),
@@ -104,6 +107,8 @@ export default async function FeatureDetailPage({ params }: FeatureDetailPagePro
 
       {/* Header */}
       <FeatureHeader feature={feature} healthStatus={eval_?.health_status} />
+
+      <FeatureWorkflowHealthCard result={featureWorkflowHealthResult} />
 
       {/* Phase Timeline (Enhanced - clickable, expandable) */}
         <Card>

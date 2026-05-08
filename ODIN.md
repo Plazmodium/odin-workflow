@@ -765,6 +765,12 @@ odin.get_feature_status({ feature_id: "FEAT-001" })
 
 Check `workflow.invocation_coverage.pre_release_missing` before PR handoff and `workflow.invocation_coverage.pre_completion_missing` before final completion. The Release agent definition also includes the equivalent SQL shape for direct workflow-state inspection.
 
+### Feature Workflow Health
+
+Use `odin.get_feature_health({ feature_id })` when the user asks what needs attention now, whether a feature is blocked, or what should happen next. It returns the concise `workflow_health` surface: status, summary, current focus, blockers, warnings, and next actions.
+
+Use `odin.get_feature_status({ feature_id })` when you need the broader diagnostic bundle with counts, automation details, invocation coverage, artifacts, evals, and recent records. Feature workflow health is distinct from post-hoc EVALS `health_status`.
+
 **Expected phase/agent mapping**:
 
 | Phase | Agent |
@@ -1082,6 +1088,8 @@ odin.publish_skill_proposal({
 ### Status & Release
 
 ```
+odin.get_feature_health({ feature_id: "FEAT-001" })
+
 odin.get_feature_status({ feature_id: "FEAT-001" })
 
 odin.pick_next_autonomous_phase({

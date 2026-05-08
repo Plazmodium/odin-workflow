@@ -30,6 +30,7 @@ import {
   ExportLocalArtifactsInputSchema,
   GetClaimsNeedingReviewInputSchema,
   GetDevelopmentEvalStatusInputSchema,
+  GetFeatureHealthInputSchema,
   GetFeatureStatusInputSchema,
   GetNextPhaseInputSchema,
   PickNextAutonomousPhaseInputSchema,
@@ -75,6 +76,7 @@ import { handleExploreKnowledge } from './tools/explore-knowledge.js';
 import { handleExportLocalArtifacts } from './tools/export-local-artifacts.js';
 import { handleGetClaimsNeedingReview } from './tools/get-claims-needing-review.js';
 import { handleGetDevelopmentEvalStatus } from './tools/get-development-eval-status.js';
+import { handleGetFeatureHealth } from './tools/get-feature-health.js';
 import { handleGetFeatureStatus } from './tools/get-feature-status.js';
 import { handleGetNextPhase } from './tools/get-next-phase.js';
 import { handleGetSkillProposalQueue } from './tools/get-skill-proposal-queue.js';
@@ -254,6 +256,16 @@ server.registerTool(
     inputSchema: GetFeatureStatusInputSchema,
   },
   safeToolHandler(async (input) => handleGetFeatureStatus(workflow_state, skill_adapter, runtime_config, input))
+);
+
+server.registerTool(
+  'odin.get_feature_health',
+  {
+    title: 'Get Feature Health',
+    description: 'Return concise current feature workflow health with blockers, warnings, and next actions.',
+    inputSchema: GetFeatureHealthInputSchema,
+  },
+  safeToolHandler(async (input) => handleGetFeatureHealth(workflow_state, skill_adapter, runtime_config, input))
 );
 
 server.registerTool(
