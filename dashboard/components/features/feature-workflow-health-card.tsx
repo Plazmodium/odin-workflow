@@ -107,14 +107,18 @@ export function FeatureWorkflowHealthCard({ result }: FeatureWorkflowHealthCardP
 
         <div className="space-y-2">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Next Actions</p>
-          <ol className="space-y-2">
-            {visibleActions.map((action, index) => (
-              <li key={action} className="flex gap-2">
-                <span className="text-muted-foreground">{index + 1}.</span>
-                <span>{action}</span>
-              </li>
-            ))}
-          </ol>
+          {visibleActions.length === 0 ? (
+            <p className="text-muted-foreground">No immediate actions.</p>
+          ) : (
+            <ol className="space-y-2">
+              {visibleActions.map((action, index) => (
+                <li key={`${action}:${index}`} className="flex gap-2">
+                  <span className="text-muted-foreground">{index + 1}.</span>
+                  <span>{action}</span>
+                </li>
+              ))}
+            </ol>
+          )}
         </div>
       </CardContent>
     </Card>

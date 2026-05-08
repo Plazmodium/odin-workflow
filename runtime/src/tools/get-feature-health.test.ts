@@ -165,6 +165,43 @@ describe('handleGetFeatureHealth', () => {
     expect(health).not.toHaveProperty('workflow_health');
   });
 
+  it('reports a running feature with an open invocation', async () => {
+    const invocation: AgentInvocationRecord = {
+      id: 'inv_1',
+      feature_id: 'FEAT-HEALTH',
+      phase: '5',
+      agent_name: 'builder-agent',
+      operation: 'Phase 5: Builder',
+      skills_used: [],
+      started_at: '2026-05-08T00:00:00.000Z',
+      ended_at: null,
+      duration_ms: null,
+    };
+    const result = await handleGetFeatureHealth(
+      createWorkflowAdapter(createFeature(), { invocations: [invocation] }),
+      createSkillAdapter(),
+      createConfig(),
+      { feature_id: 'FEAT-HEALTH' },
+    );
+
+    const health = workflowHealth(result);
+    expect(health.status).toBe('running');
+    expect(health.next_actions[0]).toContain('inv_1');
+  });
+
+  it('reports a completed feature', async () => {
+    const result = await handleGetFeatureHealth(
+      createWorkflowAdapter(createFeature({ current_phase: '10', status: 'COMPLETED', completed_at: '2026-05-08T01:00:00.000Z' })),
+      createSkillAdapter(),
+      createConfig(),
+      { feature_id: 'FEAT-HEALTH' },
+    );
+
+    const health = workflowHealth(result);
+    expect(health.status).toBe('complete');
+    expect(health.next_actions).toEqual(['No workflow action is required.']);
+  });
+
   it('reports an open blocker', async () => {
     const result = await handleGetFeatureHealth(
       createWorkflowAdapter(createFeature(), { open_blockers: ['Needs product decision'] }),
@@ -179,6 +216,29 @@ describe('handleGetFeatureHealth', () => {
       kind: 'blocker',
       message: 'Needs product decision',
     }));
+  });
+
+  it('reports open review gates', async () => {
+    const gate: QualityGateRecord = {
+      id: 1,
+      feature_id: 'FEAT-HEALTH',
+      gate_name: 'semgrep',
+      phase: '4',
+      status: 'PENDING',
+      approver: 'reviewer-agent',
+      approved_at: '2026-05-08T00:00:00.000Z',
+      approval_notes: null,
+    };
+    const result = await handleGetFeatureHealth(
+      createWorkflowAdapter(createFeature({ current_phase: '5' }), { open_gate_records: [gate] }),
+      createSkillAdapter(),
+      createConfig(),
+      { feature_id: 'FEAT-HEALTH' },
+    );
+
+    const health = workflowHealth(result);
+    expect(health.status).toBe('waiting_on_review');
+    expect(health.blockers[0]).toMatchObject({ kind: 'gate', message: 'semgrep is PENDING in phase 4.' });
   });
 
   it('reports watcher review pending', async () => {

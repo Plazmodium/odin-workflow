@@ -27,16 +27,17 @@ interface RuntimeComponents {
   config: RuntimeConfig;
 }
 
-const WORKFLOW_HEALTH_STATUSES = [
-  'ready',
-  'running',
-  'blocked',
-  'waiting_on_review',
-  'waiting_on_watchers',
-  'waiting_on_human',
-  'needs_attention',
-  'complete',
-] as const satisfies readonly FeatureWorkflowHealthStatus[];
+const WORKFLOW_HEALTH_STATUS_COVERAGE = {
+  ready: true,
+  running: true,
+  blocked: true,
+  waiting_on_review: true,
+  waiting_on_watchers: true,
+  waiting_on_human: true,
+  needs_attention: true,
+  complete: true,
+} as const satisfies Record<FeatureWorkflowHealthStatus, true>;
+const WORKFLOW_HEALTH_STATUSES = Object.keys(WORKFLOW_HEALTH_STATUS_COVERAGE) as FeatureWorkflowHealthStatus[];
 const WORKFLOW_HEALTH_STATUS_SET = new Set<string>(WORKFLOW_HEALTH_STATUSES);
 
 let cachedRuntime: RuntimeComponents | null = null;

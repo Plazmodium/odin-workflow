@@ -87,18 +87,6 @@ function openInvocation(input: DeriveFeatureWorkflowHealthInput): AgentInvocatio
   return input.invocations.find((invocation) => invocation.ended_at == null) ?? null;
 }
 
-function claimAttentionCount(input: DeriveFeatureWorkflowHealthInput): number {
-  const claim_ids = new Set<string>();
-  for (const claim of input.claims_needing_review) {
-    claim_ids.add(claim.claim_id);
-  }
-  for (const claim of input.claim_verification.filter((claim) => claim.final_status !== 'PASS')) {
-    claim_ids.add(claim.claim_id);
-  }
-
-  return input.pending_claims.length + claim_ids.size;
-}
-
 function buildBaseWarnings(input: DeriveFeatureWorkflowHealthInput): FeatureWorkflowHealthWarning[] {
   const warnings: FeatureWorkflowHealthWarning[] = [];
 
@@ -294,35 +282,35 @@ export function deriveFeatureWorkflowHealth(input: DeriveFeatureWorkflowHealthIn
     };
   }
 
-  const claim_count = claimAttentionCount(input);
-  if (claim_count > 0) {
-    const claim_blockers: FeatureWorkflowHealthBlocker[] = [
-      ...input.claims_needing_review.map((claim) => ({
+  const claim_blockers: FeatureWorkflowHealthBlocker[] = [
+    ...input.claims_needing_review.map((claim) => ({
+      kind: 'claim' as const,
+      message: `${claim.claim_id} needs watcher review: ${claim.claim_type} by ${claim.agent_name}.`,
+      recovery: 'Have watcher-agent review this claim and record the verdict with odin.record_watcher_review.',
+    })),
+    ...input.pending_claims.map((claim) => ({
+      kind: 'claim' as const,
+      message: claim,
+      recovery: 'Run odin.verify_claims to resolve policy status, then handle any watcher queue entries.',
+    })),
+    ...input.claim_verification
+      .filter((claim) => claim.final_status !== 'PASS')
+      .map((claim) => ({
         kind: 'claim' as const,
-        message: `${claim.claim_id} needs watcher review: ${claim.claim_type} by ${claim.agent_name}.`,
-        recovery: 'Have watcher-agent review this claim and record the verdict with odin.record_watcher_review.',
+        message: `${claim.claim_id} verification is ${claim.final_status}.`,
+        recovery: claim.final_status === 'FAIL'
+          ? 'Fix the failing claim evidence or implementation, rerun policy checks, then rerun odin.get_feature_health.'
+          : 'Resolve claim policy/watcher review, then rerun odin.get_feature_health.',
       })),
-      ...input.pending_claims.map((claim) => ({
-        kind: 'claim' as const,
-        message: claim,
-        recovery: 'Run odin.verify_claims to resolve policy status, then handle any watcher queue entries.',
-      })),
-      ...input.claim_verification
-        .filter((claim) => claim.final_status !== 'PASS')
-        .map((claim) => ({
-          kind: 'claim' as const,
-          message: `${claim.claim_id} verification is ${claim.final_status}.`,
-          recovery: claim.final_status === 'FAIL'
-            ? 'Fix the failing claim evidence or implementation, rerun policy checks, then rerun odin.get_feature_health.'
-            : 'Resolve claim policy/watcher review, then rerun odin.get_feature_health.',
-        })),
-    ];
+  ];
+
+  if (claim_blockers.length > 0) {
 
     return {
       feature_id: input.feature.id,
       feature_name: input.feature.name,
       status: 'waiting_on_watchers',
-      summary: `Feature ${input.feature.id} is waiting on ${plural(claim_count, 'claim')} in ${input.phase_name}.`,
+      summary: `Feature ${input.feature.id} is waiting on ${plural(claim_blockers.length, 'claim')} in ${input.phase_name}.`,
       current_focus,
       blockers: claim_blockers,
       warnings,
