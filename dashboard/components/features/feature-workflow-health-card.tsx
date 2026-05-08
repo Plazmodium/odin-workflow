@@ -19,8 +19,11 @@ function statusVariant(status: FeatureWorkflowHealthStatus) {
     case 'waiting_on_human':
       return 'concerning' as const;
     case 'running':
-    default:
       return 'secondary' as const;
+    default: {
+      const exhaustive: never = status;
+      return exhaustive;
+    }
   }
 }
 
@@ -52,6 +55,9 @@ export function FeatureWorkflowHealthCard({ result }: FeatureWorkflowHealthCardP
   const visibleBlockers = workflowHealth.blockers.slice(0, 3);
   const visibleWarnings = workflowHealth.warnings.slice(0, 3);
   const visibleActions = workflowHealth.next_actions.slice(0, 3);
+  const remainingBlockers = workflowHealth.blockers.length - visibleBlockers.length;
+  const remainingWarnings = workflowHealth.warnings.length - visibleWarnings.length;
+  const remainingActions = workflowHealth.next_actions.length - visibleActions.length;
 
   return (
     <Card className="border-l-4 border-l-primary">
@@ -85,6 +91,9 @@ export function FeatureWorkflowHealthCard({ result }: FeatureWorkflowHealthCardP
                   )}
                 </div>
               ))}
+              {remainingBlockers > 0 && (
+                <p className="text-xs text-muted-foreground">+{remainingBlockers} more. Run `odin.get_feature_health` for the full list.</p>
+              )}
             </div>
           )}
         </div>
@@ -101,6 +110,9 @@ export function FeatureWorkflowHealthCard({ result }: FeatureWorkflowHealthCardP
                   <p>{warning.message}</p>
                 </div>
               ))}
+              {remainingWarnings > 0 && (
+                <p className="text-xs text-muted-foreground">+{remainingWarnings} more. Run `odin.get_feature_health` for the full list.</p>
+              )}
             </div>
           )}
         </div>
@@ -118,6 +130,9 @@ export function FeatureWorkflowHealthCard({ result }: FeatureWorkflowHealthCardP
                 </li>
               ))}
             </ol>
+          )}
+          {remainingActions > 0 && (
+            <p className="text-xs text-muted-foreground">+{remainingActions} more. Run `odin.get_feature_health` for the full list.</p>
           )}
         </div>
       </CardContent>
