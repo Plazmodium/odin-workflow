@@ -45,6 +45,17 @@ function createConfig(mode: 'guarded' | 'auto_pr'): RuntimeConfig {
   };
 }
 
+function createStrictConfig(): RuntimeConfig {
+  return {
+    ...createConfig('guarded'),
+    attestation: {
+      mode: 'strict',
+      require_execution_phases: ['5', '6', '7', '9'],
+      require_prompt_realization_phases: ['5', '6', '7', '9'],
+    },
+  };
+}
+
 function createArtifact(output_type: PhaseArtifact['output_type'], created_at: string, content: unknown): PhaseArtifact {
   return {
     id: `artifact_${output_type}_${created_at}`,
@@ -446,6 +457,89 @@ describe('handlePreparePhaseContext', () => {
     expect(context?.execution.response_style).toBe('terse_execution');
     expect(context?.execution.phase_prompt_manifest?.phase_role_name).toBe('builder-agent');
     expect(context?.invocation?.agent_name).toBe('senior-builder');
+  });
+
+  it('surfaces strict phase-agent readiness before phase work starts', async () => {
+    const adapter: WorkflowStateAdapter = {
+      getFeature: vi.fn(async () => createFeature()),
+      listPhaseArtifacts: vi.fn(async () => []),
+      listLearnings: vi.fn(async () => []),
+      listRelatedLearnings: vi.fn(async () => []),
+      listOpenBlockers: vi.fn(async () => []),
+      listOpenGateRecords: vi.fn(async () => []),
+      listOpenFindings: vi.fn(async () => []),
+      listPendingClaims: vi.fn(async () => []),
+      listClaimVerificationStatus: vi.fn(async () => []),
+      listClaimsNeedingReview: vi.fn(async () => []),
+      findOpenAgentInvocation: vi.fn(async () => null),
+      startAgentInvocation: vi.fn(async () => ({
+        id: 'inv_strict',
+        feature_id: 'FEAT-CTX',
+        phase: '5',
+        agent_name: 'builder-agent',
+        operation: 'Phase 5: Builder',
+        skills_used: [],
+        started_at: '2026-03-20T01:30:00.000Z',
+        ended_at: null,
+        duration_ms: null,
+      })),
+      getPhaseExecutionAttestation: vi.fn(async () => null),
+      getPhasePromptRealization: vi.fn(async () => null),
+    } as unknown as WorkflowStateAdapter;
+
+    const skillAdapter: SkillAdapter = {
+      resolveSkills: vi.fn(async () => ({
+        resolved: [],
+        fallback_used: false,
+      })),
+      listKnowledgeDomains: vi.fn(async () => []),
+      invalidateCaches: vi.fn(),
+    };
+
+    const result = await handlePreparePhaseContext(adapter, skillAdapter, createStrictConfig(), {
+      feature_id: 'FEAT-CTX',
+      phase: '5',
+      include_artifacts: false,
+      include_skills: true,
+      include_learnings: false,
+    });
+
+    const context = (
+      result.structuredContent as {
+        context?: {
+          phase_agent_readiness: {
+            attestation_mode: string;
+            status: string;
+            full_odin_required: boolean;
+            can_record_phase_work: boolean;
+            missing: string[];
+            next_actions: string[];
+            execution: { error: string | null } | null;
+            prompt_realization: { error: string | null; expected_manifest_id: string | null } | null;
+          };
+          execution: { phase_prompt_manifest: PhasePromptManifest | null };
+        };
+      }
+    )?.context;
+
+    expect(context?.phase_agent_readiness).toMatchObject({
+      attestation_mode: 'strict',
+      status: 'blocked_missing_agent_proof',
+      full_odin_required: true,
+      can_record_phase_work: false,
+      missing: ['execution_attestation', 'prompt_realization'],
+    });
+    expect(context?.phase_agent_readiness.next_actions).toContain(
+      'Record odin.register_phase_execution with actual_mode subagent and distinct supervisor_session_id / worker_session_id before phase work starts.'
+    );
+    expect(context?.phase_agent_readiness.next_actions).toContain(
+      'Record odin.register_phase_realization using this context phase_prompt_manifest after launching the canonical phase agent prompt.'
+    );
+    expect(context?.phase_agent_readiness.execution?.error).toContain('requires a distinct worker session');
+    expect(context?.phase_agent_readiness.prompt_realization?.error).toContain('requires attested realization');
+    expect(context?.phase_agent_readiness.prompt_realization?.expected_manifest_id).toBe(
+      context?.execution.phase_prompt_manifest?.manifest_id
+    );
   });
 
   it('returns inline-allowed execution policy for durable artifact phases', async () => {

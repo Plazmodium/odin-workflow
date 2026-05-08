@@ -4,13 +4,18 @@
  */
 
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import type { SkillAdapter } from '../adapters/skills/types.js';
+import type { RuntimeConfig } from '../config.js';
 import { resolveWorkflowActorName } from '../domain/actors.js';
 import type { RecordPhaseArtifactInput } from '../schemas.js';
 import { createId, createErrorResult, createTextResult } from '../utils.js';
+import { assessStrictPhaseAgentPrework } from './phase-agent-prework.js';
 
 export async function handleRecordPhaseArtifact(
   adapter: WorkflowStateAdapter,
-  input: RecordPhaseArtifactInput
+  input: RecordPhaseArtifactInput,
+  skill_adapter?: SkillAdapter,
+  config?: RuntimeConfig,
 ) {
   const feature = await adapter.getFeature(input.feature_id);
   if (feature == null) {
@@ -20,6 +25,21 @@ export async function handleRecordPhaseArtifact(
   }
 
   const created_by = resolveWorkflowActorName(input.phase, input.created_by);
+
+  if (skill_adapter != null && config != null) {
+    const prework_error = await assessStrictPhaseAgentPrework(
+      adapter,
+      skill_adapter,
+      config,
+      feature,
+      input.phase,
+      created_by,
+      'record phase artifact',
+    );
+    if (prework_error != null) {
+      return prework_error;
+    }
+  }
 
   const artifact = await adapter.recordPhaseArtifact({
     id: createId('artifact'),

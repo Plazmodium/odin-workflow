@@ -77,7 +77,7 @@ When developers use AI coding assistants without proper specifications:
 | 3 | Architect | Architect | No | Specification drafting |
 | 4 | Guardian | Guardian | No | PRD + Spec review |
 | 5 | Builder | Builder | **YES** | Implementation |
-| 6 | Reviewer | Reviewer | No | SAST/security scan (Semgrep) |
+| 6 | Reviewer | Reviewer | No | Review checks (Semgrep or `docs_process`) |
 | 7 | Integrator | Integrator | **YES** | Build verification |
 | 8 | Documenter | Documenter | No | Documentation generation |
 | 9 | Release | Release | **YES** | PR creation and archival |
@@ -104,11 +104,15 @@ This is the canonical step-by-step workflow the orchestrator follows for every f
 3. For each phase 0→9:
    a. odin.get_next_phase({ feature_id })           # Confirm next phase
    b. odin.prepare_phase_context({ feature_id, phase, agent_name })
-                                                     # Get agent bundle
-   c. Read agent definition from agents/definitions/ # Load mandatory checklist
-   d. Invoke agent (Task tool or inline)             # Agent produces output
-   e. odin.record_phase_artifact({ ... })            # Persist artifacts
-   f. Phase-specific actions:
+                                                     # Get agent bundle and readiness
+   c. Inspect context.phase_agent_readiness          # Strict mode may block writes
+   d. Invoke canonical phase agent directly, spawn a subagent from the phase bundle,
+      or explicitly record reduced fidelity with odin.record_phase_agent_launch({ launch_mode: "inline_reduced_fidelity", ... })
+   e. For full-Odin strict phases, record odin.record_phase_agent_launch,
+      odin.register_phase_execution, and odin.register_phase_realization before phase work is written
+   f. Record actual skill use with odin.record_phase_skills_applied({ ... })
+   g. odin.record_phase_artifact({ ... })            # Persist artifacts
+   h. Phase-specific actions:
       - Phase 3 (Architect): record eval_plan when required
       - Phase 4 (Guardian): verify spec quality rubric scores 2/2
                             record eval_readiness via odin.record_quality_gate({ ... })
@@ -119,14 +123,16 @@ This is the canonical step-by-step workflow the orchestrator follows for every f
                              odin.archive_feature_release({ ... }),
                              inspect context.automation,
                              gh pr create only when policy allows it
-   g. odin.record_phase_result({ ..., outcome: "completed" })
+   i. odin.record_phase_result({ ..., outcome: "completed" })
                                                      # Advance to next phase
 4. In `guarded`, STOP at human PR handoff. In `auto_pr`, create/record the PR when policy allows it, then wait for human merge.
 ```
 
 When a project opts into runtime automation policy, the orchestrator must consult the `automation` block returned by `odin.prepare_phase_context` before attempting PR-related actions. `odin.record_pr` and `odin.record_merge` persist facts after external git/GitHub actions; they are not the trusted authorization boundary by themselves.
 
-> **Remember**: Child-agent MCP access depends on harness capabilities. Some harnesses let task-spawned child agents call `odin.*` directly; others require the main orchestrator session to proxy those calls. `recommended_mode` is guidance, `execution_policy` is enforcement, and invocation telemetry alone does not prove a distinct child session. For the stricter question "did the child run from the canonical Odin phase bundle?", the harness must also use the prompt manifest and record `odin.register_phase_realization(...)`.
+> **Remember**: Child-agent MCP access depends on harness capabilities. Some harnesses let task-spawned child agents call `odin.*` directly; others require the main orchestrator session to proxy those calls. `recommended_mode` is guidance, `execution_policy` is enforcement, and invocation telemetry alone does not prove a distinct child session. For the stricter question "did the child run from the canonical Odin phase bundle?", the harness must invoke the canonical phase agent definition directly or spawn a subagent whose prompt is built from that definition, the prepared phase context, and resolved skills, then record `odin.register_phase_realization(...)`.
+
+Strict phase writes are pre-work gated. `odin.record_phase_artifact`, `odin.submit_claim`, `odin.record_eval_plan`, `odin.record_eval_run`, and `odin.run_review_checks` can reject writes until the required launch, execution, and realization proof is present.
 
 ### Feature Is the Unit of Execution
 
@@ -324,7 +330,7 @@ Before implementation, score your spec:
 | [Architect](agents/definitions/architect.md) | 3 | No | Specification drafting and task breakdown |
 | [Guardian](agents/definitions/guardian.md) | 4 | No | PRD + Spec review with 3 perspectives |
 | [Builder](agents/definitions/builder.md) | 5 | **YES** | Code implementation per spec |
-| [Reviewer](agents/definitions/reviewer.md) | 6 | No | SAST/security scan (Semgrep) |
+| [Reviewer](agents/definitions/reviewer.md) | 6 | No | Review checks (Semgrep or `docs_process`) |
 | [Integrator](agents/definitions/integrator.md) | 7 | **YES** | Build and runtime verification |
 | [Documenter](agents/definitions/documenter.md) | 8 | No | Documentation generation |
 | [Release](agents/definitions/release.md) | 9 | **YES** | PR creation and feature archival |
@@ -516,22 +522,24 @@ The Watcher is **advisory** — it informs but does not auto-block. The orchestr
 
 ---
 
-## Reviewer (SAST/Security)
+## Reviewer (Review Checks)
 
-The Reviewer agent (Phase 6) performs static application security testing using Semgrep.
+The Reviewer agent (Phase 6) runs review checks. Code changes use Semgrep; documentation/process-only changes use the `docs_process` profile.
 
 ### How It Works
 
 The orchestrator calls:
-```
+
+```typescript
 odin.run_review_checks({
   feature_id: "FEAT-001",
+  tool: "semgrep",
   initiated_by: "reviewer-agent",
   changed_files: ["src/auth.ts", "src/api/users.ts"]
 })
 ```
 
-The runtime handles everything: runs Semgrep, records findings, and reports results. The orchestrator does NOT need to run Semgrep directly or record findings manually.
+Use `tool: "docs_process"` when changed files are documentation/process-only. The runtime handles everything: runs the selected profile, records findings/checks, and reports results. The orchestrator does NOT need to run Semgrep directly or record findings manually.
 
 ### Severity Levels
 
@@ -607,13 +615,13 @@ The `dev_initials` and `author` parameters in `odin.start_feature` identify the 
 1. **Orchestrator creates the git branch FIRST**: `git checkout -b {dev_initials}/feature/{FEATURE-ID}` — this must succeed before anything is recorded in the database
 2. **Only after the branch exists**, call `odin.start_feature` to record the feature
 3. Transition to Phase 1 (Product) — all work happens on the feature branch
-4. Each phase: `odin.prepare_phase_context` → agent work → either individual records (`odin.record_phase_artifact`, claims/evals, `odin.record_phase_result`) or one `odin.complete_phase_bundle` call
-5. `odin.prepare_phase_context` starts the phase invocation timer; `odin.record_phase_result` completes it
+4. Each phase: `odin.prepare_phase_context` → inspect `phase_agent_readiness` → launch/realize the phase agent or record reduced fidelity → agent work → either individual records (`odin.record_phase_artifact`, claims/evals, `odin.record_phase_result`) or one `odin.complete_phase_bundle` call. In strict mode, watched completed phases must submit and verify claims before completion; do not include claims inside a completed `odin.complete_phase_bundle` call.
+5. `odin.prepare_phase_context` may open invocation telemetry; this is timing/lineage only, not proof that a canonical phase agent ran. Full-Odin proof requires `odin.record_phase_agent_launch`, `odin.register_phase_execution`, and `odin.register_phase_realization` when strict policy requires them.
 6. Release phase inspects `context.automation` from `odin.prepare_phase_context`
 7. In `guarded`, prepare the PR handoff for a human; in `auto_pr`, create the PR via `gh pr create` only when policy allows it, then record it with `odin.record_pr`
 8. Human reviews and merges the PR (NEVER the agent)
 9. After the human merges the PR, record the merge with `odin.record_merge`
-10. Complete Release closeout with `odin.record_release_closeout`
+10. Complete Release closeout with `odin.record_release_closeout`; release status moves through `handoff_ready`, `handoff_created`, `awaiting_merge`, `merged`, and `complete`
 
 `odin.record_phase_artifact` accepts optional `artifact_path` metadata. Use it for durable files such as `documentation-report.md` so strict projects can enforce expected completion artifacts by filename.
 
@@ -809,6 +817,8 @@ Important distinction:
 - `recommended_mode` is harness guidance
 - `execution_policy` is the enforcement level
 - invocation telemetry alone does **not** prove a distinct child session ran
+- reading a phase definition as a checklist is **not** full Odin execution
+- full Odin execution requires the canonical phase agent definition to be directly invoked or realized into a spawned subagent prompt
 - strict phase ownership is only proven when the harness records execution attestation
 - strict phase-agent realization is only proven when the harness also records prompt-bundle realization against the canonical phase manifest
 
@@ -994,25 +1004,40 @@ odin.record_phase_result({
 })
 ```
 
-> `odin.prepare_phase_context` returns an `invocation` object. That invocation stays open while the agent works and is completed automatically when `odin.record_phase_result` is called for the same phase.
+Runtime notes:
 
-> When Development Evals are relevant, `odin.prepare_phase_context` also returns `development_evals.expected_artifacts`, `development_evals.expected_gate`, `development_evals.status_summary`, and `development_evals.harness_prompt_block`. Harnesses should append the `harness_prompt_block` lines to the active agent prompt instead of relying on implicit eval behavior.
-
-> If the harness wants a focused eval-only read path, use `odin.get_development_eval_status({ feature_id })` instead of parsing the broader `odin.get_feature_status` payload.
-
-> Canonical eval-aware harness flow: `odin.prepare_phase_context` -> build prompt from `role_summary`, `constraints`, and `harness_prompt_block` -> `odin.get_development_eval_status` when focused eval state is needed -> `odin.record_eval_plan` / `odin.record_eval_run` / `odin.record_quality_gate` as work completes.
+- `odin.prepare_phase_context` returns an `invocation` object. That invocation stays open while the agent works and is completed automatically when `odin.record_phase_result` is called for the same phase.
+- In strict attestation mode, `odin.prepare_phase_context` also returns `phase_agent_readiness`. If `can_record_phase_work` is false, do not record phase artifacts, evals, review checks, or watched claims yet. Launch the canonical phase agent directly, or spawn a subagent from the returned phase prompt manifest, then record `odin.register_phase_execution` and `odin.register_phase_realization` before phase work is written.
+- Harnesses should also call `odin.record_phase_agent_launch` when a phase agent is actually launched, or with `launch_mode: "inline_reduced_fidelity"` when the orchestrator performs the phase inline. Inline reduced-fidelity records do not satisfy strict full-Odin gates.
+- Each phase should record `odin.record_phase_skills_applied` with the skills actually used, or explicitly mark fallback/no-applicable-skill. This is separate from the skills resolved in context.
+- Strict watched claims must be evidence-backed when submitted. Include non-empty `evidence_refs` or structured `evidence` such as command outputs, file paths, artifact ids/paths, commit hashes, PR URLs, or verification summaries.
+- When Development Evals are relevant, `odin.prepare_phase_context` also returns `development_evals.expected_artifacts`, `development_evals.expected_gate`, `development_evals.status_summary`, and `development_evals.harness_prompt_block`. Harnesses should append the `harness_prompt_block` lines to the active agent prompt instead of relying on implicit eval behavior.
+- If the harness wants a focused eval-only read path, use `odin.get_development_eval_status({ feature_id })` instead of parsing the broader `odin.get_feature_status` payload.
+- Canonical eval-aware harness flow: `odin.prepare_phase_context` -> build prompt from `role_summary`, `constraints`, and `harness_prompt_block` -> `odin.get_development_eval_status` when focused eval state is needed -> `odin.record_eval_plan` / `odin.record_eval_run` / `odin.record_quality_gate` as work completes.
 
 ### Review & Verification
 
-```
+```typescript
 odin.run_review_checks({
   feature_id: "FEAT-001",
   initiated_by: "reviewer-agent",
   changed_files: ["src/auth.ts"]
 })
 
+// Docs/process-only work can use the lower-noise profile:
+odin.run_review_checks({
+  feature_id: "FEAT-001",
+  tool: "docs_process",
+  initiated_by: "reviewer-agent",
+  changed_files: ["docs/guide.md"]
+})
+
 odin.verify_claims({ feature_id: "FEAT-001" })
 ```
+
+If strict proof is missing in an emergency, record the exception explicitly with `odin.record_break_glass_override`. This creates a follow-up gate; it does not bypass normal completion gates.
+
+Use `odin.export_local_artifacts` to mirror PRD, eval plan/run, release handoff, and release closeout into stable local markdown files when a local artifact trail is required.
 
 ### Learnings & Knowledge
 
@@ -1097,7 +1122,7 @@ odin.record_merge({
 
 odin.record_release_closeout({
   feature_id: "FEAT-001",
-  summary: "Release closed after human merge",
+  summary: "Release closeout completed after human merge",
   created_by: "ralph-loop"
 })
 ```

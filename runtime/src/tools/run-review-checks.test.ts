@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { ReviewAdapter } from '../adapters/review/types.js';
 import type { SkillAdapter } from '../adapters/skills/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
 import type { RuntimeConfig } from '../config.js';
-import { handleRecordEvalRun } from './record-eval-run.js';
+import { handleRunReviewChecks } from './run-review-checks.js';
 
 function createStrictConfig(): RuntimeConfig {
   return {
@@ -35,51 +36,35 @@ function createSkillAdapter(): SkillAdapter {
   };
 }
 
-describe('handleRecordEvalRun', () => {
-  it('records a reviewer eval_run artifact with normalized actor name', async () => {
+describe('handleRunReviewChecks', () => {
+  it('fails closed in strict mode when skill adapter is unavailable', async () => {
     const adapter: WorkflowStateAdapter = {
-      getFeature: vi.fn(async () => ({ id: 'FEAT-EVAL' })),
-      recordPhaseArtifact: vi.fn(async (artifact) => artifact),
+      getFeature: vi.fn(),
+      recordReviewCheck: vi.fn(),
     } as unknown as WorkflowStateAdapter;
+    const reviewAdapter: ReviewAdapter = {
+      runChecks: vi.fn(async () => ({ tool: 'semgrep', status: 'passed', summary: 'ok', changed_files: [], findings: [] })),
+    };
 
-    const result = await handleRecordEvalRun(adapter, {
-      feature_id: 'FEAT-EVAL',
+    const result = await handleRunReviewChecks(adapter, reviewAdapter, {
+      feature_id: 'FEAT-REVIEW',
       phase: '6',
-      created_by: 'codex',
-      status: 'partial',
-      cases_run: ['CAP-1', 'REG-1'],
-      important_failures: [],
-      manual_review_notes: ['Runtime spot-check still pending.'],
-      transcript_review_observations: [],
-      follow_up: ['Integrator verifies rendered state.'],
-      environment_summary: ['Reviewer executed local test suite.'],
-    });
+      tool: 'semgrep',
+      changed_files: [],
+      initiated_by: 'opencode',
+    }, undefined, createStrictConfig());
 
-    expect(result.isError).toBeUndefined();
-    expect(adapter.recordPhaseArtifact).toHaveBeenCalledWith(
-      expect.objectContaining({
-        feature_id: 'FEAT-EVAL',
-        phase: '6',
-        output_type: 'eval_run',
-        created_by: 'reviewer-agent',
-        content: expect.objectContaining({
-          status: 'partial',
-          cases_run: ['CAP-1', 'REG-1'],
-        }),
-      })
-    );
-    expect(result.structuredContent?.eval_run).toMatchObject({
-      status: 'partial',
-      phase: '6',
-      cases_run: 2,
-    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('Strict attestation mode requires skill_adapter');
+    expect(adapter.getFeature).not.toHaveBeenCalled();
+    expect(reviewAdapter.runChecks).not.toHaveBeenCalled();
   });
 
-  it('blocks strict eval_run writes before phase-agent prework is proven', async () => {
+  it('blocks strict review checks before phase-agent prework is proven', async () => {
     const adapter: WorkflowStateAdapter = {
       getFeature: vi.fn(async () => ({
-        id: 'FEAT-EVAL',
-        name: 'Eval Feature',
+        id: 'FEAT-REVIEW',
+        name: 'Review Feature',
         status: 'IN_PROGRESS',
         current_phase: '6',
         complexity_level: 2,
@@ -87,7 +72,7 @@ describe('handleRecordEvalRun', () => {
         created_at: '2026-03-20T00:00:00.000Z',
         updated_at: '2026-03-20T00:00:00.000Z',
       })),
-      recordPhaseArtifact: vi.fn(async (artifact) => artifact),
+      recordReviewCheck: vi.fn(),
       listPhaseArtifacts: vi.fn(async () => []),
       listLearnings: vi.fn(async () => []),
       listRelatedLearnings: vi.fn(async () => []),
@@ -100,22 +85,20 @@ describe('handleRecordEvalRun', () => {
       getPhaseExecutionAttestation: vi.fn(async () => null),
       getPhasePromptRealization: vi.fn(async () => null),
     } as unknown as WorkflowStateAdapter;
+    const reviewAdapter: ReviewAdapter = {
+      runChecks: vi.fn(async () => ({ tool: 'semgrep', status: 'passed', summary: 'ok', changed_files: [], findings: [] })),
+    };
 
-    const result = await handleRecordEvalRun(adapter, {
-      feature_id: 'FEAT-EVAL',
+    const result = await handleRunReviewChecks(adapter, reviewAdapter, {
+      feature_id: 'FEAT-REVIEW',
       phase: '6',
-      created_by: 'opencode',
-      status: 'blocked',
-      cases_run: [],
-      important_failures: [],
-      manual_review_notes: [],
-      transcript_review_observations: [],
-      follow_up: [],
-      environment_summary: [],
+      tool: 'semgrep',
+      changed_files: [],
+      initiated_by: 'opencode',
     }, createSkillAdapter(), createStrictConfig());
 
     expect(result.isError).toBe(true);
     expect(result.content[0]?.text).toContain('before canonical phase-agent execution is proven');
-    expect(adapter.recordPhaseArtifact).not.toHaveBeenCalled();
+    expect(reviewAdapter.runChecks).not.toHaveBeenCalled();
   });
 });

@@ -5,19 +5,48 @@
 
 import type { ReviewAdapter } from '../adapters/review/types.js';
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import type { SkillAdapter } from '../adapters/skills/types.js';
+import type { RuntimeConfig } from '../config.js';
+import { resolveWorkflowActorName } from '../domain/actors.js';
 import type { RunReviewChecksInput } from '../schemas.js';
 import { createErrorResult, createId, createTextResult } from '../utils.js';
+import { assessStrictPhaseAgentPrework } from './phase-agent-prework.js';
 
 export async function handleRunReviewChecks(
   adapter: WorkflowStateAdapter,
   review_adapter: ReviewAdapter,
-  input: RunReviewChecksInput
+  input: RunReviewChecksInput,
+  skill_adapter?: SkillAdapter,
+  config?: RuntimeConfig,
 ) {
+  if (config?.attestation?.mode === 'strict' && skill_adapter == null) {
+    return createErrorResult('Strict attestation mode requires skill_adapter for run review checks so phase-agent prework cannot be bypassed.', {
+      feature_id: input.feature_id,
+      phase: input.phase,
+      recovery: 'Provide the runtime skill adapter when calling odin.run_review_checks in strict attestation mode.',
+    });
+  }
+
   const feature = await adapter.getFeature(input.feature_id);
   if (feature == null) {
     return createErrorResult(`Feature ${input.feature_id} was not found.`, {
       feature_id: input.feature_id,
     });
+  }
+
+  if (skill_adapter != null && config != null) {
+    const prework_error = await assessStrictPhaseAgentPrework(
+      adapter,
+      skill_adapter,
+      config,
+      feature,
+      input.phase,
+      resolveWorkflowActorName(input.phase, input.initiated_by),
+      'run review checks',
+    );
+    if (prework_error != null) {
+      return prework_error;
+    }
   }
 
   const execution = await review_adapter.runChecks({

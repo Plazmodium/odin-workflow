@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.8.1--beta-orange" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.8.2--beta-orange" alt="Version">
   <img src="https://img.shields.io/badge/workflow-11_phase-blue" alt="11-phase workflow">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
 </p>
@@ -61,7 +61,7 @@ It gives your assistant a branch-first feature workflow with checkpoints that an
 
 - Your AI agent works from durable specs and phase artifacts instead of ad-hoc prompt history.
 - Implementation starts from an explicit feature workflow, not just because an agent can write code.
-- Specs, tasks, phase outputs, quality gates, review checks, and reusable learnings become explicit.
+- Specs, tasks, phase outputs, quality gates, review checks, phase-agent proof, skills used, and reusable learnings become explicit.
 - Odin can persist workflow state, learnings, and release history when you are ready for Supabase.
 - You keep your current AI tool. Odin plugs into it as an MCP server.
 
@@ -199,7 +199,8 @@ If your setup does not automate that yet, the manual `odin start-feature` helper
 
 - 11-phase feature workflow with explicit phase outputs and checkpoints
 - one local MCP server named `odin` for workflow and state operations
-- review checks via Semgrep
+- review checks via Semgrep for code and `docs_process` for docs/process-only changes
+- strict phase-agent readiness, execution attestation, prompt-realization proof, and skills-applied audit tools
 - learnings capture and propagation
 - optional Supabase-backed persistence and archives
 - optional dashboard for feature health, claims, learnings, and eval visibility
@@ -225,7 +226,8 @@ Odin is in active beta. The core workflow and MCP tools are usable today, while 
 What works today:
 
 - 11-phase workflow with sequential phase transitions
-- `odin.start_feature`, `odin.prepare_phase_context`, `odin.record_phase_artifact`, `odin.complete_phase_bundle`, `odin.record_phase_result`, and related workflow tools
+- `odin.start_feature`, `odin.prepare_phase_context`, `odin.record_phase_agent_launch`, `odin.record_phase_artifact`, `odin.complete_phase_bundle`, `odin.record_phase_result`, and related workflow tools
+- `odin.record_phase_skills_applied`, `odin.record_break_glass_override`, and `odin.export_local_artifacts` for strict-mode audit and local artifact trails
 - `odin.apply_migrations` for packaged schema setup
 - Supabase-backed workflow state for persistent runs
 - dashboard support for feature, claim, learning, and eval visibility

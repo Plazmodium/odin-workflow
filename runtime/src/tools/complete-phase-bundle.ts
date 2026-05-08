@@ -51,9 +51,10 @@ function failedBundleResult(
 
 function applyAttestationOverride<T extends { warning: string | null; error: string | null }>(
   assessment: T,
+  config: RuntimeConfig,
   override_reason: string | undefined,
 ): T {
-  if (assessment.error == null || override_reason == null) {
+  if (assessment.error == null || override_reason == null || config.attestation?.mode === 'strict') {
     return assessment;
   }
 
@@ -141,11 +142,21 @@ async function preflightPhaseResult(
   const prompt_realization = await adapter.getPhasePromptRealization(input.feature_id, input.phase);
   const execution_assessment = applyAttestationOverride(
     assessPhaseExecutionPolicy(input.phase, execution_attestation, config.attestation),
+    config,
     input.attestation_override_reason,
   );
   if (execution_assessment.error != null) {
+    if (config.attestation?.mode === 'strict' && input.attestation_override_reason != null) {
+      await adapter.recordAuditEvent(input.feature_id, 'STRICT_ATTESTATION_OVERRIDE_REJECTED', actor, {
+        phase: input.phase,
+        missing_proof: 'execution_attestation',
+        reason: input.attestation_override_reason,
+        error: execution_assessment.error,
+      });
+    }
     return failedBundleResult(execution_assessment.error, input, steps, {
       execution: execution_assessment.row,
+      recovery: 'Run the canonical Odin phase agent in a distinct worker session, record odin.register_phase_execution and odin.register_phase_realization before completion, or use a dedicated break-glass process outside normal phase completion.',
     });
   }
 
@@ -156,11 +167,21 @@ async function preflightPhaseResult(
       prompt_realization,
       config.attestation,
     ),
+    config,
     input.attestation_override_reason,
   );
   if (prompt_realization_assessment.error != null) {
+    if (config.attestation?.mode === 'strict' && input.attestation_override_reason != null) {
+      await adapter.recordAuditEvent(input.feature_id, 'STRICT_ATTESTATION_OVERRIDE_REJECTED', actor, {
+        phase: input.phase,
+        missing_proof: 'prompt_realization',
+        reason: input.attestation_override_reason,
+        error: prompt_realization_assessment.error,
+      });
+    }
     return failedBundleResult(prompt_realization_assessment.error, input, steps, {
       prompt_realization: prompt_realization_assessment.row,
+      recovery: 'Build the worker prompt from odin.prepare_phase_context, invoke the canonical phase agent or spawned subagent, record odin.register_phase_realization, then retry completion.',
     });
   }
 
@@ -254,7 +275,7 @@ export async function handleCompletePhaseBundle(
         content: artifact.content,
         artifact_path: artifact.artifact_path,
         created_by: input.created_by,
-      }),
+      }, skill_adapter, config),
     );
     if (result.isError === true) {
       return failedBundleResult(`Phase bundle stopped while recording artifact ${artifact.output_type}: ${resultText(result)}`, input, steps);
@@ -318,7 +339,7 @@ export async function handleCompletePhaseBundle(
         evidence_refs: claim.evidence_refs,
         evidence: claim.evidence,
         risk_level: claim.risk_level,
-      }),
+      }, skill_adapter, config),
     );
     if (result.isError === true) {
       return failedBundleResult(`Phase bundle stopped while submitting claim ${claim.claim_type}: ${resultText(result)}`, input, steps);

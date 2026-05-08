@@ -108,7 +108,7 @@ As a Builder, document the following state changes in your `implementation-notes
 
 ## Emitting Structured Claims (Watcher Verification)
 
-**Builder is a watched agent.** After each major action, you must emit a structured claim. The Policy Engine (deterministic SQL checks) verifies claims automatically. HIGH risk claims or claims with missing evidence are escalated to the LLM Watcher for semantic verification.
+**Builder is a watched agent.** After each major action, you must emit a structured claim. The Policy Engine (deterministic SQL checks) verifies claims automatically. HIGH risk claims escalate to the LLM Watcher for semantic verification. Missing evidence may escalate in advisory mode and can be rejected at submission in strict mode.
 
 ### When to Emit Claims
 

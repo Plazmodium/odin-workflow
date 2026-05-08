@@ -4,10 +4,13 @@
  */
 
 import type { WorkflowStateAdapter } from '../adapters/workflow-state/types.js';
+import type { SkillAdapter } from '../adapters/skills/types.js';
+import type { RuntimeConfig } from '../config.js';
 import { resolveWorkflowActorName } from '../domain/actors.js';
 import { getPhaseAgentInstructions, isWatchedPhase } from '../domain/phases.js';
 import type { SubmitClaimInput } from '../schemas.js';
 import { createErrorResult, createTextResult } from '../utils.js';
+import { assessStrictPhaseAgentPrework } from './phase-agent-prework.js';
 
 function mergeEvidence(input: SubmitClaimInput): Record<string, unknown> {
   if (input.evidence == null) {
@@ -24,9 +27,39 @@ function mergeEvidence(input: SubmitClaimInput): Record<string, unknown> {
   };
 }
 
+function hasMeaningfulEvidenceValue(value: unknown): boolean {
+  if (value == null) {
+    return false;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim().length > 0;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    return value.some(hasMeaningfulEvidenceValue);
+  }
+
+  if (typeof value === 'object') {
+    return Object.values(value).some(hasMeaningfulEvidenceValue);
+  }
+
+  return false;
+}
+
+function hasMeaningfulEvidence(evidence_refs: Record<string, unknown>): boolean {
+  return Object.values(evidence_refs).some(hasMeaningfulEvidenceValue);
+}
+
 export async function handleSubmitClaim(
   adapter: WorkflowStateAdapter,
-  input: SubmitClaimInput
+  input: SubmitClaimInput,
+  skill_adapter?: SkillAdapter,
+  config?: RuntimeConfig,
 ) {
   const feature = await adapter.getFeature(input.feature_id);
   if (feature == null) {
@@ -61,6 +94,35 @@ export async function handleSubmitClaim(
     input.phase,
     input.agent_name ?? getPhaseAgentInstructions(input.phase).name
   );
+  const evidence_refs = mergeEvidence(input);
+
+  if (config?.attestation?.mode === 'strict' && !hasMeaningfulEvidence(evidence_refs)) {
+    return createErrorResult(
+      `Strict mode requires evidence-backed watched claims. Claim ${input.claim_type} for phase ${input.phase} did not include any non-empty evidence.`,
+      {
+        feature_id: input.feature_id,
+        phase: input.phase,
+        claim_type: input.claim_type,
+        recovery: 'Resubmit the claim with evidence_refs or structured evidence such as command_outputs, file_paths, artifact_ids, artifact_paths, commit_hashes, pr_urls, or verification_summaries.',
+      },
+    );
+  }
+
+  if (skill_adapter != null && config != null) {
+    const prework_error = await assessStrictPhaseAgentPrework(
+      adapter,
+      skill_adapter,
+      config,
+      feature,
+      input.phase,
+      agent_name,
+      'submit claim',
+    );
+    if (prework_error != null) {
+      return prework_error;
+    }
+  }
+
   const invocation =
     input.invocation_id == null
       ? await adapter.findOpenAgentInvocation(input.feature_id, input.phase, agent_name)
@@ -73,7 +135,7 @@ export async function handleSubmitClaim(
     invocation_id: input.invocation_id ?? invocation?.id ?? null,
     claim_type: input.claim_type,
     claim_description: input.description,
-    evidence_refs: mergeEvidence(input),
+    evidence_refs,
     risk_level: input.risk_level,
   });
 
