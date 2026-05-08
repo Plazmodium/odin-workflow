@@ -1,30 +1,53 @@
 import 'server-only';
 
-import { basename, resolve } from 'node:path';
+export type FeatureWorkflowHealthStatus =
+  | 'ready'
+  | 'running'
+  | 'blocked'
+  | 'waiting_on_review'
+  | 'waiting_on_watchers'
+  | 'waiting_on_human'
+  | 'needs_attention'
+  | 'complete';
 
-import { FilesystemSkillAdapter } from '../../runtime/src/adapters/skills/filesystem';
-import { InMemoryWorkflowStateAdapter } from '../../runtime/src/adapters/workflow-state/in-memory';
-import { SupabaseWorkflowStateAdapter } from '../../runtime/src/adapters/workflow-state/supabase';
-import type { SkillAdapter } from '../../runtime/src/adapters/skills/types';
-import type { WorkflowStateAdapter } from '../../runtime/src/adapters/workflow-state/types';
-import { loadRuntimeConfig, type RuntimeConfig } from '../../runtime/src/config';
-import type {
-  FeatureWorkflowHealth,
-  FeatureWorkflowHealthStatus,
-} from '../../runtime/src/domain/feature-workflow-health';
-import { handleGetFeatureHealth } from '../../runtime/src/tools/get-feature-health';
+export type FeatureWorkflowHealthBlockerKind =
+  | 'blocker'
+  | 'gate'
+  | 'finding'
+  | 'claim'
+  | 'attestation'
+  | 'artifact'
+  | 'eval'
+  | 'release';
 
-export type { FeatureWorkflowHealth, FeatureWorkflowHealthStatus };
+export interface FeatureWorkflowHealthIssue {
+  kind: FeatureWorkflowHealthBlockerKind;
+  message: string;
+  recovery: string | null;
+}
+
+export interface FeatureWorkflowHealthWarning {
+  kind: string;
+  message: string;
+}
+
+export interface FeatureWorkflowHealth {
+  feature_id: string;
+  feature_name: string;
+  status: FeatureWorkflowHealthStatus;
+  summary: string;
+  current_focus: {
+    phase: string;
+    phase_name: string;
+  };
+  blockers: FeatureWorkflowHealthIssue[];
+  warnings: FeatureWorkflowHealthWarning[];
+  next_actions: string[];
+}
 
 export interface FeatureWorkflowHealthResult {
   workflow_health: FeatureWorkflowHealth | null;
   error: string | null;
-}
-
-interface RuntimeComponents {
-  adapter: WorkflowStateAdapter;
-  skillAdapter: SkillAdapter;
-  config: RuntimeConfig;
 }
 
 const WORKFLOW_HEALTH_STATUS_COVERAGE = {
@@ -39,8 +62,7 @@ const WORKFLOW_HEALTH_STATUS_COVERAGE = {
 } as const satisfies Record<FeatureWorkflowHealthStatus, true>;
 const WORKFLOW_HEALTH_STATUSES = Object.keys(WORKFLOW_HEALTH_STATUS_COVERAGE) as FeatureWorkflowHealthStatus[];
 const WORKFLOW_HEALTH_STATUS_SET = new Set<string>(WORKFLOW_HEALTH_STATUSES);
-
-let cachedRuntime: RuntimeComponents | null = null;
+const WORKFLOW_HEALTH_ENDPOINT = process.env.ODIN_FEATURE_HEALTH_URL;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === 'object' && !Array.isArray(value);
@@ -78,59 +100,58 @@ function isFeatureWorkflowHealth(value: unknown): value is FeatureWorkflowHealth
 }
 
 function getErrorText(error: unknown): string {
-  return error instanceof Error ? error.message : 'An unknown runtime feature-health error occurred.';
+  return error instanceof Error ? error.message : 'An unknown feature workflow health error occurred.';
 }
 
-function getResultText(result: Awaited<ReturnType<typeof handleGetFeatureHealth>>): string {
-  return result.content.map((item) => item.text).join('\n');
-}
-
-function getProjectRoot(): string {
-  if (process.env.ODIN_PROJECT_ROOT != null && process.env.ODIN_PROJECT_ROOT.length > 0) {
-    return process.env.ODIN_PROJECT_ROOT;
+function extractWorkflowHealth(payload: unknown): FeatureWorkflowHealth | null {
+  if (isFeatureWorkflowHealth(payload)) {
+    return payload;
   }
 
-  const cwd = process.cwd();
-  return basename(cwd) === 'dashboard' ? resolve(cwd, '..') : cwd;
-}
-
-function getRuntimeComponents(): RuntimeComponents {
-  if (cachedRuntime != null) {
-    return cachedRuntime;
+  if (!isRecord(payload)) {
+    return null;
   }
 
-  const projectRoot = getProjectRoot();
-  const config = loadRuntimeConfig(projectRoot);
-  const adapter = config.runtime.mode === 'supabase'
-    ? new SupabaseWorkflowStateAdapter(config)
-    : new InMemoryWorkflowStateAdapter();
-  cachedRuntime = {
-    adapter,
-    skillAdapter: new FilesystemSkillAdapter(projectRoot, config),
-    config,
-  };
-  return cachedRuntime;
+  if (isFeatureWorkflowHealth(payload.structuredContent)) {
+    return payload.structuredContent;
+  }
+
+  return null;
 }
 
 export async function getFeatureWorkflowHealth(featureId: string): Promise<FeatureWorkflowHealthResult> {
+  if (WORKFLOW_HEALTH_ENDPOINT == null || WORKFLOW_HEALTH_ENDPOINT.length === 0) {
+    return {
+      workflow_health: null,
+      error: 'Feature workflow health endpoint is not configured. Set ODIN_FEATURE_HEALTH_URL to an HTTP endpoint that returns the odin.get_feature_health payload.',
+    };
+  }
+
   try {
-    const runtime = getRuntimeComponents();
-    const result = await handleGetFeatureHealth(runtime.adapter, runtime.skillAdapter, runtime.config, {
-      feature_id: featureId,
+    const response = await fetch(WORKFLOW_HEALTH_ENDPOINT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ feature_id: featureId }),
+      cache: 'no-store',
     });
 
-    if (result.isError === true) {
-      return { workflow_health: null, error: getResultText(result) };
-    }
-
-    if (!isFeatureWorkflowHealth(result.structuredContent)) {
+    if (!response.ok) {
       return {
         workflow_health: null,
-        error: 'Odin runtime returned an unexpected feature workflow health payload shape.',
+        error: `Feature workflow health endpoint returned HTTP ${response.status}.`,
       };
     }
 
-    return { workflow_health: result.structuredContent, error: null };
+    const payload = await response.json() as unknown;
+    const workflow_health = extractWorkflowHealth(payload);
+    if (workflow_health == null) {
+      return {
+        workflow_health: null,
+        error: 'Feature workflow health endpoint returned an unexpected payload shape.',
+      };
+    }
+
+    return { workflow_health, error: null };
   } catch (error) {
     return { workflow_health: null, error: getErrorText(error) };
   }
