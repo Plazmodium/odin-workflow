@@ -148,6 +148,10 @@ export const GetFeatureStatusInputSchema = z.object({
   feature_id: z.string().min(1),
 });
 
+export const GetFeatureHealthInputSchema = z.object({
+  feature_id: z.string().min(1),
+});
+
 export const PickNextAutonomousPhaseInputSchema = z.object({
   supervisor_name: z.string().min(1).default('ralph-loop'),
   agent_name: z.string().optional(),
@@ -499,6 +503,7 @@ export type RecordEvalPlanInput = z.infer<typeof RecordEvalPlanInputSchema>;
 export type RecordEvalRunInput = z.infer<typeof RecordEvalRunInputSchema>;
 export type GetNextPhaseInput = z.infer<typeof GetNextPhaseInputSchema>;
 export type GetFeatureStatusInput = z.infer<typeof GetFeatureStatusInputSchema>;
+export type GetFeatureHealthInput = z.infer<typeof GetFeatureHealthInputSchema>;
 export type PickNextAutonomousPhaseInput = z.infer<typeof PickNextAutonomousPhaseInputSchema>;
 export type RecordSupervisorEventInput = z.infer<typeof RecordSupervisorEventInputSchema>;
 export type GetDevelopmentEvalStatusInput = z.infer<typeof GetDevelopmentEvalStatusInputSchema>;

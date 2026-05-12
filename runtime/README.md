@@ -280,6 +280,7 @@ These are the runtime calls most users notice first:
 | `odin.record_break_glass_override` | Record a strict-mode exception and create a follow-up gate |
 | `odin.run_review_checks` | Run review/security checks; use `tool: "docs_process"` for docs/process-only changes |
 | `odin.export_local_artifacts` | Mirror PRD, eval, and release lifecycle records to local markdown |
+| `odin.get_feature_health` | Get concise current feature workflow health, blockers, warnings, and next actions |
 | `odin.get_feature_status` | Inspect workflow status |
 
 ## Optional Features

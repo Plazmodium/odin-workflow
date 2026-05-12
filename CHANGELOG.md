@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.8.3-beta] - 2026-05-08
+
+### Added
+
+- `odin.get_feature_health` now reports feature workflow health, blocking conditions, and next actions without replacing the broader `odin.get_feature_status` diagnostics bundle.
+- Dashboard feature detail pages now show a Feature Workflow Health card backed by a configurable runtime health endpoint.
+
 ## [0.8.2-beta] - 2026-05-07
 
 ### Added
