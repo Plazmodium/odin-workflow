@@ -63,7 +63,7 @@ When developers use AI coding assistants without proper specifications:
 - **EVALS** for health monitoring and performance diagnostics
 - **11-phase workflow** with 11 specialized workflow/support agents
 - **Watcher verification** - Policy Engine + LLM escalation for critical phases
-- **Skills system** with 36+ domain-specific knowledge modules
+- **Skills system** with 60+ workflow and domain-specific knowledge modules
 
 ---
 
@@ -344,10 +344,11 @@ All agents inherit shared context from [_shared-context.md](agents/definitions/_
 
 ## Skills System
 
-Skills are domain-specific knowledge modules loaded into agents based on tech stack.
+Skills are workflow protocols and domain-specific knowledge modules loaded into agents based on phase, artifact language, and tech stack.
 
 ### Categories
 
+- **Workflow**: using-agent-skills, idea-refine, spec-driven-development, planning-and-task-breakdown, incremental-implementation, test-driven-development, code-review-and-quality, shipping-and-launch, and related lifecycle skills
 - **Frontend**: nextjs-dev, react-patterns, tailwindcss, angular-dev, vuejs-dev, svelte-dev, astro-dev, htmx-dev, alpine-dev
 - **Backend**: nodejs-express, nodejs-fastify, python-fastapi, python-django, golang-gin
 - **Database**: supabase, postgresql, prisma-orm, mongodb, redis
@@ -358,10 +359,11 @@ Skills are domain-specific knowledge modules loaded into agents based on tech st
 
 ### How Skills Work
 
-1. Orchestrator detects tech stack from `package.json`, `pyproject.toml`, etc.
-2. Matching skills are injected into agent prompts
-3. Agents apply skill-specific patterns and best practices
-4. If no match, the `generic-dev` fallback skill is used
+1. Orchestrator loads phase workflow skills for the active agent
+2. Orchestrator detects tech stack from `package.json`, artifacts, and local config
+3. Matching workflow and technology skills are injected into agent prompts
+4. Agents apply skill-specific workflows, patterns, and best practices
+5. If no technology/domain skill matches a tech-aware phase, the `generic-dev` fallback skill is also used
 
 > **Full Documentation**: See [SKILLS-SYSTEM.md](docs/reference/SKILLS-SYSTEM.md)
 
@@ -911,7 +913,7 @@ odin/
 ├── README.md                  # Quick start
 ├── agents/
 │   ├── definitions/           # 12 agent prompts + shared context
-│   └── skills/                # 36+ domain skills
+│   └── skills/                # 60+ workflow and domain skills
 ├── runtime/                   # Odin MCP server package (TypeScript)
 │   ├── src/                   # Source code
 │   └── migrations/            # Bundled database migrations

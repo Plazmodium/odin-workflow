@@ -63,6 +63,34 @@ const PHASE_REQUIRED_SKILLS: Partial<Record<PhaseId, string[]>> = {
   '6': ['unit-tests-eval-sdd'],
 };
 
+const PHASE_WORKFLOW_SKILLS: Partial<Record<PhaseId, string[]>> = {
+  '0': ['using-agent-skills', 'idea-refine'],
+  '1': ['using-agent-skills', 'idea-refine'],
+  '2': ['using-agent-skills', 'context-engineering', 'spec-driven-development'],
+  '3': ['using-agent-skills', 'spec-driven-development', 'planning-and-task-breakdown'],
+  '4': ['using-agent-skills', 'code-review-and-quality', 'doubt-driven-development', 'security-and-hardening'],
+  '5': ['using-agent-skills', 'incremental-implementation', 'test-driven-development'],
+  '6': ['using-agent-skills', 'code-review-and-quality', 'security-and-hardening'],
+  '7': ['using-agent-skills', 'debugging-and-error-recovery'],
+  '8': ['using-agent-skills', 'documentation-and-adrs'],
+  '9': ['using-agent-skills', 'shipping-and-launch', 'git-workflow-and-versioning', 'ci-cd-and-automation', 'documentation-and-adrs'],
+};
+
+const TOPICAL_WORKFLOW_SKILLS: Array<{ skill: string; keywords: string[] }> = [
+  { skill: 'api-and-interface-design', keywords: ['api', 'endpoint', 'rest', 'graphql', 'grpc', 'trpc', 'cli', 'schema', 'contract', 'interface'] },
+  { skill: 'frontend-ui-engineering', keywords: ['ui', 'frontend', 'component', 'form', 'route', 'page', 'accessibility', 'responsive'] },
+  { skill: 'browser-testing-with-devtools', keywords: ['browser', 'dom', 'console', 'network', 'viewport', 'e2e', 'playwright', 'cypress'] },
+  { skill: 'debugging-and-error-recovery', keywords: ['bug', 'failure', 'failing', 'error', 'regression', 'broken', 'debug'] },
+  { skill: 'source-driven-development', keywords: ['library', 'framework', 'sdk', 'version', 'external api', 'third party', 'dependency'] },
+  { skill: 'doubt-driven-development', keywords: ['critical', 'high risk', 'irreversible', 'data loss', 'payment', 'security-sensitive'] },
+  { skill: 'security-and-hardening', keywords: ['auth', 'authentication', 'authorization', 'secret', 'pii', 'token', 'csrf', 'xss', 'ssrf', 'injection', 'trust boundary'] },
+  { skill: 'performance-optimization', keywords: ['performance', 'latency', 'throughput', 'memory', 'bundle', 'render', 'slow', 'cache'] },
+  { skill: 'code-simplification', keywords: ['simplify', 'refactor', 'cleanup', 'complexity', 'dead code', 'duplication'] },
+  { skill: 'deprecation-and-migration', keywords: ['migration', 'migrate', 'deprecate', 'remove', 'sunset', 'legacy', 'backward compatibility'] },
+  { skill: 'ci-cd-and-automation', keywords: ['ci', 'cd', 'pipeline', 'workflow', 'github actions', 'deploy', 'automation'] },
+  { skill: 'shipping-and-launch', keywords: ['release', 'ship', 'launch', 'rollout', 'rollback', 'feature flag', 'monitoring'] },
+];
+
 const TECH_AWARE_PHASES = new Set<PhaseId>(['2', '3', '4', '5', '6', '7']);
 
 function getBuiltInSkillRoots(): string[] {
@@ -229,6 +257,18 @@ function collectMentionedSkills(text: string, available: Map<string, SkillDefini
 
     if (candidates.some((candidate) => text.includes(candidate))) {
       mentioned.add(name);
+    }
+  }
+
+  return mentioned;
+}
+
+function collectTopicalWorkflowSkills(text: string): Set<string> {
+  const mentioned = new Set<string>();
+
+  for (const { skill, keywords } of TOPICAL_WORKFLOW_SKILLS) {
+    if (keywords.some((keyword) => text.includes(keyword))) {
+      mentioned.add(skill);
     }
   }
 
@@ -460,13 +500,21 @@ export class FilesystemSkillAdapter implements SkillAdapter {
       requested.add(skill);
     }
 
+    for (const skill of PHASE_WORKFLOW_SKILLS[input.phase] ?? []) {
+      requested.add(skill);
+    }
+
+    const artifactText = collectArtifactText(input.feature, input.artifacts);
+    for (const skill of collectTopicalWorkflowSkills(artifactText)) {
+      requested.add(skill);
+    }
+
     if (this.config.skills?.auto_detect !== false && TECH_AWARE_PHASES.has(input.phase)) {
       const repoDetected = await detectRepoSkills(this.projectRoot);
       for (const skill of repoDetected) {
         requested.add(skill);
       }
 
-      const artifactText = collectArtifactText(input.feature, input.artifacts);
       const mentioned = collectMentionedSkills(artifactText, mergedSkills);
       for (const skill of mentioned) {
         requested.add(skill);
@@ -486,6 +534,20 @@ export class FilesystemSkillAdapter implements SkillAdapter {
       if (generic != null) {
         fallback_used = true;
         resolved = [
+          {
+            name: generic.metadata.name,
+            category: generic.metadata.category,
+            source: generic.source,
+            content: generic.content,
+          },
+        ];
+      }
+    } else if (TECH_AWARE_PHASES.has(input.phase) && !resolved.some((skill) => skill.category !== 'workflow')) {
+      const generic = mergedSkills.get('generic-dev');
+      if (generic != null) {
+        fallback_used = true;
+        resolved = [
+          ...resolved,
           {
             name: generic.metadata.name,
             category: generic.metadata.category,
