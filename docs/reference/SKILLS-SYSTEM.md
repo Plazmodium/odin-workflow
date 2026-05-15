@@ -1,32 +1,32 @@
 # Skills System
 
-The Skills System enables SDD agents to have **composable, domain-specific knowledge** that can be mixed and matched based on project requirements.
+The Skills System enables SDD agents to have **composable, domain-specific knowledge and workflow protocols** that can be mixed and matched based on project requirements and phase intent.
 
 ## Overview
 
-Instead of bloating agents with knowledge of every framework, language, and tool, skills are modular units of expertise that are **injected into agents when relevant**.
+Instead of bloating agents with knowledge of every framework, language, tool, and lifecycle practice, skills are modular units of expertise that are **injected into agents when relevant**.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         SKILLS SYSTEM                           │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│   Spec defines Tech Stack                                       │
+│   Phase + Spec define workflow intent and tech stack            │
 │         ↓                                                       │
-│   Orchestrator reads Tech Stack                                 │
+│   Orchestrator resolves phase, artifact, and repo signals       │
 │         ↓                                                       │
 │   Orchestrator selects relevant Skills                          │
 │         ↓                                                       │
 │   Skills injected into Agent prompt                             │
 │         ↓                                                       │
-│   Agent has domain-specific knowledge                           │
+│   Agent has phase workflow + domain-specific knowledge          │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Key Principles
 
-1. **Explicit over Magic** - Tech stack defined in spec, not auto-detected
+1. **Explicit over Magic** - Phase workflow skills are deterministic; tech skills come from repo and artifact signals
 2. **Composable** - Multiple skills can be combined (Next.js + Prisma + Tailwind)
 3. **Mandatory** - Agents require skills; `generic-dev` is the fallback when no specific skills match
 4. **Maintainable** - Skills updated independently of agents
@@ -40,6 +40,14 @@ Instead of bloating agents with knowledge of every framework, language, and tool
 agents/skills/
 ├── generic-dev/              # Fallback skill for any tech stack
 │   └── SKILL.md
+│
+├── workflow/ (22 skills)        # Phase and lifecycle protocols
+│   ├── using-agent-skills/SKILL.md
+│   ├── spec-driven-development/SKILL.md
+│   ├── incremental-implementation/SKILL.md
+│   ├── code-review-and-quality/SKILL.md
+│   ├── shipping-and-launch/SKILL.md
+│   └── ...
 │
 ├── frontend/ (9 skills)
 │   ├── alpine-dev/SKILL.md
@@ -133,6 +141,15 @@ compatible_with:               # Skills that work well together (informational)
 [How this works with other technologies...]
 ```
 
+## Workflow vs Technology Skills
+
+Odin loads two broad skill types:
+
+- **Workflow skills** (`category: workflow`) are short operating protocols for phases and lifecycle concerns: specification, planning, incremental implementation, review, debugging, release, migration, and documentation.
+- **Technology skills** (`frontend`, `backend`, `database`, `testing`, `devops`, `api`, `architecture`) provide stack-specific patterns, gotchas, and examples.
+
+Workflow skills should stay concise and evidence-oriented. Technology skills can include deeper examples and framework-specific guidance.
+
 ## Defining Tech Stack in Specifications
 
 ### In Requirements (Discovery Agent Output)
@@ -189,13 +206,14 @@ See requirements.md section "Technical Context" for full stack details.
 
 ### Step 1: Orchestrator Reads Spec
 
-When spawning an agent, orchestrator extracts the "Required Skills" section:
+When spawning an agent, the orchestrator resolves phase workflow skills first, then extracts stack and artifact signals:
 
 ```javascript
 // Pseudo-code
+const phaseSkills = getPhaseWorkflowSkills(phase);
 const spec = readFile('specs/AUTH-001/spec.md');
-const requiredSkills = extractRequiredSkills(spec);
-// Returns: ['nextjs-dev', 'prisma-orm', 'tailwindcss', 'jest', 'playwright']
+const requiredSkills = [...phaseSkills, ...extractRequiredSkills(spec)];
+// Returns: ['using-agent-skills', 'incremental-implementation', 'unit-tests-sdd', 'nextjs-dev', 'prisma-orm']
 ```
 
 ### Step 2: Orchestrator Loads Skill Files
@@ -247,18 +265,20 @@ The agent now has domain-specific knowledge available in its context and can app
 
 ## Which Agents Use Skills?
 
-All agents use skills. If no specific tech stack skills match, the `generic-dev` fallback skill is injected.
+All agents use skills. Workflow skills are selected by phase and artifact language. If no technology/domain-specific skill matches a tech-aware phase, the `generic-dev` fallback skill is also injected.
 
 | Agent | Skill Injection | Primary Skill Categories |
 |-------|-----------------|-------------------------|
-| **Discovery** | Via shared-context | Domain knowledge, business patterns |
-| **Planning** | Via shared-context | Architecture patterns |
-| **Architect** | Explicit block | Patterns, architecture, all tech categories |
-| **Guardian** | Explicit block | Testing, security, patterns |
-| **Builder** | Explicit block | All categories (primary user) |
-| **Integrator** | Via shared-context | DevOps, CI/CD |
-| **Documenter** | Via shared-context | Documentation patterns |
-| **Release** | Via shared-context | DevOps, deployment |
+| **Planning** | Via shared-context | Workflow, architecture patterns |
+| **Product** | Via shared-context | Workflow, product boundary patterns |
+| **Discovery** | Via shared-context | Workflow, domain knowledge, business patterns |
+| **Architect** | Explicit block | Workflow, patterns, architecture, all tech categories |
+| **Guardian** | Explicit block | Workflow, testing, security, patterns |
+| **Builder** | Explicit block | Workflow plus all tech categories (primary user) |
+| **Reviewer** | Explicit block | Workflow, testing, security, review patterns |
+| **Integrator** | Via shared-context | Workflow, DevOps, CI/CD, runtime verification |
+| **Documenter** | Via shared-context | Workflow, documentation patterns |
+| **Release** | Via shared-context | Workflow, DevOps, deployment |
 
 ### Builder Agent - Primary Skill User
 
@@ -311,6 +331,25 @@ depends_on:
 3. Load in dependency order (dependencies first)
 4. Detect circular dependencies and warn (do not load circular chain)
 
+### Phase Workflow Skills
+
+These workflow skills are loaded by phase before tech-stack auto-detection:
+
+| Phase | Core workflow skills |
+|-------|----------------------|
+| 0 Planning | `using-agent-skills`, `idea-refine` |
+| 1 Product | `using-agent-skills`, `idea-refine` |
+| 2 Discovery | `using-agent-skills`, `context-engineering`, `spec-driven-development` |
+| 3 Architect | `using-agent-skills`, `spec-driven-development`, `planning-and-task-breakdown` |
+| 4 Guardian | `using-agent-skills`, `code-review-and-quality`, `doubt-driven-development`, `security-and-hardening` |
+| 5 Builder | `using-agent-skills`, `incremental-implementation`, `test-driven-development`, `unit-tests-sdd` |
+| 6 Reviewer | `using-agent-skills`, `code-review-and-quality`, `security-and-hardening`, `unit-tests-eval-sdd` |
+| 7 Integrator | `using-agent-skills`, `debugging-and-error-recovery` |
+| 8 Documenter | `using-agent-skills`, `documentation-and-adrs` |
+| 9 Release | `using-agent-skills`, `shipping-and-launch`, `git-workflow-and-versioning`, `ci-cd-and-automation`, `documentation-and-adrs` |
+
+Topical workflow skills such as `api-and-interface-design`, `frontend-ui-engineering`, `browser-testing-with-devtools`, `performance-optimization`, and `deprecation-and-migration` are added when feature or artifact language indicates they are relevant.
+
 ### `compatible_with` — Soft Recommendations
 
 Skills that work well together but are not required:
@@ -332,7 +371,7 @@ Orchestrator can suggest compatible skills but should not auto-load them.
 ---
 name: [skill-name]
 description: [One-line description]
-category: [frontend|backend|database|testing|devops|api|architecture]
+    category: [workflow|frontend|backend|database|testing|devops|api|architecture]
 version: "[version or 'latest']"
 depends_on:                    # Optional — skills that must load first
   - [required-skill]

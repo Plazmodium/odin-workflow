@@ -190,16 +190,16 @@ Document project knowledge discovered during your work. The orchestrator will pr
 
 ## Skills — Mandatory
 
-Skills are **mandatory** for all agents. The orchestrator injects domain-specific skills into your context under `## Active Skills`. If no specific tech stack skills match, the `generic-dev` fallback skill is injected.
+Skills are **mandatory** for all agents. The orchestrator injects phase workflow skills and domain-specific skills into your context under `## Active Skills`. If no technology/domain-specific skill matches a tech-aware phase, the `generic-dev` fallback skill is also injected.
 
-Some phases also require workflow skills:
+Some phases also require SDD-specific testing skills:
 
 - **Builder** must receive `testing/unit-tests-sdd`
 - **Reviewer** must receive `testing/unit-tests-eval-sdd`
 
-Always follow patterns, conventions, and best practices from your injected skills.
+Always follow the workflow protocols, patterns, conventions, and best practices from your injected skills.
 
-Before completion, document `odin.record_phase_skills_applied(...)` with the skills you actually used. If no domain-specific skill applied, mark `fallback_used` or `no_applicable_skill` instead of pretending a skill was used.
+Before completion, document `odin.record_phase_skills_applied(...)` with the skills you actually used. Record workflow skills only when they materially shaped the work; if no domain-specific skill applied, mark `fallback_used` or `no_applicable_skill` instead of pretending a skill was used.
 
 ---
 

@@ -74,7 +74,7 @@ describe('FilesystemSkillAdapter.resolveSkills', () => {
     });
 
     expect(result.resolved.map((skill) => skill.name)).toEqual(
-      expect.arrayContaining(['unit-tests-sdd', 'vitest'])
+      expect.arrayContaining(['unit-tests-sdd', 'vitest', 'using-agent-skills', 'incremental-implementation', 'test-driven-development'])
     );
   });
 
@@ -91,7 +91,9 @@ describe('FilesystemSkillAdapter.resolveSkills', () => {
       phase: '6',
     });
 
-    expect(result.resolved.map((skill) => skill.name)).toContain('unit-tests-eval-sdd');
+    expect(result.resolved.map((skill) => skill.name)).toEqual(
+      expect.arrayContaining(['unit-tests-eval-sdd', 'using-agent-skills', 'code-review-and-quality', 'security-and-hardening'])
+    );
   });
 
   it('does not treat broad category words like api/architecture/testing as matches for every skill in those categories', async () => {
@@ -127,7 +129,7 @@ describe('FilesystemSkillAdapter.resolveSkills', () => {
     );
   });
 
-  it('falls back to generic-dev for non-technical phases instead of loading the whole repo tech stack', async () => {
+  it('loads release workflow skills for Release instead of loading the whole repo tech stack', async () => {
     const projectRoot = createProjectRoot();
     writeFileSync(
       join(projectRoot, 'package.json'),
@@ -159,7 +161,77 @@ describe('FilesystemSkillAdapter.resolveSkills', () => {
       phase: '9',
     });
 
-    expect(result.resolved.map((skill) => `${skill.category}/${skill.name}`)).toEqual(['foundation/generic-dev']);
+    expect(result.resolved.map((skill) => `${skill.category}/${skill.name}`)).toEqual(
+      expect.arrayContaining([
+        'workflow/using-agent-skills',
+        'workflow/shipping-and-launch',
+        'workflow/git-workflow-and-versioning',
+        'workflow/ci-cd-and-automation',
+        'workflow/documentation-and-adrs',
+      ])
+    );
+    expect(result.resolved.map((skill) => skill.name)).not.toEqual(
+      expect.arrayContaining(['nextjs-dev', 'react-patterns', 'supabase', 'vitest'])
+    );
+    expect(result.fallback_used).toBe(false);
+  });
+
+  it('adds generic-dev when a tech-aware phase only resolves workflow skills', async () => {
+    const projectRoot = createProjectRoot();
+    const adapter = new FilesystemSkillAdapter(projectRoot, {
+      runtime: { mode: 'in_memory' },
+      skills: { paths: ['.odin/skills'], defaults: [], auto_detect: true },
+    } satisfies RuntimeConfig);
+
+    const result = await adapter.resolveSkills({
+      feature: createFeature(),
+      artifacts: [],
+      phase: '2',
+    });
+
+    expect(result.resolved.map((skill) => `${skill.category}/${skill.name}`)).toEqual(
+      expect.arrayContaining([
+        'workflow/using-agent-skills',
+        'workflow/context-engineering',
+        'workflow/spec-driven-development',
+        'foundation/generic-dev',
+      ])
+    );
     expect(result.fallback_used).toBe(true);
+  });
+
+  it('loads topical workflow skills from artifact language', async () => {
+    const projectRoot = createProjectRoot();
+    const adapter = new FilesystemSkillAdapter(projectRoot, {
+      runtime: { mode: 'in_memory' },
+      skills: { paths: ['.odin/skills'], defaults: [], auto_detect: true },
+    } satisfies RuntimeConfig);
+
+    const result = await adapter.resolveSkills({
+      feature: createFeature(),
+      artifacts: [
+        {
+          id: 'artifact_api',
+          feature_id: 'FEAT-SKILL',
+          phase: '2',
+          output_type: 'requirements',
+          content: {
+            summary: 'Design a stable API endpoint with auth, rollback, and latency targets.',
+          },
+          created_by: 'discovery-agent',
+          created_at: '2026-03-24T00:00:00.000Z',
+        },
+      ],
+      phase: '3',
+    });
+
+    expect(result.resolved.map((skill) => `${skill.category}/${skill.name}`)).toEqual(
+      expect.arrayContaining([
+        'workflow/api-and-interface-design',
+        'workflow/security-and-hardening',
+        'workflow/shipping-and-launch',
+        'workflow/performance-optimization',
+      ])
+    );
   });
 });
