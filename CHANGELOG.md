@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.8.4-beta] - 2026-05-15
+
+### Added
+
+- Added 22 workflow skills under `agents/skills/workflow` and packaged them for npm release assets.
+- Runtime skill resolution now loads phase-appropriate workflow skills and topical workflow skills while preserving technology skill detection.
+
+### Changed
+
+- Skills documentation now distinguishes workflow protocols from technology/domain skills.
+
 ## [0.8.3-beta] - 2026-05-08
 
 ### Added
