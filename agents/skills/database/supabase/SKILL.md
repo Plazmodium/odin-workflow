@@ -51,7 +51,7 @@ export const supabaseAdmin = createClient<Database>(
 ### Generate Types
 
 ```bash
-npx supabase gen types typescript --project-id YOUR_PROJECT_ID > types/supabase.ts
+pnpm exec supabase gen types typescript --project-id YOUR_PROJECT_ID > types/supabase.ts
 ```
 
 ## Database Queries

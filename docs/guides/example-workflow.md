@@ -16,19 +16,19 @@ Examples:
 
 ```bash
 # Codex
-npx -y @plazmodium/odin init --tool codex --write-mcp
+pnpm dlx @plazmodium/odin init --tool codex --write-mcp
 
 # OpenCode
-npx -y @plazmodium/odin init --tool opencode --write-mcp
+pnpm dlx @plazmodium/odin init --tool opencode --write-mcp
 
 # Claude Code
-npx -y @plazmodium/odin init --tool claude-code --write-mcp
+pnpm dlx @plazmodium/odin init --tool claude-code --write-mcp
 
 # Amp
-npx -y @plazmodium/odin init --tool amp --write-mcp
+pnpm dlx @plazmodium/odin init --tool amp --write-mcp
 
 # Cursor / Junie / other generic MCP setups
-npx -y @plazmodium/odin init --tool generic
+pnpm dlx @plazmodium/odin init --tool generic
 ```
 
 Odin creates `.odin/`, `.env.example`, and your MCP config when auto-config is supported.

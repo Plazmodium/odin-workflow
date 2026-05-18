@@ -18,7 +18,7 @@ function printHelp(): void {
     'Examples:',
     '  odin mcp',
     '  odin init --tool opencode --write-mcp',
-    '  npx -y @plazmodium/odin mcp',
+    '  pnpm dlx @plazmodium/odin mcp',
   ].join('\n'));
 }
 

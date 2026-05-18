@@ -755,7 +755,7 @@ Before closing any bug fix, ask: *Is this a learning?* If the fix involved a non
 
 ### Integrator Verifies Runtime
 
-A passing `npm run build` does NOT guarantee correctness. Integrator must spot-check runtime behavior.
+A passing `pnpm run build` does NOT guarantee correctness. Integrator must spot-check runtime behavior.
 
 ### Agent Invocation Coverage Gate (Release)
 

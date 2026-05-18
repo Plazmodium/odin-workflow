@@ -281,16 +281,16 @@ const stats = await prisma.post.aggregate({
 
 ```bash
 # Create migration
-npx prisma migrate dev --name add_user_role
+pnpm exec prisma migrate dev --name add_user_role
 
 # Apply migrations (production)
-npx prisma migrate deploy
+pnpm exec prisma migrate deploy
 
 # Reset database (development only!)
-npx prisma migrate reset
+pnpm exec prisma migrate reset
 
 # Generate client after schema changes
-npx prisma generate
+pnpm exec prisma generate
 ```
 
 ## Best Practices

@@ -31,10 +31,10 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copy package files first (layer caching)
-COPY package*.json ./
+COPY package.json pnpm-lock.yaml ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN corepack enable && pnpm install --prod --frozen-lockfile
 
 # Copy application code
 COPY . .
@@ -63,10 +63,10 @@ CMD ["node", "server.js"]
 # Build stage
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
 # Production stage
 FROM node:20-alpine AS production
@@ -301,8 +301,8 @@ FROM node:20.10.0-alpine3.19
 
 ```dockerfile
 # Order from least to most frequently changed
-COPY package*.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile
 COPY . .  # Application code last
 ```
 
@@ -312,18 +312,18 @@ COPY . .  # Application code last
 # Dockerfile.dev
 FROM node:20-alpine
 WORKDIR /app
-COPY package*.json ./
-RUN npm install  # Include devDependencies
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && pnpm install  # Include devDependencies
 COPY . .
-CMD ["npm", "run", "dev"]
+CMD ["pnpm", "run", "dev"]
 
 # Dockerfile (production)
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
 FROM node:20-alpine
 WORKDIR /app

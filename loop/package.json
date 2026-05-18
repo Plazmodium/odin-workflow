@@ -3,12 +3,13 @@
   "private": true,
   "version": "0.2.3",
   "type": "module",
+  "packageManager": "pnpm@11.1.2",
   "scripts": {
     "build": "tsc",
     "tick": "node dist/cli.js tick",
     "watch": "node dist/cli.js watch",
-    "test:simulation": "npm run build && vitest run src/scenario.test.ts",
-    "test": "npm run build && vitest run",
+    "test:simulation": "pnpm run build && vitest run src/scenario.test.ts",
+    "test": "pnpm run build && vitest run",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -18,6 +19,11 @@
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",
     "vitest": "^3.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "engines": {
     "node": ">=18.0.0"

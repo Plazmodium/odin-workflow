@@ -40,18 +40,18 @@ The child-command protocol currently proxies artifacts and final results. If you
 From the full Odin suite repo:
 
 ```bash
-npm run ralph:tick -- --project-root /path/to/project
-npm run ralph:watch -- --project-root /path/to/project --interval-ms 30000
+pnpm run ralph:tick -- --project-root /path/to/project
+pnpm run ralph:watch -- --project-root /path/to/project --interval-ms 30000
 ```
 
 From this source package directly:
 
 ```bash
 cd loop
-npm install
-npm run tick -- --project-root /path/to/project
-npm run watch -- --project-root /path/to/project --interval-ms 30000
-npm run tick -- --project-root /path/to/project --subagent-command-json '["node","./child-runner.js"]'
+pnpm install
+pnpm run tick -- --project-root /path/to/project
+pnpm run watch -- --project-root /path/to/project --interval-ms 30000
+pnpm run tick -- --project-root /path/to/project --subagent-command-json '["node","./child-runner.js"]'
 ```
 
 ## Simulated tests
@@ -60,8 +60,8 @@ If your real project database is stale or not ready for live smoke runs yet, use
 
 ```bash
 cd loop
-npm install
-npm run test:simulation
+pnpm install
+pnpm run test:simulation
 ```
 
 That covers:
@@ -164,5 +164,5 @@ When `selection.prepared_context.execution.phase_prompt_manifest` is present and
 For a local one-shot smoke run:
 
 ```bash
-npm run tick -- --project-root /path/to/project
+pnpm run tick -- --project-root /path/to/project
 ```

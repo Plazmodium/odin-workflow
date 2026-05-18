@@ -12,6 +12,7 @@
     "directory": "runtime"
   },
   "type": "module",
+  "packageManager": "pnpm@11.1.2",
   "main": "./dist/server.js",
   "files": [
     "assets",
@@ -35,7 +36,7 @@
     "init:project": "node dist/cli.js init",
     "start": "node dist/server.js",
     "clean": "rm -rf dist",
-    "test": "npm run build && vitest run",
+    "test": "pnpm run build && vitest run",
     "type-check": "tsc --noEmit"
   },
   "keywords": [
@@ -59,6 +60,11 @@
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",
     "vitest": "^3.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "engines": {
     "node": ">=18.0.0"

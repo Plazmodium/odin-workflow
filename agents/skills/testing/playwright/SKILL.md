@@ -300,7 +300,7 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['iPhone 13'] } },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: 'pnpm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
   },
@@ -322,16 +322,16 @@ export default defineConfig({
 
 ```bash
 # Run with UI mode
-npx playwright test --ui
+pnpm exec playwright test --ui
 
 # Run with headed browser
-npx playwright test --headed
+pnpm exec playwright test --headed
 
 # Debug specific test
-npx playwright test --debug tests/login.spec.ts
+pnpm exec playwright test --debug tests/login.spec.ts
 
 # Generate code
-npx playwright codegen http://localhost:3000
+pnpm exec playwright codegen http://localhost:3000
 ```
 
 ## References

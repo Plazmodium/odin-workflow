@@ -488,8 +488,8 @@ Task Reference: Task 1 of 5"
 #### 5a. Run Tests and Verify Build
 
 ```bash
-npm test          # ✅ All tests passing
-npm run build     # ✅ Build passes with zero errors
+pnpm test         # ✅ All tests passing
+pnpm run build    # ✅ Build passes with zero errors
 ```
 
 **CRITICAL**: Always run the build before ending the Builder phase. A passing test suite does not guarantee the build will succeed — TypeScript type errors, import issues, and configuration problems are only caught by the full build. The Reviewer and Integrator will also verify, but catching errors here avoids unnecessary phase transitions.

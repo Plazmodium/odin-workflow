@@ -342,16 +342,16 @@ it('user flow', () => {
 
 ```bash
 # Open Cypress UI
-npx cypress open
+pnpm exec cypress open
 
 # Run headless
-npx cypress run
+pnpm exec cypress run
 
 # Run specific spec
-npx cypress run --spec "cypress/e2e/login.cy.ts"
+pnpm exec cypress run --spec "cypress/e2e/login.cy.ts"
 
 # With browser
-npx cypress run --browser chrome
+pnpm exec cypress run --browser chrome
 ```
 
 ```typescript

@@ -56,7 +56,7 @@ const CONFIG_TEMPLATE = [
   '  require_prompt_realization_phases: ["5", "6", "7", "9"]',
   '',
   '# formal_verification:',
-  '#   provider: tla-precheck    # requires: Java 17+, npm install -D tla-precheck',
+  '#   provider: tla-precheck    # requires: Java 17+, pnpm add -D tla-precheck',
   '#   timeout_seconds: 120',
   '',
   'archive:',
@@ -460,8 +460,8 @@ function asRecord(value: unknown): Record<string, unknown> {
 function createCommandSpec(distribution: DistributionMode): { command: string; args: string[] } {
   if (distribution === 'published') {
     return {
-      command: 'npx',
-      args: ['-y', PUBLISHED_PACKAGE_NAME, 'mcp'],
+      command: 'pnpm',
+      args: ['dlx', PUBLISHED_PACKAGE_NAME, 'mcp'],
     };
   }
 

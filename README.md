@@ -93,12 +93,12 @@ Odin writes `.odin/` into the directory you run this command from, unless you pa
 
 | Tool | Command | What happens |
 |------|---------|--------------|
-| **Codex** | `npx -y @plazmodium/odin init --tool codex --write-mcp` | Writes `.codex/config.toml` for you |
-| **OpenCode** | `npx -y @plazmodium/odin init --tool opencode --write-mcp` | Writes `opencode.json` for you |
-| **Claude Code** | `npx -y @plazmodium/odin init --tool claude-code --write-mcp` | Writes `.mcp.json` for you |
-| **Amp** | `npx -y @plazmodium/odin init --tool amp --write-mcp` | Writes `.mcp.json` for you |
-| **Cursor** | `npx -y @plazmodium/odin init --tool generic` | Prints the MCP server snippet for you to paste into Cursor |
-| **Junie / other tools** | `npx -y @plazmodium/odin init --tool generic` | Prints the MCP server snippet if your tool can wire a local MCP server |
+| **Codex** | `pnpm dlx @plazmodium/odin init --tool codex --write-mcp` | Writes `.codex/config.toml` for you |
+| **OpenCode** | `pnpm dlx @plazmodium/odin init --tool opencode --write-mcp` | Writes `opencode.json` for you |
+| **Claude Code** | `pnpm dlx @plazmodium/odin init --tool claude-code --write-mcp` | Writes `.mcp.json` for you |
+| **Amp** | `pnpm dlx @plazmodium/odin init --tool amp --write-mcp` | Writes `.mcp.json` for you |
+| **Cursor** | `pnpm dlx @plazmodium/odin init --tool generic` | Prints the MCP server snippet for you to paste into Cursor |
+| **Junie / other tools** | `pnpm dlx @plazmodium/odin init --tool generic` | Prints the MCP server snippet if your tool can wire a local MCP server |
 
 What `init` does:
 

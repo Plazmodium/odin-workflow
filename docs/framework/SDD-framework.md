@@ -458,9 +458,9 @@ MCP servers provide AI agents with tool access to various systems. Below are com
 {
   "mcpServers": {
     "filesystem": {
-      "command": "npx",
+      "command": "pnpm",
       "args": [
-        "-y",
+        "dlx",
         "@modelcontextprotocol/server-filesystem",
         "/absolute/path/to/your/project",
         "/absolute/path/to/your/docs"
@@ -477,9 +477,9 @@ MCP servers provide AI agents with tool access to various systems. Below are com
       ]
     },
     "postgres": {
-      "command": "npx",
+      "command": "pnpm",
       "args": [
-        "-y",
+        "dlx",
         "@modelcontextprotocol/server-postgres",
         "postgresql://read_only_user:password@localhost:5432/your_database"
       ]

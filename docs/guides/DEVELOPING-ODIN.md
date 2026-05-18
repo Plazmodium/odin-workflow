@@ -9,8 +9,8 @@ If you want to use Odin in an existing project, do not start here. Use [GETTING-
 ```bash
 git clone https://github.com/Plazmodium/odin-workflow.git
 cd odin-workflow/runtime
-npm install
-npm run build
+pnpm install
+pnpm run build
 ```
 
 The published package is `@plazmodium/odin`, but maintainers often need the source-checkout flow while changing the runtime itself.
@@ -22,31 +22,31 @@ Run these from `odin-workflow/runtime` after the build completes.
 ### Claude Code
 
 ```bash
-npm run init:project -- --project-root /path/to/your/project --tool claude-code --distribution source --write-mcp
+pnpm run init:project -- --project-root /path/to/your/project --tool claude-code --distribution source --write-mcp
 ```
 
 ### Amp
 
 ```bash
-npm run init:project -- --project-root /path/to/your/project --tool amp --distribution source --write-mcp
+pnpm run init:project -- --project-root /path/to/your/project --tool amp --distribution source --write-mcp
 ```
 
 ### OpenCode
 
 ```bash
-npm run init:project -- --project-root /path/to/your/project --tool opencode --distribution source --write-mcp
+pnpm run init:project -- --project-root /path/to/your/project --tool opencode --distribution source --write-mcp
 ```
 
 ### Codex
 
 ```bash
-npm run init:project -- --project-root /path/to/your/project --tool codex --distribution source --write-mcp
+pnpm run init:project -- --project-root /path/to/your/project --tool codex --distribution source --write-mcp
 ```
 
 ### Cursor / generic tools
 
 ```bash
-npm run init:project -- --project-root /path/to/your/project --tool generic --distribution source
+pnpm run init:project -- --project-root /path/to/your/project --tool generic --distribution source
 ```
 
 That writes the default `.odin/config.yaml`, `.odin/ODIN.md`, `.odin/skills/.gitkeep`, `.env.example`, and MCP wiring into the target project while pointing the MCP server config at this repo checkout's built runtime. Add `--sync-managed-assets` if you also need packaged agent definitions and built-in skills copied for local inspection or override testing.
@@ -56,24 +56,24 @@ That writes the default `.odin/config.yaml`, `.odin/ODIN.md`, `.odin/skills/.git
 From `runtime/`:
 
 ```bash
-npm run type-check
-npm test
-npm start
+pnpm run type-check
+pnpm test
+pnpm start
 ```
 
 Useful commands:
 
-- `npm run build` - compile TypeScript to `dist/`
-- `npm run dev` - watch mode
-- `npm run init:project` - source-checkout bootstrap helper
+- `pnpm run build` - compile TypeScript to `dist/`
+- `pnpm run dev` - watch mode
+- `pnpm run init:project` - source-checkout bootstrap helper
 
 ## Ralph Loop
 
 From the repo root:
 
 ```bash
-npm run ralph:tick -- --project-root /path/to/your/project
-npm run ralph:watch -- --project-root /path/to/your/project --interval-ms 30000
+pnpm run ralph:tick -- --project-root /path/to/your/project
+pnpm run ralph:watch -- --project-root /path/to/your/project --interval-ms 30000
 ```
 
 Use [../../loop/README.md](../../loop/README.md) and [RALPH-LOOP.md](RALPH-LOOP.md) for the operator details.

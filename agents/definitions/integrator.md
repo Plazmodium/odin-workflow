@@ -110,8 +110,8 @@ git pull --ff-only origin "${branchName}"
 Run the smallest relevant verification commands for the target repo, for example:
 
 ```bash
-npm run build
-npm test
+pnpm run build
+pnpm test
 ```
 
 Add integration/e2e commands when the repo exposes them.

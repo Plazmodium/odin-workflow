@@ -120,7 +120,7 @@ formal_verification:
 - `tla-precheck` installed as a devDependency in the target project
 
 ```bash
-npm install -D tla-precheck
+pnpm add -D tla-precheck
 ```
 
 ## Verification Status Codes

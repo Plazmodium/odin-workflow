@@ -11,7 +11,7 @@ This guide is for maintainers publishing the Odin runtime from `odin-workflow/ru
 
 ## Prerequisites
 
-- `npm whoami` returns `plazmodium`
+- `pnpm whoami` returns `plazmodium`
 - 2FA is enabled on the npm account
 - `runtime/package.json` has the intended version
 - runtime tests pass locally
@@ -23,20 +23,20 @@ This guide is for maintainers publishing the Odin runtime from `odin-workflow/ru
 - Recommended command for the current line:
 
 ```bash
-npm publish --access public --tag beta
+pnpm publish --access public --tag beta
 ```
 
-- Only publish to `latest` when you intentionally want `npx -y @plazmodium/odin ...` to resolve to a non-beta release.
+- Only publish to `latest` when you intentionally want `pnpm dlx @plazmodium/odin ...` to resolve to a non-beta release.
 
 ## Prepublish checklist
 
 From `runtime/`:
 
 ```bash
-npm install
-npm run type-check
-npm test
-npm pack --dry-run
+pnpm install
+pnpm run type-check
+pnpm test
+pnpm pack --dry-run
 ```
 
 Confirm the package includes:
@@ -62,20 +62,20 @@ Confirm the package does not include:
 From `runtime/`:
 
 ```bash
-npm publish --access public --tag beta
+pnpm publish --access public --tag beta
 ```
 
 Then verify:
 
 ```bash
-npx -y @plazmodium/odin --help
-npx -y @plazmodium/odin init --help
+pnpm dlx @plazmodium/odin --help
+pnpm dlx @plazmodium/odin init --help
 ```
 
 If the package should also be tested as an MCP server entrypoint, run:
 
 ```bash
-npx -y @plazmodium/odin mcp
+pnpm dlx @plazmodium/odin mcp
 ```
 
 ## Postpublish checklist
@@ -90,7 +90,7 @@ npx -y @plazmodium/odin mcp
 ### `E404` or package not found after publish
 
 - wait a short time for npm propagation
-- retry `npm view @plazmodium/odin version`
+- retry `pnpm view @plazmodium/odin version`
 
 ### `402` / access / scope errors
 
@@ -100,7 +100,7 @@ npx -y @plazmodium/odin mcp
 
 ### 2FA or auth failures
 
-- rerun `npm whoami`
+- rerun `pnpm whoami`
 - confirm the current shell is authenticated as `plazmodium`
 - retry with a fresh login if needed
 

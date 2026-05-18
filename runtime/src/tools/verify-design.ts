@@ -24,10 +24,10 @@ export async function handleVerifyDesign(
   const available = await adapter.isAvailable();
   if (!available) {
     return createTextResult(
-      'tla-precheck is not available. Ensure Java 17+ is installed and tla-precheck is in project dependencies: npm install -D tla-precheck@<version>',
+      'tla-precheck is not available. Ensure Java 17+ is installed and tla-precheck is in project dependencies: pnpm add -D tla-precheck@<version>',
       {
         status: 'UNAVAILABLE',
-        error: 'tla-precheck not found in project dependencies or Java 17+ not installed. Run: npm install -D tla-precheck@<version>',
+        error: 'tla-precheck not found in project dependencies or Java 17+ not installed. Run: pnpm add -D tla-precheck@<version>',
       }
     );
   }

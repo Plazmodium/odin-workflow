@@ -149,8 +149,8 @@ WHERE id = 'feature-archives';
 
 ```bash
 cd dashboard
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 Open `http://localhost:3000` and verify the dashboard loads.

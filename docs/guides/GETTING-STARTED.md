@@ -9,7 +9,7 @@ Odin adds one MCP server named `odin` to your AI coding setup. Your AI tool keep
 You need:
 
 - Node.js 18+
-- npm
+- pnpm
 - a git repository where you want Odin to live
 - an AI tool that can connect to a local MCP server
 
@@ -23,17 +23,17 @@ Run the command from the directory where you want `.odin/` to be created.
 
 | Tool | Command |
 |------|---------|
-| **Codex** | `npx -y @plazmodium/odin init --tool codex --write-mcp` |
-| **OpenCode** | `npx -y @plazmodium/odin init --tool opencode --write-mcp` |
-| **Claude Code** | `npx -y @plazmodium/odin init --tool claude-code --write-mcp` |
-| **Amp** | `npx -y @plazmodium/odin init --tool amp --write-mcp` |
+| **Codex** | `pnpm dlx @plazmodium/odin init --tool codex --write-mcp` |
+| **OpenCode** | `pnpm dlx @plazmodium/odin init --tool opencode --write-mcp` |
+| **Claude Code** | `pnpm dlx @plazmodium/odin init --tool claude-code --write-mcp` |
+| **Amp** | `pnpm dlx @plazmodium/odin init --tool amp --write-mcp` |
 
 ### Generic MCP snippet path
 
 | Tool type | Command |
 |-----------|---------|
-| **Cursor** | `npx -y @plazmodium/odin init --tool generic` |
-| **Junie / other tools** | `npx -y @plazmodium/odin init --tool generic` |
+| **Cursor** | `pnpm dlx @plazmodium/odin init --tool generic` |
+| **Junie / other tools** | `pnpm dlx @plazmodium/odin init --tool generic` |
 
 Important:
 
@@ -59,7 +59,7 @@ your-project/
 └── opencode.json         # OpenCode only when auto-written
 ```
 
-Odin does not copy broad managed workflow assets by default. Run `npx -y @plazmodium/odin init --sync-managed-assets` only when you intentionally want packaged `.odin/agents/definitions/` and built-in skills copied locally.
+Odin does not copy broad managed workflow assets by default. Run `pnpm dlx @plazmodium/odin init --sync-managed-assets` only when you intentionally want packaged `.odin/agents/definitions/` and built-in skills copied locally.
 
 What the main files are for:
 

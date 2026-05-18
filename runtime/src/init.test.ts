@@ -172,8 +172,8 @@ describe('odin-runtime-init', () => {
     expect(existsSync(join(tmpDir, '.mcp.json'))).toBe(true);
     const mcp = JSON.parse(readFileSync(join(tmpDir, '.mcp.json'), 'utf8'));
     expect(mcp.mcpServers.odin).toBeDefined();
-    expect(mcp.mcpServers.odin.command).toBe('npx');
-    expect(mcp.mcpServers.odin.args).toEqual(['-y', '@plazmodium/odin', 'mcp']);
+    expect(mcp.mcpServers.odin.command).toBe('pnpm');
+    expect(mcp.mcpServers.odin.args).toEqual(['dlx', '@plazmodium/odin', 'mcp']);
   });
 
   it('writes opencode.json with --tool opencode --write-mcp', () => {
@@ -184,8 +184,8 @@ describe('odin-runtime-init', () => {
     expect(config.$schema).toBe('https://opencode.ai/config.json');
     expect(config.mcp.odin).toBeDefined();
     expect(config.mcp.odin.type).toBe('local');
-    expect(config.mcp.odin.command[0]).toBe('npx');
-    expect(config.mcp.odin.command.slice(1)).toEqual(['-y', '@plazmodium/odin', 'mcp']);
+    expect(config.mcp.odin.command[0]).toBe('pnpm');
+    expect(config.mcp.odin.command.slice(1)).toEqual(['dlx', '@plazmodium/odin', 'mcp']);
     expect(config.mcp.odin.environment.ODIN_PROJECT_ROOT).toBe(tmpDir);
   });
 

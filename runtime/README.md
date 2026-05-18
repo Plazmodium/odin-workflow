@@ -14,17 +14,17 @@ Run `init` from the root of the project where Odin should create `.odin/`.
 
 | Tool | Command | Written file |
 |------|---------|--------------|
-| **Codex** | `npx -y @plazmodium/odin init --tool codex --write-mcp` | `.codex/config.toml` |
-| **OpenCode** | `npx -y @plazmodium/odin init --tool opencode --write-mcp` | `opencode.json` |
-| **Claude Code** | `npx -y @plazmodium/odin init --tool claude-code --write-mcp` | `.mcp.json` |
-| **Amp** | `npx -y @plazmodium/odin init --tool amp --write-mcp` | `.mcp.json` |
+| **Codex** | `pnpm dlx @plazmodium/odin init --tool codex --write-mcp` | `.codex/config.toml` |
+| **OpenCode** | `pnpm dlx @plazmodium/odin init --tool opencode --write-mcp` | `opencode.json` |
+| **Claude Code** | `pnpm dlx @plazmodium/odin init --tool claude-code --write-mcp` | `.mcp.json` |
+| **Amp** | `pnpm dlx @plazmodium/odin init --tool amp --write-mcp` | `.mcp.json` |
 
 ### Generic snippet path
 
 | Tool type | Command | Result |
 |-----------|---------|--------|
-| **Cursor** | `npx -y @plazmodium/odin init --tool generic` | Prints the MCP server block to paste into Cursor |
-| **Junie / other tools** | `npx -y @plazmodium/odin init --tool generic` | Prints the MCP server block when your tool can wire a local MCP server |
+| **Cursor** | `pnpm dlx @plazmodium/odin init --tool generic` | Prints the MCP server block to paste into Cursor |
+| **Junie / other tools** | `pnpm dlx @plazmodium/odin init --tool generic` | Prints the MCP server block when your tool can wire a local MCP server |
 
 Important:
 
@@ -84,7 +84,7 @@ Most users do not need this command directly. It exists as a helper when you wan
 From your project root:
 
 ```bash
-npx -y @plazmodium/odin start-feature \
+pnpm dlx @plazmodium/odin start-feature \
   --id AUTH-001 \
   --name "Login" \
   --complexity-level 2 \
@@ -141,8 +141,8 @@ Use this only when you do not want `init --write-mcp` to write the config for yo
 {
   "mcpServers": {
     "odin": {
-      "command": "npx",
-      "args": ["-y", "@plazmodium/odin", "mcp"],
+      "command": "pnpm",
+      "args": ["dlx", "@plazmodium/odin", "mcp"],
       "env": {
         "ODIN_PROJECT_ROOT": "/absolute/path/to/your/project"
       }
@@ -160,8 +160,8 @@ Use this only when you do not want `init --write-mcp` to write the config for yo
     "odin": {
       "type": "local",
       "command": [
-        "npx",
-        "-y",
+        "pnpm",
+        "dlx",
         "@plazmodium/odin",
         "mcp"
       ],
@@ -178,8 +178,8 @@ Use this only when you do not want `init --write-mcp` to write the config for yo
 
 ```toml
 [mcp_servers.odin]
-command = "npx"
-args = ["-y", "@plazmodium/odin", "mcp"]
+command = "pnpm"
+args = ["dlx", "@plazmodium/odin", "mcp"]
 env = { ODIN_PROJECT_ROOT = "/absolute/path/to/your/project" }
 ```
 
@@ -236,7 +236,7 @@ attestation:
   require_prompt_realization_phases: ["5", "6", "7", "9"]
 
 # formal_verification:
-#   provider: tla-precheck    # requires: Java 17+, npm install -D tla-precheck
+#   provider: tla-precheck    # requires: Java 17+, pnpm add -D tla-precheck
 #   timeout_seconds: 120
 
 archive:
@@ -294,7 +294,7 @@ Switch `.odin/config.yaml` to `runtime.mode: supabase` when you want persistent 
 Install `tla-precheck` in the target project if you want `odin.verify_design` for state-heavy features:
 
 ```bash
-npm install -D tla-precheck
+pnpm add -D tla-precheck
 ```
 
 This also requires Java 17+ locally.

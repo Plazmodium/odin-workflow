@@ -36,9 +36,9 @@ Ralph Loop's child-command protocol currently proxies returned artifacts and fin
 In the public Odin suite repo:
 
 ```bash
-npm run ralph:tick -- --project-root /path/to/project
-npm run ralph:watch -- --project-root /path/to/project --interval-ms 30000
-npm run ralph:tick -- --project-root /path/to/project --subagent-command-json '["node","./child-runner.js"]'
+pnpm run ralph:tick -- --project-root /path/to/project
+pnpm run ralph:watch -- --project-root /path/to/project --interval-ms 30000
+pnpm run ralph:tick -- --project-root /path/to/project --subagent-command-json '["node","./child-runner.js"]'
 ```
 
 ## Simulated verification first
@@ -47,8 +47,8 @@ If your real project is not ready for a live smoke run yet (for example because 
 
 ```bash
 cd loop
-npm install
-npm run test:simulation
+pnpm install
+pnpm run test:simulation
 ```
 
 The simulation suite covers:
@@ -153,7 +153,7 @@ Use this to verify the already-merged closeout path.
 2. Run:
 
 ```bash
-npm run ralph:tick -- --project-root /path/to/project
+pnpm run ralph:tick -- --project-root /path/to/project
 ```
 
 3. Expect:
@@ -182,7 +182,7 @@ automation:
 3. Run:
 
 ```bash
-npm run ralph:tick -- --project-root /path/to/project
+pnpm run ralph:tick -- --project-root /path/to/project
 ```
 
 4. Expect:
@@ -197,7 +197,7 @@ npm run ralph:tick -- --project-root /path/to/project
 ### C. Local watch mode
 
 ```bash
-npm run ralph:watch -- --project-root /path/to/project --interval-ms 30000
+pnpm run ralph:watch -- --project-root /path/to/project --interval-ms 30000
 ```
 
 Watch mode is single-worker and intentionally simple for now.

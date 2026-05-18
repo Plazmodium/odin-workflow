@@ -47,13 +47,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: npm test
+        run: pnpm test
 ```
 
 ## Common Triggers
@@ -109,19 +109,19 @@ on:
 ## Caching
 
 ```yaml
-# Node.js with npm
+# Node.js with pnpm
 - uses: actions/setup-node@v4
   with:
     node-version: '20'
-    cache: 'npm'
+    cache: 'pnpm'
 
 # Custom cache
 - uses: actions/cache@v4
   with:
     path: |
-      ~/.npm
+      ~/.local/share/pnpm/store
       node_modules
-    key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+    key: ${{ runner.os }}-node-${{ hashFiles('**/pnpm-lock.yaml') }}
     restore-keys: |
       ${{ runner.os }}-node-
 
@@ -160,10 +160,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - run: npm ci
-      - run: npm test
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
       - if: matrix.coverage
-        run: npm run coverage
+        run: pnpm run coverage
 ```
 
 ## Secrets and Environment Variables
@@ -286,9 +286,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run lint
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
 
   test:
     runs-on: ubuntu-latest
@@ -309,9 +309,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm test
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/test
 
@@ -323,9 +323,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run build
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
       - uses: actions/upload-artifact@v4
         with:
           name: build

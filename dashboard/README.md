@@ -44,7 +44,7 @@ If you are just trying Odin for the first time, start with [../docs/guides/GETTI
 
 ```bash
 cd dashboard
-npm install
+pnpm install
 ```
 
 ### 3. Configure Environment
@@ -70,7 +70,7 @@ SUPABASE_SECRET_KEY=your-secret-key-here
 ### 4. Run Development Server
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -78,8 +78,8 @@ Open [http://localhost:3000](http://localhost:3000).
 ### 5. Build for Production
 
 ```bash
-npm run build
-npm start
+pnpm run build
+pnpm start
 ```
 
 ## Architecture
@@ -155,7 +155,7 @@ Deploy to any platform that supports Next.js:
 - **Vercel** (recommended) — zero config, just connect your repo
 - **Netlify** — use `@netlify/plugin-nextjs`
 - **Docker** — use `next start` in a container
-- **Self-hosted** — `npm run build && npm start`
+- **Self-hosted** — `pnpm run build && pnpm start`
 
 Set these environment variables on your platform:
 - `SUPABASE_URL` (required)

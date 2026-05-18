@@ -249,7 +249,7 @@ If your harness does not give the child direct `odin.*` access, document these s
 
 Both the **Builder** and **Integrator** agents must verify the build passes. This provides defense-in-depth:
 
-1. **Builder (Step 5a)**: Runs `npm run build` after completing all code changes. Catches TypeScript errors, import issues, and configuration problems before handoff. If the build fails, the Builder fixes the issue — no phase transition until the build passes.
+1. **Builder (Step 5a)**: Runs `pnpm run build` after completing all code changes. Catches TypeScript errors, import issues, and configuration problems before handoff. If the build fails, the Builder fixes the issue — no phase transition until the build passes.
 
 2. **Integrator (Step 6)**: Runs the build again as a second verification. Also performs runtime verification (Step 6b) to catch issues that pass the build but fail at runtime (e.g., stale data, caching, missing env vars).
 

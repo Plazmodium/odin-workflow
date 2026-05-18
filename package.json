@@ -23,12 +23,13 @@
   "license": "MIT",
   "author": "Gabor Racz",
   "type": "module",
+  "packageManager": "pnpm@11.1.2",
   "scripts": {
-    "dashboard:dev": "cd dashboard && npm run dev",
-    "dashboard:build": "cd dashboard && npm run build",
-    "dashboard:start": "cd dashboard && npm start",
-    "ralph:tick": "cd loop && npm run tick --",
-    "ralph:watch": "cd loop && npm run watch --"
+    "dashboard:dev": "pnpm --dir dashboard dev",
+    "dashboard:build": "pnpm --dir dashboard build",
+    "dashboard:start": "pnpm --dir dashboard start",
+    "ralph:tick": "pnpm --dir loop tick --",
+    "ralph:watch": "pnpm --dir loop watch --"
   },
   "engines": {
     "node": ">=18.0.0"

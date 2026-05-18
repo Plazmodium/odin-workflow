@@ -272,7 +272,7 @@ spec:
       containers:
         - name: migrate
           image: myapp:latest
-          command: ["npm", "run", "migrate"]
+          command: ["pnpm", "run", "migrate"]
       restartPolicy: Never
   backoffLimit: 3
 ---
@@ -290,7 +290,7 @@ spec:
           containers:
             - name: cleanup
               image: myapp:latest
-              command: ["npm", "run", "cleanup"]
+              command: ["pnpm", "run", "cleanup"]
           restartPolicy: OnFailure
 ```
 
